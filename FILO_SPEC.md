@@ -17,7 +17,7 @@ Nessun colore rosso nell'app. Mai.
 - Pagamenti (futuro): Stripe
 - Voice: Groq Whisper API
 - OCR: Google Vision API
-- AI Parser: OpenAI GPT-4o mini
+- AI Parser: Groq (llama-3.1-8b-instant)
 
 ## Regole di sviluppo — SEMPRE rispettare
 1. Modulare: ogni feature è un file/modulo indipendente
@@ -34,14 +34,14 @@ Nessun colore rosso nell'app. Mai.
   test-registration.tsx  → screen di test parsing (rimossa in produzione)
 /modules
   /registration
-    voiceParser.ts       → Groq Whisper + GPT-4o mini
-    receiptParser.ts     → Google Vision + GPT-4o mini
+    voiceParser.ts       → Groq Whisper + Groq AI
+    receiptParser.ts     → Google Vision + Groq AI
     manualParser.ts      → parsing keyword-based senza AI
-    expenseParser.ts     → funzione shared parseExpenseText (GPT-4o mini)
+    expenseParser.ts     → funzione shared parseExpenseText (Groq AI)
     types.ts             → tipo ParsedExpense
 /services
-  groq.ts                → client Groq API
-  openai.ts              → client OpenAI API
+  groq.ts                → client Groq API (Transcription)
+  groqParser.ts          → client Groq API (Text Parsing)
   googleVision.ts        → client Google Vision API
 /constants
   categoryKeywords.ts    → mappa keyword → categoria emotiva

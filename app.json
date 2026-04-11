@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "Finance-app",
-    "slug": "Finance-app",
-    "version": "1.0.0",
+    "name": "Filo",
+    "scheme": "filo",
+    "slug": "filo",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,7 +14,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.filo.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,8 +23,30 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.filo.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Filo to access your microphone."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with your friends.",
+          "cameraPermission": "Allow Filo to access your camera."
+        }
+      ],
+      "expo-router"
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }
