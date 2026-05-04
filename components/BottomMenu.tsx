@@ -315,16 +315,16 @@ export default function BottomMenu() {
             </Pressable>
           </View>
 
-          {/* Settings Button */}
+          {/* AI Chat Button */}
           <View style={styles.menuItem}>
             <Pressable 
-              onPress={() => router.push('/settings')}
+              onPress={() => router.push('/ai-chat')}
               style={styles.menuItemInner}
             >
               <Ionicons 
-                name={isActive('/settings') ? "settings" : "settings-outline"} 
-                size={28} 
-                color={isActive('/settings') ? COLORS.primary : COLORS.secondary} 
+                name={isActive('/ai-chat') ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} 
+                size={26} 
+                color={isActive('/ai-chat') ? COLORS.accent : COLORS.secondary} 
               />
             </Pressable>
           </View>
