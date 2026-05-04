@@ -161,6 +161,17 @@ export default function AiChatPage() {
                     contentContainerStyle={styles.answerScrollContent}
                     showsVerticalScrollIndicator={false}
                   >
+                    {qa.answer.analysis_steps && qa.answer.analysis_steps.length > 0 && (
+                      <View style={styles.stepsContainer}>
+                        {qa.answer.analysis_steps.map((step, idx) => (
+                          <View key={idx} style={styles.stepItem}>
+                            <Ionicons name="checkmark-circle" size={12} color={COLORS.success} />
+                            <Text style={styles.stepText}>{step}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
                     <Text style={styles.answerText}>{qa.answer.text_response}</Text>
                     
                     {qa.answer.intent === 'total' && qa.answer.total_data && (
@@ -380,6 +391,28 @@ const styles = StyleSheet.create({
   },
   iconBtn: {
     padding: 8,
+  },
+  stepsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: SPACING.lg,
+    opacity: 0.7,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.border,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  stepText: {
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: 10,
+    color: COLORS.secondary,
   },
   debugBox: {
     marginTop: SPACING.lg,

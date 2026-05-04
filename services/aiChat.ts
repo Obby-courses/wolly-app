@@ -5,6 +5,7 @@ import { TransactionRepository } from './database/repositories/TransactionReposi
 export interface AiChatResponse {
   intent: 'total' | 'distribution' | 'list' | 'timeline' | 'text';
   text_response: string;
+  analysis_steps?: string[]; // I passaggi logici seguiti
   
   // Archetipo QUANTO
   total_data?: {
@@ -111,28 +112,23 @@ Oggi è ${currentDateISO}.
 
 ${financialContext}
 
-Il tuo compito è analizzare la domanda dell'utente e rispondere usando uno dei 4 ARCHEIPI definiti:
+Usa uno dei 4 ARCHEIPI definiti per la visualizzazione:
+1. QUANTO: popola "total_data".
+2. COME: popola "distribution_data".
+3. COSA: popola "list_data".
+4. QUANDO: popola "timeline_data".
 
-1. QUANTO (Risposta numerica)
-   - Trigger: quanto, totale, speso, guadagnato, costo.
-   - JSON: popola "total_data". Includi sempre "comparison" rispetto al periodo precedente.
-
-2. COME (Distribuzione)
-   - Trigger: come, dove, distribuzione, percentuale, di più.
-   - JSON: popola "distribution_data". Max 5 voci + "Altro".
-
-3. COSA (Lista)
-   - Trigger: cosa, quali, lista, mostrami, transazioni.
-   - JSON: popola "list_data". Max 5 item.
-
-4. QUANDO (Timeline)
-   - Trigger: quando, giorni, andamento, trend.
-   - JSON: popola "timeline_data" con type "bar_vertical" (per giorni settimana) o "heatmap_calendar" (per mese).
+Il tuo compito è analizzare la domanda dell'utente seguendo una CATENA DI RAGIONAMENTO (Chain of Thought):
+1. Filtra i dati dal contesto (es. per data o città).
+2. Aggrega o calcola i valori necessari.
+3. Ordina i risultati decrescente/crescente.
+4. Produci il risultato visivo finale.
 
 REGOLE:
+- ANALYSIS STEPS: In ogni risposta, popola l'array "analysis_steps" con i passaggi logici seguiti (es: ["Filtro transazioni di Febbraio", "Raggruppo per categoria", "Ordino in modo decrescente"]).
 - FOCUS ASSOLUTO: Rispondi SOLO a ciò che l'utente ha chiesto.
-- PERIODO TEMPORALE: Specifica SEMPRE il periodo (es. "A febbraio..."). Sii ESTREMAMENTE preciso con le date (es. il 1 marzo NON è febbraio).
-- LINGUAGGIO UMANO: Nella "text_response" usa i nomi leggibili delle categorie (es. "Cibo" invece di "cibo_bevande", "Trasporti" invece di "trasporti").
+- PERIODO TEMPORALE: Specifica SEMPRE il periodo (es. "A febbraio..."). Sii ESTREMAMENTE preciso con le date.
+- LINGUAGGIO UMANO: Nella "text_response" usa i nomi leggibili delle categorie.
 - Se l'utente chiede un totale, non mostrare la lista. Se chiede la lista, non mostrare la distribuzione.
 - text_response: max 1-2 frasi, dritta al punto.
 - Usa SOLO i dati reali forniti.
@@ -142,6 +138,7 @@ FORMATO JSON OBBLIGATORIO (Segui ESATTAMENTE questi nomi campo):
 {
   "intent": "total" | "distribution" | "list" | "timeline" | "text",
   "text_response": "stringa concisa con periodo temporale",
+  "analysis_steps": ["step 1", "step 2", ...],
   "total_data": {
     "value": numero,
     "comparison": { "diff": numero, "percentage": numero, "is_better": boolean },
