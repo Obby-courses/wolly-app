@@ -71,8 +71,13 @@ async function buildFinancialContext(): Promise<string> {
       .map(t => `[${t.date}] ${t.direction === 'in' ? '+' : '-'}€${t.amount.toFixed(2)} | ${t.category_key} | ${t.city || 'N/A'} | ${t.description}`)
       .join('\n');
 
+    // Mappa categorie per aiutare l'IA con le label
+    const categoryMapping = `Mappa Categorie (chiave: Etichetta): cibo_bevande: Cibo, trasporti: Trasporti, alloggio: Casa, vita_intrattenimento: Vita, acquisti: Acquisti, comunicazione_pc: Tech, spese_finanziarie: Finanza, investimenti: Investimenti, veicolo: Auto, entrata: Entrate`;
+
     return `
-CONTESTO FINANZIARIO UTENTE (aggiornato ora):
+${categoryMapping}
+
+CONTESTO FINANZIARIO UTENTE:
 - Mese corrente (${now.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}): Entrate €${monthIncome.toFixed(2)}, Uscite €${monthExpense.toFixed(2)}, Saldo €${(monthIncome - monthExpense).toFixed(2)}
 - Categorie principali (questo mese): ${topCats || 'nessuna'}
 
@@ -125,21 +130,38 @@ Il tuo compito è analizzare la domanda dell'utente e rispondere usando uno dei 
    - JSON: popola "timeline_data" con type "bar_vertical" (per giorni settimana) o "heatmap_calendar" (per mese).
 
 REGOLE:
-- FOCUS ASSOLUTO: Rispondi SOLO a ciò che l'utente ha chiesto. Non includere metriche, dati o analisi extra non richiesti.
-- PERIODO TEMPORALE: Specifica SEMPRE chiaramente il periodo preso in analisi nella "text_response" (es. "A maggio...", "Nell'ultima settimana...", "Dall'inizio dell'anno...").
-- Se l'utente chiede un totale, non mostrare la lista. Se chiede la lista, non mostrare la distribuzione, a meno che non sia strettamente necessario per la risposta.
-- text_response: max 1-2 frasi, dritta al punto, includendo il periodo.
-- Usa SOLO i dati reali forniti nel contesto sopra.
-- Se la domanda non rientra negli archetipi, usa intent "text" e rispondi in modo conciso.
+- FOCUS ASSOLUTO: Rispondi SOLO a ciò che l'utente ha chiesto.
+- PERIODO TEMPORALE: Specifica SEMPRE il periodo (es. "A febbraio..."). Sii ESTREMAMENTE preciso con le date (es. il 1 marzo NON è febbraio).
+- LINGUAGGIO UMANO: Nella "text_response" usa i nomi leggibili delle categorie (es. "Cibo" invece di "cibo_bevande", "Trasporti" invece di "trasporti").
+- Se l'utente chiede un totale, non mostrare la lista. Se chiede la lista, non mostrare la distribuzione.
+- text_response: max 1-2 frasi, dritta al punto.
+- Usa SOLO i dati reali forniti.
+- Se la domanda non rientra negli archetipi o i dati sono assenti, usa intent "text".
 
-FORMATO JSON OBBLIGATORIO:
+FORMATO JSON OBBLIGATORIO (Segui ESATTAMENTE questi nomi campo):
 {
   "intent": "total" | "distribution" | "list" | "timeline" | "text",
-  "text_response": "stringa",
-  "total_data": { ... } | null,
-  "distribution_data": { ... } | null,
-  "list_data": { ... } | null,
-  "timeline_data": { ... } | null
+  "text_response": "stringa concisa con periodo temporale",
+  "total_data": {
+    "value": numero,
+    "comparison": { "diff": numero, "percentage": numero, "is_better": boolean },
+    "period_label": "stringa (es: Questa settimana)"
+  } | null,
+  "distribution_data": {
+    "title": "stringa",
+    "items": [{ "label": "stringa", "value": numero, "percentage": numero, "color": "stringa HEX" }]
+  } | null,
+  "list_data": {
+    "title": "stringa",
+    "total_count": numero,
+    "items": [{ "id": "stringa", "date": "YYYY-MM-DD", "description": "stringa", "amount": numero, "category_key": "stringa", "is_impulsive": boolean }]
+  } | null,
+  "timeline_data": {
+    "type": "bar_vertical" | "heatmap_calendar",
+    "title": "stringa",
+    "data": [{ "label": "stringa", "value": numero }],
+    "granularity": "weekday" | "day"
+  } | null
 }`;
 
   const messages = [
