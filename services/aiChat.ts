@@ -2,34 +2,49 @@ import { TransactionRepository } from './database/repositories/TransactionReposi
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface ChartDataPoint {
-  label: string;
-  value: number;
-  color?: string;
-}
-
-export interface AiChartPayload {
-  type: 'bar' | 'pie' | 'line';
-  title: string;
-  data: ChartDataPoint[];
-}
-
-export interface AiListPayload {
-  title: string;
-  items: {
-    date: string;
-    description: string;
-    amount: number;
-    category_key: string;
-    city?: string;
-  }[];
-}
-
 export interface AiChatResponse {
-  intent: 'text' | 'chart' | 'list';
+  intent: 'total' | 'distribution' | 'list' | 'timeline' | 'text';
   text_response: string;
-  chart: AiChartPayload | null;
-  list: AiListPayload | null;
+  
+  // Archetipo QUANTO
+  total_data?: {
+    value: number;
+    comparison?: {
+      diff: number;
+      percentage: number;
+      is_better: boolean; // true se spesa diminuita o entrata aumentata
+    };
+    period_label: string;
+  };
+
+  // Archetipo COME
+  distribution_data?: {
+    title: string;
+    items: { label: string; value: number; percentage: number; color: string }[];
+  };
+
+  // Archetipo COSA
+  list_data?: {
+    title: string;
+    total_count: number;
+    items: {
+      id: string;
+      date: string;
+      time?: string;
+      description: string;
+      amount: number;
+      category_key: string;
+      is_impulsive?: boolean;
+    }[];
+  };
+
+  // Archetipo QUANDO
+  timeline_data?: {
+    type: 'bar_vertical' | 'heatmap_calendar';
+    title: string;
+    data: { label: string; value: number; intensity?: number }[];
+    granularity: 'weekday' | 'day';
+  };
 }
 
 // ─── Context Builder ──────────────────────────────────────────────────────────
@@ -86,31 +101,37 @@ Oggi è ${currentDateISO}.
 
 ${financialContext}
 
-Il tuo compito:
-1. Analizza la domanda dell'utente. Hai accesso alle ultime 50 transazioni con data, importo, categoria, città e descrizione.
-2. Puoi FILTRARE i dati (es. solo spese a "Milano"), ORDINARLI (es. la spesa più alta) e AGGREGARLI per rispondere.
-3. Rispondi con un JSON strutturato.
+Il tuo compito è analizzare la domanda dell'utente e rispondere usando uno dei 4 ARCHEIPI definiti:
+
+1. QUANTO (Risposta numerica)
+   - Trigger: quanto, totale, speso, guadagnato, costo.
+   - JSON: popola "total_data". Includi sempre "comparison" rispetto al periodo precedente.
+
+2. COME (Distribuzione)
+   - Trigger: come, dove, distribuzione, percentuale, di più.
+   - JSON: popola "distribution_data". Max 5 voci + "Altro".
+
+3. COSA (Lista)
+   - Trigger: cosa, quali, lista, mostrami, transazioni.
+   - JSON: popola "list_data". Max 5 item.
+
+4. QUANDO (Timeline)
+   - Trigger: quando, giorni, andamento, trend.
+   - JSON: popola "timeline_data" con type "bar_vertical" (per giorni settimana) o "heatmap_calendar" (per mese).
 
 REGOLE:
-- Se l'utente chiede un elenco o una ricerca specifica (es. "le mie ultime spese", "cerca sushi") → usa intent "list" e popola l'oggetto "list".
-- Se la domanda richiede un'analisi visuale o un confronto → usa intent "chart" (bar, pie o line).
-- text_response: sempre presente, molto breve, introduce il risultato.
-- chart: null se non richiesto.
-- list: null se non richiesto.
+- text_response: sempre presente, max 2 frasi, introduce il risultato.
+- Usa SOLO i dati reali forniti nel contesto sopra.
+- Se la domanda non rientra negli archetipi, usa intent "text" e suggerisci come riformulare.
 
-FORMATO JSON OUTPUT OBBLIGATORIO:
+FORMATO JSON OBBLIGATORIO:
 {
-  "intent": "text" | "chart" | "list",
+  "intent": "total" | "distribution" | "list" | "timeline" | "text",
   "text_response": "stringa",
-  "chart": {
-    "type": "bar" | "pie" | "line",
-    "title": "stringa",
-    "data": [{ "label": "stringa", "value": numero }]
-  } | null,
-  "list": {
-    "title": "stringa",
-    "items": [{ "date": "YYYY-MM-DD", "description": "stringa", "amount": numero, "category_key": "stringa", "city": "stringa" }]
-  } | null
+  "total_data": { ... } | null,
+  "distribution_data": { ... } | null,
+  "list_data": { ... } | null,
+  "timeline_data": { ... } | null
 }`;
 
   const controller = new AbortController();

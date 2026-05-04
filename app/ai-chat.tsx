@@ -8,8 +8,10 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import ChatBubble from '../components/ai/ChatBubble';
-import InlineChart from '../components/ai/InlineChart';
+import JitTotal from '../components/ai/JitTotal';
+import JitDistribution from '../components/ai/JitDistribution';
 import JitList from '../components/ai/JitList';
+import JitTimeline from '../components/ai/JitTimeline';
 import VoiceInputBar from '../components/ai/VoiceInputBar';
 import { askAiChat, AiChatResponse } from '../services/aiChat';
 
@@ -140,13 +142,37 @@ export default function AiChatPage() {
                     showsVerticalScrollIndicator={false}
                   >
                     <Text style={styles.answerText}>{qa.answer.text_response}</Text>
-                    {qa.answer.chart && (
-                      <View style={styles.chartWrapper}>
-                        <InlineChart payload={qa.answer.chart} />
-                      </View>
+                    
+                    {qa.answer.intent === 'total' && qa.answer.total_data && (
+                      <JitTotal 
+                        value={qa.answer.total_data.value} 
+                        comparison={qa.answer.total_data.comparison} 
+                        periodLabel={qa.answer.total_data.period_label} 
+                      />
                     )}
-                    {qa.answer.list && (
-                      <JitList title={qa.answer.list.title} items={qa.answer.list.items} />
+
+                    {qa.answer.intent === 'distribution' && qa.answer.distribution_data && (
+                      <JitDistribution 
+                        title={qa.answer.distribution_data.title} 
+                        items={qa.answer.distribution_data.items} 
+                      />
+                    )}
+
+                    {qa.answer.intent === 'list' && qa.answer.list_data && (
+                      <JitList 
+                        title={qa.answer.list_data.title} 
+                        items={qa.answer.list_data.items} 
+                        totalCount={qa.answer.list_data.total_count} 
+                      />
+                    )}
+
+                    {qa.answer.intent === 'timeline' && qa.answer.timeline_data && (
+                      <JitTimeline 
+                        type={qa.answer.timeline_data.type} 
+                        title={qa.answer.timeline_data.title} 
+                        data={qa.answer.timeline_data.data} 
+                        granularity={qa.answer.timeline_data.granularity} 
+                      />
                     )}
                   </ScrollView>
                 )}

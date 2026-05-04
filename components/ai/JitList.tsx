@@ -6,28 +6,36 @@ import CategoryPill from '../CategoryPill';
 interface JitListProps {
   title: string;
   items: {
+    id: string;
     date: string;
     description: string;
     amount: number;
     category_key: string;
     city?: string;
+    is_impulsive?: boolean;
   }[];
+  totalCount: number;
 }
 
-export default function JitList({ title, items }: JitListProps) {
+export default function JitList({ title, items, totalCount }: JitListProps) {
+  const displayItems = items.slice(0, 5);
+  const hasMore = totalCount > 5;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title.toUpperCase()}</Text>
       <View style={styles.listCard}>
-        {items.map((item, index) => (
-          <View key={index} style={[styles.item, index === items.length - 1 && styles.lastItem]}>
+        {displayItems.map((item, index) => (
+          <View key={item.id || index} style={[styles.item, index === displayItems.length - 1 && !hasMore && styles.lastItem]}>
             <View style={styles.left}>
-              <Text style={styles.date}>{new Date(item.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}</Text>
+              {item.is_impulsive && (
+                <Ionicons name="flash" size={16} color={COLORS.warning} style={{ marginRight: 4 }} />
+              )}
               <View style={styles.details}>
                 <Text style={styles.desc} numberOfLines={1}>{item.description}</Text>
                 <View style={styles.meta}>
                   <CategoryPill categoryKey={item.category_key} size="sm" />
-                  {item.city && <Text style={styles.city}>• {item.city}</Text>}
+                  <Text style={styles.date}>{new Date(item.date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}</Text>
                 </View>
               </View>
             </View>
@@ -36,6 +44,12 @@ export default function JitList({ title, items }: JitListProps) {
             </Text>
           </View>
         ))}
+
+        {hasMore && (
+          <Pressable style={styles.seeMore}>
+            <Text style={styles.seeMoreText}>Vedi tutte le {totalCount} →</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -56,11 +70,9 @@ const styles = StyleSheet.create({
   },
   listCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: SPACING.md,
+    borderRadius: 24,
+    padding: SPACING.lg,
     ...SHADOWS.soft,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   item: {
     flexDirection: 'row',
@@ -78,30 +90,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: SPACING.md,
-  },
-  date: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 12,
-    color: COLORS.secondary,
-    width: 45,
-    textAlign: 'center',
   },
   details: {
     flex: 1,
-    gap: 4,
   },
   desc: {
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 14,
     color: COLORS.primary,
+    marginBottom: 2,
   },
   meta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
-  city: {
+  date: {
     fontFamily: TYPOGRAPHY.fontFamily,
     fontSize: 11,
     color: COLORS.secondary,
@@ -109,5 +113,14 @@ const styles = StyleSheet.create({
   amount: {
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 15,
+  },
+  seeMore: {
+    alignItems: 'center',
+    paddingTop: SPACING.md,
+  },
+  seeMoreText: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: 12,
+    color: COLORS.accent,
   },
 });
