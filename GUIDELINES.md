@@ -10,3 +10,6 @@ Per garantire la qualità e la manutenibilità del progetto nel tempo, ogni cont
 *   Ogni elemento, soprattutto grafico, deve essere **centralizzato**.
 *   Tutti gli stili, i colori, la tipografia e i componenti UI comuni devono fare riferimento a file di configurazione centrali (es. `constants/Theme.ts`).
 *   Questo approccio permette che le modifiche future siano centralizzate e distribuite automaticamente in tutta l'applicazione.
+
+### 3. Sincronizzazione GitHub
+*   **Non caricare o sincronizzare mai il codice su GitHub** (git push) se non esplicitamente richiesto dall'utente.
