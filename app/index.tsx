@@ -138,6 +138,9 @@ export default function Home() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Wolly</Text>
+        <Pressable onPress={() => router.push('/settings')}>
+          <Ionicons name="settings-outline" size={24} color={COLORS.primary} />
+        </Pressable>
       </View>
 
       {!isDbReady ? (
