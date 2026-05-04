@@ -1,4 +1,4 @@
-# Nuova Tassonomia Filo Semantic Engine
+# Nuova Tassonomia Wolly Semantic Engine
 
 Questa è la nuova tassonomia ufficiale fornita dall'utente. Ogni categoria e sottocategoria è mappata per il motore di parsing AI.
 

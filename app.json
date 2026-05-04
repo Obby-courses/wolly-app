@@ -1,30 +1,30 @@
 {
   "expo": {
-    "name": "Filo",
-    "scheme": "filo",
-    "slug": "filo",
+    "name": "Wolly",
+    "scheme": "wolly",
+    "slug": "wolly",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./wolly_favicon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./wolly_favicon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.filo.app"
+      "bundleIdentifier": "com.wolly.app"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./wolly_favicon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.filo.app",
+      "package": "com.wolly.app",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -35,20 +35,22 @@
       [
         "expo-av",
         {
-          "microphonePermission": "Allow Filo to access your microphone."
+          "microphonePermission": "Allow Wolly to access your microphone."
         }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "The app accesses your photos to let you share them with your friends.",
-          "cameraPermission": "Allow Filo to access your camera."
+          "cameraPermission": "Allow Wolly to access your camera."
         }
       ],
-      "expo-router"
+      "expo-router",
+      "expo-font",
+      "@react-native-community/datetimepicker"
     ],
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./wolly_favicon.png"
     }
   }
 }

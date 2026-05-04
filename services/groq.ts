@@ -19,14 +19,20 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
     formData.append('language', 'it');
     formData.append('response_format', 'text');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondi di timeout
+
     const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'multipart/form-data',
+        // NON impostare Content-Type quando si usa FormData, lo fa fetch automaticamente con il boundary corretto
       },
       body: formData,
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
 
     console.log(`[GroqWhisper] Response status: ${response.status} ${response.statusText}`);
 

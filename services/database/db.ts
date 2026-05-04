@@ -8,15 +8,18 @@ export async function getDBConnection(): Promise<SQLite.SQLiteDatabase> {
     return dbInstance;
   }
   
-  dbInstance = await SQLite.openDatabaseAsync('filo.db');
+  const db = await SQLite.openDatabaseAsync('wolly.db');
+  dbInstance = db;
   
   // Optional: Add PRAGMAs for performance
-  await dbInstance.execAsync('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
+  await db.execAsync('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
   
-  return dbInstance;
+  // Ensure tables and migrations are run
+  await createTables(db);
+  
+  return db;
 }
 
 export async function initDatabase() {
-  const db = await getDBConnection();
-  await createTables(db);
+  await getDBConnection();
 }

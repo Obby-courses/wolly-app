@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 import { startRecording, stopRecording, parseFromVoice } from '../modules/registration/voiceParser';
 import { parseFromReceipt } from '../modules/registration/receiptParser';
 import { parseFromManual } from '../modules/registration/manualParser';
 import { parseExpenseWithAI } from '../services/groqParser';
 import { ParsedExpense } from '../modules/registration/types';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../constants/Theme';
 
 export default function TestRegistration() {
   const router = useRouter();
@@ -15,7 +18,30 @@ export default function TestRegistration() {
   const [manualInput, setManualInput] = useState('');
   const [result, setResult] = useState<ParsedExpense | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const { action, text } = useLocalSearchParams<{ action?: string, text?: string }>();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (action === 'camera') {
+      handleReceipt();
+    } else if (action === 'text' && text) {
+      handleManualText(text);
+    }
+  }, [action, text]);
+
+  const handleManualText = async (input: string) => {
+    try {
+      resetState();
+      setIsLoading(true);
+      const parsed = await parseExpenseWithAI(input, 'manual');
+      setResult(parsed);
+      router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
+    } catch (error) {
+      setErrorMsg('Errore parsing testo: ' + String(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const resetState = () => {
     setResult(null);
@@ -60,10 +86,16 @@ export default function TestRegistration() {
         setResult(parsed);
         router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
       } else {
-        setErrorMsg('Nessuna immagine selezionata o scontrino illeggibile');
+        // Se l'azione è partita automaticamente ed è stata annullata, torna subito in Home
+        if (action === 'camera') {
+          router.replace('/?menu=expanded');
+        } else {
+          setErrorMsg('Nessuna immagine selezionata o scontrino illeggibile');
+        }
       }
     } catch (error) {
       setErrorMsg('Errore parsing scontrino: ' + String(error));
+      if (action === 'camera') router.replace('/?menu=expanded');
     } finally {
       setIsLoading(false);
     }
@@ -90,8 +122,14 @@ export default function TestRegistration() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.push('/?menu=expanded')} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={28} color={COLORS.primary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Scegli Modalità</Text>
+      </View>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Test Moduli Registrazione</Text>
+        <Text style={styles.title}>Registra Transazione</Text>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>1. Voce</Text>
@@ -117,7 +155,7 @@ export default function TestRegistration() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>3. Manuale</Text>
+          <Text style={styles.sectionTitle}>3. Manuale (AI)</Text>
           <TextInput 
             style={styles.input} 
             placeholder="Cosa hai speso? (es: 10€ kebab)" 
@@ -126,7 +164,29 @@ export default function TestRegistration() {
             multiline={true}
           />
           <Pressable style={styles.button} onPress={handleManual}>
-            <Text style={styles.buttonText}>Analizza</Text>
+            <Text style={styles.buttonText}>Analizza con AI</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>4. Manuale (Tabella)</Text>
+          <Text style={styles.subtitle}>Inserisci manualmente ogni riga della tabella</Text>
+          <Pressable 
+            style={[styles.button, { backgroundColor: '#111827' }]} 
+            onPress={() => router.push('/manual-entry')}
+          >
+            <Text style={styles.buttonText}>Apri Form Manuale</Text>
+          </Pressable>
+        </View>
+
+        <View style={[styles.section, { marginTop: 40, borderStyle: 'dashed', borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: '#F9FAFB' }]}>
+          <Text style={styles.sectionTitle}>⚙️ Debug & Dati</Text>
+          <Text style={styles.subtitle}>Gestisci il database e carica dati di prova</Text>
+          <Pressable 
+            style={[styles.button, { backgroundColor: '#6B7280' }]} 
+            onPress={() => router.push('/seed-data')}
+          >
+            <Text style={styles.buttonText}>Gestione Dati Fittizi</Text>
           </Pressable>
         </View>
 
@@ -154,6 +214,18 @@ export default function TestRegistration() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#fcfcfc' },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 20, 
+    paddingVertical: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6'
+  },
+  backButton: { width: 40 },
+  backButtonText: { fontSize: 24, color: '#111827', fontWeight: '300' },
+  headerTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: '#111827' },
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 60 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
@@ -164,7 +236,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 
   },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
+  subtitle: { fontSize: 13, color: '#6B7280', marginBottom: 12 },
   button: { backgroundColor: '#007AFF', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 8 },
   buttonStop: { backgroundColor: '#FF3B30' },
   buttonText: { color: '#fff', fontWeight: 'bold' },

@@ -1,8 +1,13 @@
 import { ParsedExpense, RawParsingResult } from '../modules/registration/types';
 import uuid from 'react-native-uuid';
 import { parseFromManual } from '../modules/registration/manualParser';
+import { DOMAINS_CONFIG, ALL_CATEGORIES, getDomainForCategory } from '../constants/categories';
 
-export async function parseExpenseWithAI(text: string, context: 'voice' | 'receipt' | 'manual'): Promise<ParsedExpense> {
+export async function parseExpenseWithAI(
+  text: string, 
+  context: 'voice' | 'receipt' | 'manual' | 'text', 
+  locationContext?: { city: string | null; address: string | null }
+): Promise<ParsedExpense> {
   const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
   if (!apiKey) throw new Error('Missing Groq API Key (EXPO_PUBLIC_GROQ_FINANCE_API)');
 
@@ -11,27 +16,44 @@ export async function parseExpenseWithAI(text: string, context: 'voice' | 'recei
   const currentDayNames = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
   const currentDayName = currentDayNames[now.getDay()];
 
-  const systemPrompt = `Sei l'Analista Finanziario Senior di Filo. Il tuo compito è estrarre dati strutturati con precisione millimetrica.
+  const currentDateISO = now.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  const systemPrompt = `Sei l'Analista Finanziario Senior di Wolly. Il tuo compito è estrarre dati strutturati con precisione millimetrica.
 REQUISITO: Restituisci SOLO un oggetto JSON valido.
 
-TASSONOMIA UFFICIALE (Usa SOLO queste coppie CHIAVE_CATEGORIA -> CHIAVE_SOTTOCATEGORIA):
+TIMESTAMP DI RIFERIMENTO: Oggi è ${currentDateISO} (${currentDayName}).
+
+TASSONOMIA UFFICIALE:
+Ogni transazione ha una CATEGORIA specifica (voce dettagliata) che appartiene univocamente a un DOMINIO (macro-gruppo).
+Restituisci SEMPRE un category_key specifico. Il domain_key si deduce automaticamente.
+
+DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
 - cibo_bevande -> [alimentari, ristorante_fast_food, bar_caffe]
 - acquisti -> [abbigliamento_scarpe, gioielli_accessori, salute_bellezza, bambini, casa_giardino, animali, elettronica_accessori, regali_gioia, cancelleria_attrezzi, tempo_libero, drogheria_farmacia]
 - alloggio -> [affitto, mutuo, energia_utenze, manutenzione_riparazioni, assicurazione_proprieta]
 - trasporti -> [trasporto_pubblico, taxi, lunga_distanza, viaggi_lavoro]
-- veicolo -> [carburante, parcheggio, manutezione_veicoli, noleggio, assicurazione_veicolo, leasing]
+- veicolo -> [carburante, parcheggio, manutenzione_veicoli, noleggio, assicurazione_veicolo, leasing]
 - vita_intrattenimento -> [assistenza_sanitaria, wellness_bellezza, sport_fitness, cultura_eventi, eventi_vita, hobby, formazione_sviluppo, libri_audio_abbonamenti, tv_streaming, vacanze_viaggi_hotel, beneficienza_regali, alcool_tabacco, lotteria_azzardo]
 - comunicazione_pc -> [telefono_cellulare, internet, software_app_giochi, servizi_postali]
 - spese_finanziarie -> [tasse, assicurazioni, prestiti_interessi, multe, consulenza, commissioni, mantenimento]
 - investimenti -> [immobili, veicoli_beni_immobili, investimenti_finanziari, risparmi, collezioni]
-- entrata -> [salario_fatture, interessi_dividendi, vendita, entrate_affitto, quote_sovvenzioni, entrata_prestiti, assegni_buoni, lotteria_azzardo, rimborsi, regali]
+- entrata -> [salario_fatture, interessi_dividendi, vendita, entrate_affitto, quote_sovvenzioni, entrata_prestiti, assegni_buoni, lotteria_vincite, rimborsi, regali]
 
  REGOLE CRITICHE:
-1. DIVIETO USCITE/ENTRATE: Le chiavi "USCITE" ed "ENTRATE" sono solo titoli di sezione. NON usarle mai come category_key o subcategory_key.
-2. NET_AMOUNT: Deve essere UGUALE ad amount se non ci sono rimborsi (refund) o divisioni (split). NON sottrarre l'IVA.
-3. IMPORTO (amount): Cerca il "TOTALE" finale. Esempio Scontrini: se vedi "Totale 19,00" e "Contanti 20,00", l'amount è 19,00.
-4. SCONTRINI (receipt): "social_context": null, "is_social": false. (Forzato anche via codice).
-5. BRAND: SUBDUED -> category: "acquisti", subcategory: "abbigliamento_scarpe".
+1. category_key: Scegli SEMPRE la categoria specifica più precisa (es: "cultura_eventi", NON "vita_intrattenimento").
+2. domain_key: Inserisci il dominio di appartenenza della categoria scelta (es: "vita_intrattenimento" per "cultura_eventi").
+3. NET_AMOUNT: Deve essere UGUALE ad amount se non ci sono rimborsi (refund) o divisioni (split). NON sottrarre l'IVA.
+4. IMPORTO (amount): Cerca il "TOTALE" finale. Esempio Scontrini: se vedi "Totale 19,00" e "Contanti 20,00", l'amount è 19,00.
+5. SCONTRINI (receipt): "social_context": null, "is_social": false.
+6. BRAND: SUBDUED -> category_key: "abbigliamento_scarpe", domain_key: "acquisti".
+7. DATE RELATIVE: Se l'input contiene riferimenti temporali relativi, calcola la data ISO reale partendo da oggi (${currentDateISO}). Restituisci SEMPRE YYYY-MM-DD o null.
+8. DIRECTION: Deduci da contesto ("pagato", "speso" → "out"; "ricevuto", "stipendio", "rimborso" → "in"). Default: "out".
+9. VENDITORE vs GEOGRAFIA: 
+   - location_name: Estrai il nome del brand o negozio (es: "Esselunga", "Amazon", "McDonald's"). Se è un acquisto online, metti is_online = true e location_type = "online".
+   - city e address: Estrai città e indirizzo se menzionati esplicitamente (es: "a Milano", "in via Torino"). 
+   - FALLBACK GEOGRAFICO: Se la città/indirizzo NON sono detti esplicitamente, usa questi dati del telefono dell'utente: Città: ${locationContext?.city || 'non disponibile'}, Indirizzo: ${locationContext?.address || 'non disponibile'}.
+10. PERSONE: Estrai nomi propri menzionati in people_mentioned. Deduci social_context: "amici", "famiglia", "colleghi", "coppia". Se non specificato o se è "da solo", metti null. DIVIETO: NON usare mai la stringa "solo".
+11. LOCATION TYPE: Deduci location_type tra: "casa", "ristorante", "negozio_fisico", "online", "trasporti", "lavoro", "viaggio", "estero".
 
 DATE FORMAT: "YYYY-MM-DD".
 
@@ -40,10 +62,10 @@ JSON OUTPUT FORMAT:
   "amount": number,
   "net_amount": number,
   "currency": "EUR",
-  "payment_method": "contanti"|"carta"|"bancomat"|string|null,
+  "payment_method": null,
   "direction": "in"|"out",
+  "domain_key": "string",
   "category_key": "string",
-  "subcategory_key": "string",
   "category_confidence": number,
   "date": "YYYY-MM-DD"|null,
   "time": "HH:mm"|null,
@@ -54,7 +76,7 @@ JSON OUTPUT FORMAT:
   "people_mentioned": string[],
   "group_size": number|null,
   "is_social": boolean,
-  "location_type": "ristorante_fast_food"|"negozio_fisico"|"casa"|"online"|"trasporti"|"lavoro"|"viaggio"|"estero"|null,
+  "location_type": string|null,
   "location_name": string|null,
   "city": string|null,
   "address": string|null,
@@ -101,7 +123,42 @@ JSON OUTPUT FORMAT:
 
         const data = await response.json();
         const result: RawParsingResult = JSON.parse(data.choices[0].message.content);
-        
+
+        // --- LOG DI DEBUG IN TERMINALE ---
+        console.log(" \n" + "=".repeat(50));
+        console.log("🔍 [AI PARSING DEBUG]");
+        console.log(`📝 INPUT: "${text}"`);
+        console.log(`💰 IMPORTO: ${result.amount} ${result.currency} (${result.direction === 'in' ? 'Entrata' : 'Uscita'})`);
+        console.log(`🏠 DOMINIO: ${(result as any).domain_key || 'non specificato'}`);
+        console.log(`📂 CATEGORIA: ${result.category_key}`);
+        console.log(`🎯 CONFIDENCE: ${(result.category_confidence * 100).toFixed(0)}%`);
+        console.log(`📍 LOCATION: ${result.location_name || 'non rilevata'} (${result.location_type || '?'})`);
+
+        // Validazione Tassonomia - ora category_key è la voce specifica
+        const validCategory = ALL_CATEGORIES.find(c => c.key === result.category_key);
+
+        if (!validCategory) {
+          console.log("⚠️  [VALIDATION WARNING]: category_key non trovata in categories.ts!");
+          console.log(`   - Richiesta: ${result.category_key} (dominio atteso: ${(result as any).domain_key})`);
+
+          // Fallback: prova a usare domain_key come categoria generica
+          const fallbackDomain = DOMAINS_CONFIG.find(d => d.key === (result as any).domain_key);
+          if (fallbackDomain && fallbackDomain.categories.length > 0) {
+            result.category_key = fallbackDomain.categories[0].key;
+            console.log(`   - Fallback a: ${result.category_key}`);
+          } else {
+            result.category_key = 'tempo_libero';
+          }
+        } else {
+          // Assicura che domain_key sia sempre corretto (ridondanza)
+          (result as any).domain_key = validCategory.domain_key;
+          console.log("✅ [VALIDATION SUCCESS]: Categoria valida.");
+        }
+        // Manteniamo subcategory_key = category_key per compatibilità DB
+        result.subcategory_key = result.category_key;
+
+        console.log("=".repeat(50) + "\n");
+
         // Calcolo programmatico del giorno della settimana
         let finalDayOfWeek = result.day_of_week;
         if (result.date) {
@@ -128,6 +185,7 @@ JSON OUTPUT FORMAT:
           id: uuid.v4().toString(),
           created_at: currentTimestamp,
           ...result,
+          is_weekend: false,
           day_of_week: finalDayOfWeek || currentDayName,
           date: result.date || currentTimestamp.split('T')[0],
           input_method: context,
@@ -152,8 +210,8 @@ JSON OUTPUT FORMAT:
   } catch (error) {
     console.error('Error parsing with semantic AI, falling back:', error);
     const isAmount = text.match(/[\d,.]+/);
-    const amount = isAmount ? parseFloat(isAmount[0].replace(',','.')) : 0;
-    
+    const amount = isAmount ? parseFloat(isAmount[0].replace(',', '.')) : 0;
+
     return {
       id: uuid.v4().toString(),
       created_at: currentTimestamp,
@@ -162,7 +220,7 @@ JSON OUTPUT FORMAT:
       currency: 'EUR',
       payment_method: null,
       direction: 'out',
-      category_key: 'acquisti',
+      category_key: 'tempo_libero',
       subcategory_key: 'tempo_libero',
       category_confidence: 0.5,
       date: currentTimestamp.split('T')[0],
@@ -183,7 +241,7 @@ JSON OUTPUT FORMAT:
       is_recurring_pattern: false,
       reason: null,
       description: text.substring(0, 30),
-      input_method: context,
+      input_method: context as any,
       raw_input: text,
       is_deleted: false,
       synced_at: null,

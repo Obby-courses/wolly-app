@@ -1,0 +1,263 @@
+import { ParsedExpense, SocialContext, LocationType } from '../modules/registration/types';
+import uuid from 'react-native-uuid';
+
+export const DUMMY_TRANSACTIONS: Partial<ParsedExpense>[] = [
+  {
+    amount: 12.50,
+    description: "Pranzo veloce Burger King",
+    category_key: "cibo_bevande",
+    subcategory_key: "ristorante_fast_food",
+    direction: "out",
+    date: "2026-04-10",
+    time: "13:15",
+    payment_method: "Carta",
+    social_context: "solo",
+    location_type: "ristorante",
+    location_name: "Burger King Centro",
+    city: "Milano"
+  },
+  {
+    amount: 55.00,
+    description: "Spesa settimanale Esselunga",
+    category_key: "cibo_bevande",
+    subcategory_key: "alimentari",
+    direction: "out",
+    date: "2026-04-11",
+    time: "10:30",
+    payment_method: "Contanti",
+    social_context: "famiglia",
+    location_type: "negozio_fisico",
+    location_name: "Esselunga Ripamonti",
+    city: "Milano",
+    address: "Via Ripamonti 200"
+  },
+  {
+    amount: 1200.00,
+    description: "Stipendio Aprile",
+    category_key: "entrata",
+    subcategory_key: "salario_fatture",
+    direction: "in",
+    date: "2026-04-01",
+    time: "09:00",
+    payment_method: "Bonifico",
+    location_type: "online"
+  },
+  {
+    amount: 15.00,
+    description: "Abbonamento Netflix",
+    category_key: "vita_intrattenimento",
+    subcategory_key: "tv_streaming",
+    direction: "out",
+    date: "2026-04-05",
+    time: "00:01",
+    payment_method: "Carta",
+    is_recurring_pattern: true,
+    location_type: "online"
+  },
+  {
+    amount: 45.00,
+    description: "Pieno Benzina Eni",
+    category_key: "veicolo",
+    subcategory_key: "carburante",
+    direction: "out",
+    date: "2026-04-08",
+    time: "18:45",
+    payment_method: "Carta",
+    location_type: "trasporti",
+    location_name: "Eni Station",
+    city: "San Donato Milanese"
+  },
+  {
+    amount: 3.50,
+    description: "Colazione Bar Centrale",
+    category_key: "cibo_bevande",
+    subcategory_key: "bar_caffe",
+    direction: "out",
+    date: "2026-04-13",
+    time: "08:20",
+    payment_method: "Contanti",
+    location_type: "ristorante",
+    location_name: "Bar Centrale",
+    city: "Milano"
+  },
+  {
+    amount: 42.00,
+    description: "Cena Sushi con amici",
+    category_key: "cibo_bevande",
+    subcategory_key: "ristorante_fast_food",
+    direction: "out",
+    date: "2026-04-15",
+    time: "20:30",
+    payment_method: "Carta",
+    social_context: "amici",
+    people_mentioned: ["Luca", "Elena", "Marco"],
+    location_type: "ristorante",
+    location_name: "Kobe Sushi",
+    city: "Milano"
+  },
+  {
+    amount: 65.00,
+    description: "Spesa Esselunga",
+    category_key: "cibo_bevande",
+    subcategory_key: "alimentari",
+    direction: "out",
+    date: "2026-04-18",
+    time: "11:00",
+    payment_method: "Carta",
+    location_type: "negozio_fisico",
+    location_name: "Esselunga",
+    city: "Milano"
+  },
+  {
+    amount: 12.00,
+    description: "Biglietto Cinema",
+    category_key: "vita_intrattenimento",
+    subcategory_key: "cultura_eventi",
+    direction: "out",
+    date: "2026-04-20",
+    time: "21:15",
+    payment_method: "Carta",
+    social_context: "coppia",
+    location_type: "ristorante",
+    location_name: "The Space Cinema",
+    city: "Milano"
+  },
+  {
+    amount: 25.00,
+    description: "Ricarica Telefonica",
+    category_key: "comunicazione_pc",
+    subcategory_key: "telefono_cellulare",
+    direction: "out",
+    date: "2026-04-22",
+    time: "14:00",
+    payment_method: "App",
+    location_type: "online",
+    is_recurring_pattern: true
+  },
+  {
+    amount: 60.00,
+    description: "Spesa settimanale Carrefour",
+    category_key: "cibo_bevande",
+    subcategory_key: "alimentari",
+    direction: "out",
+    date: "2026-04-25",
+    time: "17:30",
+    payment_method: "Carta",
+    location_type: "negozio_fisico",
+    location_name: "Carrefour Market",
+    city: "Milano"
+  },
+  {
+    amount: 550.00,
+    description: "Affitto Maggio",
+    category_key: "alloggio",
+    subcategory_key: "affitto",
+    direction: "out",
+    date: "2026-05-01",
+    time: "10:00",
+    payment_method: "Bonifico",
+    location_type: "casa",
+    address: "Via della Moscova 24",
+    city: "Milano",
+    is_recurring_pattern: true
+  },
+  {
+    amount: 1250.00,
+    description: "Stipendio Maggio",
+    category_key: "entrata",
+    subcategory_key: "salario_fatture",
+    direction: "in",
+    date: "2026-05-02",
+    time: "08:30",
+    payment_method: "Bonifico",
+    location_type: "online"
+  },
+  {
+    amount: 8.50,
+    description: "Aperitivo in centro",
+    category_key: "cibo_bevande",
+    subcategory_key: "bar_caffe",
+    direction: "out",
+    date: "2026-05-03",
+    time: "19:15",
+    payment_method: "Contanti",
+    social_context: "colleghi",
+    people_mentioned: ["Giuseppe", "Chiara"],
+    location_type: "ristorante",
+    location_name: "Terrazza Aperol",
+    city: "Milano"
+  },
+  {
+    amount: 22.00,
+    description: "Taxi stazione",
+    category_key: "trasporti",
+    subcategory_key: "taxi",
+    direction: "out",
+    date: "2026-05-04",
+    time: "07:30",
+    payment_method: "Carta",
+    location_type: "trasporti",
+    location_name: "Taxi Milano",
+    city: "Milano"
+  },
+  {
+    amount: 14.50,
+    description: "PranzoPoke in ufficio",
+    category_key: "cibo_bevande",
+    subcategory_key: "ristorante_fast_food",
+    direction: "out",
+    date: "2026-05-04",
+    time: "13:00",
+    payment_method: "App",
+    social_context: "colleghi",
+    location_type: "lavoro",
+    location_name: "Poke House",
+    city: "Milano"
+  }
+];
+
+export const prepareDummyForInsert = (dummy: Partial<ParsedExpense>): ParsedExpense => {
+  const now = new Date();
+  const dateStr = dummy.date || now.toISOString().split('T')[0];
+  const d = new Date(dateStr);
+  const days = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+  const dayOfWeek = days[d.getDay()];
+  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+
+  return {
+    id: uuid.v4() as string,
+    created_at: now.toISOString(),
+    amount: dummy.amount || 0,
+    net_amount: dummy.amount || 0,
+    currency: 'EUR',
+    payment_method: dummy.payment_method || 'Carta',
+    direction: (dummy.direction as 'in' | 'out') || 'out',
+    category_key: dummy.category_key || 'varie',
+    subcategory_key: dummy.subcategory_key || dummy.category_key || 'varie',
+    category_confidence: 1.0,
+    date: dateStr,
+    time: dummy.time || "12:00",
+    time_of_day: (dummy.time ? (parseInt(dummy.time.split(':')[0]) < 13 ? 'mattina' : 'pomeriggio') : 'pomeriggio') as any,
+    is_weekend: isWeekend,
+    day_of_week: dayOfWeek,
+    social_context: (dummy.social_context as SocialContext) || 'solo',
+    people_mentioned: dummy.people_mentioned || [],
+    group_size: dummy.group_size || (dummy.people_mentioned ? dummy.people_mentioned.length + 1 : 1),
+    is_social: !!dummy.social_context && dummy.social_context !== 'solo',
+    location_type: (dummy.location_type as LocationType) || 'negozio_fisico',
+    location_name: dummy.location_name || null,
+    city: dummy.city || 'Milano',
+    address: dummy.address || null,
+    is_travel: dummy.is_travel || false,
+    is_online: dummy.location_type === 'online',
+    is_recurring_pattern: dummy.is_recurring_pattern || false,
+    refund: null,
+    split: null,
+    reason: null,
+    description: dummy.description || 'Dato fittizio',
+    input_method: 'manual',
+    raw_input: 'Dato di test simulato',
+    is_deleted: false,
+    synced_at: null
+  };
+};

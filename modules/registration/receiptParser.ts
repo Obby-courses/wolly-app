@@ -38,7 +38,10 @@ export async function pickImageFromLibrary(): Promise<string | null> {
   return null;
 }
 
-export async function parseFromReceipt(useCamera: boolean = true): Promise<ParsedExpense | null> {
+export async function parseFromReceipt(
+  useCamera: boolean = true,
+  locationContext?: { city: string | null; address: string | null }
+): Promise<ParsedExpense | null> {
   const imageUri = useCamera ? await pickImage() : await pickImageFromLibrary();
   
   if (!imageUri) return null;
@@ -48,9 +51,9 @@ export async function parseFromReceipt(useCamera: boolean = true): Promise<Parse
     throw new Error('Impossibile leggere lo scontrino');
   }
 
-  const expense = await parseExpenseWithAI(text, 'receipt');
+  const expense = await parseExpenseWithAI(text, 'receipt', locationContext);
 
-  console.log('\n--- 🧠 FILO SEMANTIC ENGINE REPORT ---');
+  console.log('\n--- 🧠 WOLLY SEMANTIC ENGINE REPORT ---');
   console.log('--- 👁️ CLOUD VISION (RAW INPUT) ---');
   console.log(text);
   console.log('--- 🤖 GROQ AI (PARSED RESULT) ---');

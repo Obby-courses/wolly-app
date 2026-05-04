@@ -38,12 +38,15 @@ export async function stopRecording(recording: Audio.Recording): Promise<string>
   }
 }
 
-export async function parseFromVoice(audioUri: string): Promise<ParsedExpense> {
+export async function parseFromVoice(
+  audioUri: string, 
+  locationContext?: { city: string | null; address: string | null }
+): Promise<ParsedExpense> {
   const text = await transcribeAudio(audioUri);
   if (!text) {
     throw new Error('Impossibile trascrivere il file audio');
   }
   
-  const expense = await parseExpenseWithAI(text, 'voice');
+  const expense = await parseExpenseWithAI(text, 'voice', locationContext);
   return expense;
 }

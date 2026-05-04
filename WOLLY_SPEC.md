@@ -1,8 +1,8 @@
 ---
-# Filo — Product Spec & Development Rules
+# Wolly — Product Spec & Development Rules
 
-## Cos'è Filo
-Filo non è un'app di budgeting. È un decision layer pre-acquisto.
+## Cos'è Wolly
+Wolly non è un'app di budgeting. È un decision layer pre-acquisto.
 Interviene prima che l'utente spenda, non dopo.
 Tono AI: amico diretto, mai giudicante, un po' cinico. Mai formale.
 Esempio tono: "Questo mese hai già speso €340 in impulso. Coincidenza?"

@@ -1,15 +1,28 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, Pressable, FlatList, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, Pressable, FlatList, ActivityIndicator, TextInput, KeyboardAvoidingView } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { initDatabase } from '../services/database/db';
 import { SubscriptionManager } from '../services/database/SubscriptionManager';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
+import { NetWorthRepository } from '../services/database/repositories/NetWorthRepository';
+import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
+import AnnualChart from '../components/AnnualChart';
 
 export default function Home() {
   const router = useRouter();
   const [isDbReady, setIsDbReady] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [timeRange, setTimeRange] = useState<'Settimana' | 'Mese' | 'Anno' | 'Tutto'>('Mese');
+  const [summary, setSummary] = useState({ income: 0, expense: 0 });
+  const [netWorth, setNetWorth] = useState<number>(0);
+  
+  // Stati per la gestione manuale del patrimonio
+  const [isEditingNetWorth, setIsEditingNetWorth] = useState(false);
+  const [tempNetWorth, setTempNetWorth] = useState('');
+  const [isNetWorthVisible, setIsNetWorthVisible] = useState(true);
 
   useEffect(() => {
     // Inizializza il DB solo la prima volta
@@ -29,38 +42,94 @@ export default function Home() {
   useFocusEffect(
     useCallback(() => {
       if (isDbReady) {
-        loadTransactions();
+        loadData();
       }
-    }, [isDbReady])
+    }, [isDbReady, timeRange])
   );
 
-  const loadTransactions = async () => {
+  const loadData = async () => {
     try {
-      const data = await TransactionRepository.getAllActive();
-      setTransactions(data);
+      const now = new Date();
+      let stats: any[] = [];
+      let title = '';
+      let labels: string[] | undefined = undefined;
+
+      if (timeRange === 'Settimana') {
+        stats = await TransactionRepository.getDailyStatsForRecentDays(7);
+        title = 'Trend Settimanale';
+        labels = stats.map(s => s.label);
+      } else if (timeRange === 'Mese') {
+        stats = await TransactionRepository.getDailyStatsForMonth(now.getFullYear(), now.getMonth() + 1);
+        title = 'Trend Mensile';
+        labels = stats.map(s => s.day.toString());
+      } else if (timeRange === 'Anno') {
+        stats = await TransactionRepository.getMonthlyStatsForYear(now.getFullYear());
+        title = 'Trend Annuale';
+        labels = ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'];
+      } else {
+        stats = await TransactionRepository.getStatsForAllTime();
+        title = 'Trend Globale';
+        labels = stats.map(s => s.label);
+      }
+
+      setChartData(stats);
+      
+      // Calcola sommario per il range attuale
+      const totalIncome = stats.reduce((acc, curr) => acc + curr.income, 0);
+      const totalExpense = stats.reduce((acc, curr) => acc + curr.expense, 0);
+      setSummary({ income: totalIncome, expense: totalExpense });
+
+      // Carica transazioni recenti filtrate per il range
+      const filteredTrans = await TransactionRepository.getFilteredTransactions(
+        timeRange as any,
+        {},
+        'date',
+        now.toISOString().split('T')[0]
+      );
+      setTransactions(filteredTrans.slice(0, 20));
+
+      // Load Net Worth
+      const currentNw = await NetWorthRepository.getCurrentTotal();
+      setNetWorth(currentNw);
+
     } catch (error) {
-      console.error('Errore nel caricamento transazioni:', error);
+      console.error('Errore nel caricamento dati:', error);
     }
+  };
+
+  const handleUpdateNetWorth = async () => {
+    const amount = parseFloat(tempNetWorth.replace(',', '.'));
+    if (!isNaN(amount)) {
+      await NetWorthRepository.updateTotal(amount);
+      setNetWorth(amount);
+    }
+    setIsEditingNetWorth(false);
+    loadData(); // Ricarica per aggiornare eventuali sync in dashboard
   };
 
   const renderTransaction = ({ item }: { item: any }) => {
     const isIncome = item.direction === 'in';
+    const categoryColor = COLORS.categories[item.category_key as keyof typeof COLORS.categories] || COLORS.categories.default;
+
     return (
       <Pressable 
         style={styles.transactionCard}
         onPress={() => router.push(`/transaction/${item.id}`)}
       >
+        <View style={[styles.categoryIndicator, { backgroundColor: categoryColor }]} />
         <View style={styles.transactionInfo}>
           <Text style={styles.transactionTitle}>
             {item.description || item.category_key.replace('_', ' ')}
           </Text>
           <Text style={styles.transactionCategory}>
-            {item.category_key} • {item.date}
+            {item.category_key.replace('_', ' ')} • {item.date}
           </Text>
         </View>
-        <Text style={[styles.transactionAmount, isIncome ? styles.income : styles.expense]}>
-          {!isIncome ? '- ' : '+ '}€{Math.abs(item.amount).toFixed(2)}
-        </Text>
+        <View style={styles.amountContainer}>
+          <Text style={[styles.transactionAmount, isIncome ? styles.income : styles.expense]}>
+            {!isIncome ? '- ' : '+ '}€{Math.abs(item.amount).toFixed(2)}
+          </Text>
+        </View>
       </Pressable>
     );
   };
@@ -68,16 +137,12 @@ export default function Home() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Le Tue Spese</Text>
+        <Text style={styles.title}>Wolly</Text>
       </View>
 
       {!isDbReady ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#111827" />
-        </View>
-      ) : transactions.length === 0 ? (
-        <View style={styles.centerContainer}>
-          <Text style={styles.emptyText}>Nessuna transazione registrata.</Text>
         </View>
       ) : (
         <FlatList
@@ -85,15 +150,108 @@ export default function Home() {
           keyExtractor={(item) => item.id}
           renderItem={renderTransaction}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
+            <View>
+              {/* Summary Cards */}
+              <View style={styles.summaryContainer}>
+                <View style={[styles.summaryCard, { backgroundColor: '#ECFDF5' }]}>
+                  <Text style={styles.summaryLabel}>Entrate</Text>
+                  <Text style={[styles.summaryValue, { color: COLORS.success }]}>+€{summary.income.toFixed(2)}</Text>
+                </View>
+                <View style={[styles.summaryCard, { backgroundColor: '#FEF2F2' }]}>
+                  <Text style={styles.summaryLabel}>Uscite</Text>
+                  <Text style={[styles.summaryValue, { color: COLORS.danger }]}>-€{summary.expense.toFixed(2)}</Text>
+                </View>
+              </View>
+
+              {/* Net Worth Card */}
+              <View style={styles.netWorthCard}>
+                <View style={styles.netWorthHeader}>
+                  <Text style={styles.netWorthLabel}>Patrimonio Totale</Text>
+                  <Pressable 
+                    onPress={() => setIsNetWorthVisible(!isNetWorthVisible)}
+                    style={styles.privacyToggle}
+                  >
+                    <Ionicons 
+                      name={isNetWorthVisible ? "eye-outline" : "eye-off-outline"} 
+                      size={20} 
+                      color="#9CA3AF" 
+                    />
+                  </Pressable>
+                </View>
+
+                {isEditingNetWorth ? (
+                  <View style={styles.netWorthEditRow}>
+                    <Text style={styles.netWorthCurrencyEdit}>€</Text>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10, paddingHorizontal: 10, alignSelf: 'stretch', justifyContent: 'center' }}>
+                      <TextInput
+                        style={styles.netWorthInput}
+                        keyboardType="decimal-pad"
+                        autoFocus
+                        value={tempNetWorth}
+                        onChangeText={setTempNetWorth}
+                        onSubmitEditing={handleUpdateNetWorth}
+                        onBlur={() => setIsEditingNetWorth(false)}
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable 
+                    onPress={() => {
+                      setTempNetWorth(netWorth.toString());
+                      setIsEditingNetWorth(true);
+                    }}
+                  >
+                    <Text style={styles.netWorthValue}>
+                      {isNetWorthVisible ? `€ ${netWorth.toFixed(2)}` : '€ ••••••'}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+
+              {/* Time Range Filter */}
+              <View style={styles.filterContainer}>
+                {['Settimana', 'Mese', 'Anno', 'Tutto'].map((range) => (
+                  <Pressable
+                    key={range}
+                    onPress={() => setTimeRange(range as any)}
+                    style={[
+                      styles.filterButton,
+                      timeRange === range && styles.filterButtonActive
+                    ]}
+                  >
+                    <Text style={[
+                      styles.filterButtonText,
+                      timeRange === range && styles.filterButtonTextActive
+                    ]}>
+                      {range}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <AnnualChart 
+                data={chartData} 
+                title={
+                  timeRange === 'Settimana' ? 'Andamento Settimanale' : 
+                  timeRange === 'Mese' ? 'Andamento Mensile' : 
+                  timeRange === 'Anno' ? 'Andamento Annuale' : 'Andamento Globale'
+                }
+                labels={
+                  timeRange === 'Settimana' 
+                    ? chartData.map(s => s.label || '') 
+                    : timeRange === 'Mese' 
+                    ? chartData.map(s => s.day?.toString() || '') 
+                    : timeRange === 'Anno'
+                    ? ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D']
+                    : chartData.map(s => s.label || '')
+                }
+              />
+              <Text style={styles.sectionTitle}>Transazioni Recenti</Text>
+            </View>
+          }
         />
       )}
-
-      <Pressable 
-        style={styles.fab}
-        onPress={() => router.push('/test-registration')}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </Pressable>
     </SafeAreaView>
   );
 }
@@ -101,18 +259,26 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.background,
   },
   header: {
-    padding: 20,
-    backgroundColor: '#fff',
+    padding: SPACING.xl,
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6'
+    borderBottomColor: COLORS.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+  },
+  seeAllText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.accent,
   },
   centerContainer: {
     flex: 1,
@@ -120,70 +286,165 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyText: {
-    color: '#6B7280',
-    fontSize: 16,
+    color: COLORS.secondary,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: TYPOGRAPHY.sizes.lg,
+  },
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+    marginLeft: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   listContent: {
-    padding: 15,
-    paddingBottom: 100, // Make room for FAB
+    paddingBottom: 120,
+  },
+  summaryContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.md,
+    marginTop: SPACING.lg,
+  },
+  summaryCard: {
+    flex: 1,
+    padding: SPACING.lg,
+    borderRadius: 20,
+    ...SHADOWS.soft,
+  },
+  summaryLabel: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontFamily: TYPOGRAPHY.fontBold,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.xl,
+    padding: 4,
+  },
+  netWorthCard: {
+    backgroundColor: '#111827',
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+    borderRadius: 24,
+    padding: SPACING.xl,
+    paddingTop: SPACING.lg,
+    alignItems: 'center',
+    ...SHADOWS.medium,
+  },
+  netWorthHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  netWorthLabel: {
+    color: '#9CA3AF',
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontFamily: TYPOGRAPHY.fontBold,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+  },
+  privacyToggle: {
+    position: 'absolute',
+    right: 0,
+    padding: 5,
+  },
+  netWorthValue: {
+    color: '#FFF',
+    fontSize: 48,
+    fontFamily: TYPOGRAPHY.fontBold,
+  },
+  netWorthEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 55,
+  },
+  netWorthCurrencyEdit: {
+    color: '#FFF',
+    fontSize: 32,
+    fontFamily: TYPOGRAPHY.fontBold,
+    marginRight: 10,
+  },
+  netWorthInput: {
+    color: '#FFF',
+    fontSize: 36,
+    fontFamily: TYPOGRAPHY.fontBold,
+    padding: 0,
+    margin: 0,
+    width: '100%',
+  },
+  filterButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  filterButtonActive: {
+    backgroundColor: COLORS.surface,
+    ...SHADOWS.soft,
+  },
+  filterButtonText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+  },
+  filterButtonTextActive: {
+    color: COLORS.primary,
   },
   transactionCard: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 16,
-    marginBottom: 10,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.lg,
+    borderRadius: 20,
+    marginBottom: SPACING.sm,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 5,
-    elevation: 2
+    ...SHADOWS.soft
+  },
+  categoryIndicator: {
+    width: 6,
+    height: 40,
+    borderRadius: 3,
+    marginRight: SPACING.md,
   },
   transactionInfo: {
     flex: 1,
   },
   transactionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
     textTransform: 'capitalize',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   transactionCategory: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
     textTransform: 'uppercase',
   },
+  amountContainer: {
+    alignItems: 'flex-end',
+  },
   transactionAmount: {
-    fontSize: 16,
-    fontWeight: '900',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontFamily: TYPOGRAPHY.fontBold,
   },
   income: {
-    color: '#10B981',
+    color: COLORS.success,
   },
   expense: {
-    color: '#111827',
+    color: COLORS.primary,
   },
-  fab: {
-    position: 'absolute',
-    bottom: 30,
-    alignSelf: 'center',
-    backgroundColor: '#111827',
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5
-  },
-  fabText: {
-    color: '#FFF',
-    fontSize: 32,
-    fontWeight: '300',
-    lineHeight: 38,
-  }
 });

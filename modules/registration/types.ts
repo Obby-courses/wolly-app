@@ -1,6 +1,7 @@
 export type TimeOfDay = 'mattina' | 'pomeriggio' | 'sera' | 'notte' | null;
 export type SocialContext = 'solo' | 'coppia' | 'amici' | 'famiglia' | 'colleghi' | 'sconosciuti' | null;
 export type LocationType = 'casa' | 'ristorante' | 'negozio_fisico' | 'online' | 'trasporti' | 'lavoro' | 'viaggio' | 'estero' | null;
+export type EmotionalCategory = 'necessità' | 'cura_di_sé' | 'amicizie' | 'passioni' | 'impulso' | 'ansia' | 'obiettivi';
 
 export interface Refund {
   amount: number;
