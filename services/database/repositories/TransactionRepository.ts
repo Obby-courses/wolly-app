@@ -464,5 +464,19 @@ export class TransactionRepository {
       await NetWorthRepository.incrementTotal(adjustment);
     }
   }
+
+  /**
+   * Retrieves a compact list of recent transactions for AI context.
+   */
+  static async getRecentForAi(limit: number = 50): Promise<any[]> {
+    const db = await getDBConnection();
+    return db.getAllAsync(`
+      SELECT date, amount, direction, category_key, description, city, location_name
+      FROM transactions
+      WHERE is_deleted = 0
+      ORDER BY date DESC, time DESC
+      LIMIT ?
+    `, [limit]);
+  }
 }
 
