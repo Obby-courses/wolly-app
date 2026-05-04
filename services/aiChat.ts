@@ -126,8 +126,9 @@ Il tuo compito è analizzare la domanda dell'utente e rispondere usando uno dei 
 
 REGOLE:
 - FOCUS ASSOLUTO: Rispondi SOLO a ciò che l'utente ha chiesto. Non includere metriche, dati o analisi extra non richiesti.
+- PERIODO TEMPORALE: Specifica SEMPRE chiaramente il periodo preso in analisi nella "text_response" (es. "A maggio...", "Nell'ultima settimana...", "Dall'inizio dell'anno...").
 - Se l'utente chiede un totale, non mostrare la lista. Se chiede la lista, non mostrare la distribuzione, a meno che non sia strettamente necessario per la risposta.
-- text_response: max 1-2 frasi, dritta al punto.
+- text_response: max 1-2 frasi, dritta al punto, includendo il periodo.
 - Usa SOLO i dati reali forniti nel contesto sopra.
 - Se la domanda non rientra negli archetipi, usa intent "text" e rispondi in modo conciso.
 
