@@ -93,14 +93,10 @@ export default function AiChatPage() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={isEmpty ? styles.emptyContent : styles.qaContent}
-          keyboardShouldPersistTaps="handled"
-        >
+        <View style={styles.flex}>
           {/* ─── Stato vuoto ─────────────────────────────────────────── */}
           {isEmpty && (
-            <>
+            <ScrollView contentContainerStyle={styles.emptyContent}>
               <View style={styles.emptyIconWrapper}>
                 <Ionicons name="chatbubbles-outline" size={52} color={COLORS.secondary} />
               </View>
@@ -117,37 +113,42 @@ export default function AiChatPage() {
                   </Pressable>
                 ))}
               </View>
-            </>
+            </ScrollView>
           )}
 
-          {/* ─── Q&A View ────────────────────────────────────────────── */}
+          {/* ─── Q&A View Centrata ────────────────────────────────────── */}
           {qa && (
-            <>
-              {/* Domanda utente */}
-              <ChatBubble role="user" text={qa.question} />
+            <View style={styles.qaContainer}>
+              {/* Domanda in alto centrata */}
+              <View style={styles.questionSection}>
+                <Text style={styles.questionLabel}>LA TUA DOMANDA</Text>
+                <Text style={styles.questionText}>{qa.question}</Text>
+              </View>
 
-              {/* Risposta AI o loader */}
-              {isLoading ? (
-                <View style={styles.thinkingRow}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>W</Text>
+              {/* Risposta al centro (50% altezza circa) */}
+              <View style={styles.answerSection}>
+                {isLoading ? (
+                  <View style={styles.loadingWrapper}>
+                    <ActivityIndicator size="large" color={COLORS.accent} />
+                    <Text style={styles.loadingText}>Analisi in corso...</Text>
                   </View>
-                  <View style={styles.thinkingBubble}>
-                    <ActivityIndicator size="small" color={COLORS.secondary} />
-                    <Text style={styles.thinkingText}>Sto analizzando i tuoi dati…</Text>
-                  </View>
-                </View>
-              ) : qa.answer && (
-                <>
-                  <ChatBubble role="assistant" text={qa.answer.text_response} />
-                  {qa.answer.chart && (
-                    <InlineChart payload={qa.answer.chart} />
-                  )}
-                </>
-              )}
-            </>
+                ) : qa.answer && (
+                  <ScrollView 
+                    contentContainerStyle={styles.answerScrollContent}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <Text style={styles.answerText}>{qa.answer.text_response}</Text>
+                    {qa.answer.chart && (
+                      <View style={styles.chartWrapper}>
+                        <InlineChart payload={qa.answer.chart} />
+                      </View>
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+            </View>
           )}
-        </ScrollView>
+        </View>
 
         {/* Input bar sempre visibile in fondo */}
         <VoiceInputBar
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    ...SHADOWS.soft,
+    zIndex: 10,
   },
   backBtn: { width: 40, alignItems: 'flex-start' },
   resetBtn: { width: 40, alignItems: 'flex-end' },
@@ -206,11 +207,11 @@ const styles = StyleSheet.create({
 
   // ─── Empty state ──────────────────────────────────────────────────────────
   emptyContent: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.xxl,
-    paddingBottom: SPACING.huge,
+    paddingVertical: SPACING.huge,
   },
   emptyIconWrapper: {
     width: 96,
@@ -257,34 +258,61 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ─── Q&A state ────────────────────────────────────────────────────────────
-  qaContent: {
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.huge,
+  // ─── Q&A Container ────────────────────────────────────────────────────────
+  qaContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
-
-  // ─── Thinking indicator ───────────────────────────────────────────────────
-  thinkingRow: {
-    flexDirection: 'row',
+  questionSection: {
+    paddingTop: SPACING.xxl,
+    paddingHorizontal: SPACING.xl,
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.sm,
-    gap: SPACING.sm,
   },
-  thinkingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+  questionLabel: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: 10,
+    color: COLORS.secondary,
+    letterSpacing: 1.5,
+    marginBottom: SPACING.sm,
   },
-  thinkingText: {
+  questionText: {
     fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    color: COLORS.primary,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  answerSection: {
+    flex: 1,
+    maxHeight: '60%', // Circa il 50-60% centrale
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.xl,
+    marginVertical: SPACING.xl,
+  },
+  answerScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  answerText: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: TYPOGRAPHY.sizes.xl,
+    color: COLORS.primary,
+    textAlign: 'center',
+    lineHeight: 32,
+    marginBottom: SPACING.xl,
+  },
+  chartWrapper: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  loadingWrapper: {
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  loadingText: {
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: TYPOGRAPHY.sizes.base,
     color: COLORS.secondary,
   },
 });
