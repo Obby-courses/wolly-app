@@ -107,7 +107,7 @@ function LineChart({ data }: { data: ChartDataPoint[] }) {
   const pathD = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.value)}`).join(' ');
 
   return (
-    <Svg width={CHART_W} height={CHART_H + 20}>
+    <Svg width={CHART_W} height={CHART_H + 5}>
       {[0.5, 1].map((f, i) => (
         <Line key={i}
           x1={SAFE} y1={CHART_H - f * (CHART_H - SAFE * 2) - SAFE}
@@ -117,16 +117,7 @@ function LineChart({ data }: { data: ChartDataPoint[] }) {
       ))}
       <Path d={pathD} fill="none" stroke={COLORS.accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
       {data.map((d, i) => (
-        <G key={i}>
-          <Circle cx={getX(i)} cy={getY(d.value)} r={4} fill={COLORS.accent} />
-          <SvgText
-            x={getX(i)} y={CHART_H + 14}
-            fontSize="9" fill={COLORS.secondary}
-            textAnchor="middle" fontFamily={TYPOGRAPHY.fontFamily}
-          >
-            {d.label.length > 4 ? d.label.slice(0, 3) + '…' : d.label}
-          </SvgText>
-        </G>
+        <Circle key={i} cx={getX(i)} cy={getY(d.value)} r={4} fill={COLORS.accent} />
       ))}
     </Svg>
   );

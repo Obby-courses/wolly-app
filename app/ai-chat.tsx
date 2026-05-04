@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import ChatBubble from '../components/ai/ChatBubble';
 import InlineChart from '../components/ai/InlineChart';
+import JitList from '../components/ai/JitList';
 import VoiceInputBar from '../components/ai/VoiceInputBar';
 import { askAiChat, AiChatResponse } from '../services/aiChat';
 
@@ -54,6 +55,7 @@ export default function AiChatPage() {
           intent: 'text',
           text_response: 'Mi dispiace, non ho potuto elaborare la risposta. Riprova.',
           chart: null,
+          list: null,
         },
       });
     } finally {
@@ -142,6 +144,9 @@ export default function AiChatPage() {
                       <View style={styles.chartWrapper}>
                         <InlineChart payload={qa.answer.chart} />
                       </View>
+                    )}
+                    {qa.answer.list && (
+                      <JitList title={qa.answer.list.title} items={qa.answer.list.items} />
                     )}
                   </ScrollView>
                 )}

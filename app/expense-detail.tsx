@@ -8,6 +8,7 @@ import { getDomainForCategory, getCategory } from '../constants/categories';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 import { COLORS } from '../constants/Theme';
 import CategoryPickerModal from '../components/CategoryPickerModal';
+import CategoryPill from '../components/CategoryPill';
 
 export default function ExpenseDetail() {
   const router = useRouter();
@@ -124,18 +125,10 @@ export default function ExpenseDetail() {
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Classificazione</Text>
               <View style={styles.classificationRow}>
-                {domain && (
-                  <View style={[styles.domainPill, { backgroundColor: getCategoryColor(editableExpense.category_key) + '20' }]}>
-                    <View style={[styles.domainPillDot, { backgroundColor: getCategoryColor(editableExpense.category_key) }]} />
-                    <Text style={[styles.domainPillText, { color: getCategoryColor(editableExpense.category_key) }]}>{domain.label}</Text>
-                  </View>
-                )}
-                {category && domain && <Text style={styles.classificationArrow}>›</Text>}
+                <CategoryPill categoryKey={editableExpense.category_key} />
+                {category && <Text style={styles.classificationArrow}>›</Text>}
                 {category && (
                   <Text style={styles.categoryInlineText}>{category.label}</Text>
-                )}
-                {!domain && !category && (
-                  <Text style={styles.detailValue}>---</Text>
                 )}
               </View>
             </View>

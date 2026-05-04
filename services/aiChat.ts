@@ -14,10 +14,22 @@ export interface AiChartPayload {
   data: ChartDataPoint[];
 }
 
+export interface AiListPayload {
+  title: string;
+  items: {
+    date: string;
+    description: string;
+    amount: number;
+    category_key: string;
+    city?: string;
+  }[];
+}
+
 export interface AiChatResponse {
-  intent: 'text' | 'chart';
+  intent: 'text' | 'chart' | 'list';
   text_response: string;
   chart: AiChartPayload | null;
+  list: AiListPayload | null;
 }
 
 // ─── Context Builder ──────────────────────────────────────────────────────────
@@ -80,20 +92,24 @@ Il tuo compito:
 3. Rispondi con un JSON strutturato.
 
 REGOLE:
-- Se l'utente chiede un elenco filtrato (es. "le mie spese a Torino"), rispondi con un testo che riassume i risultati.
-- Se la domanda richiede un'analisi visuale o un confronto tra categorie/periodi → usa intent "chart".
-- text_response: sempre presente, max 3-4 frasi, discorsivo.
-- chart: null se non utile. Se utile, popola il grafico con i dati filtrati/ordinati in tempo reale.
-- Sii specifico: se l'utente chiede di una città, usa i dati di quella città forniti nel contesto.
+- Se l'utente chiede un elenco o una ricerca specifica (es. "le mie ultime spese", "cerca sushi") → usa intent "list" e popola l'oggetto "list".
+- Se la domanda richiede un'analisi visuale o un confronto → usa intent "chart" (bar, pie o line).
+- text_response: sempre presente, molto breve, introduce il risultato.
+- chart: null se non richiesto.
+- list: null se non richiesto.
 
 FORMATO JSON OUTPUT OBBLIGATORIO:
 {
-  "intent": "text" | "chart",
+  "intent": "text" | "chart" | "list",
   "text_response": "stringa",
   "chart": {
     "type": "bar" | "pie" | "line",
     "title": "stringa",
     "data": [{ "label": "stringa", "value": numero }]
+  } | null,
+  "list": {
+    "title": "stringa",
+    "items": [{ "date": "YYYY-MM-DD", "description": "stringa", "amount": numero, "category_key": "stringa", "city": "stringa" }]
   } | null
 }`;
 
