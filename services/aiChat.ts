@@ -87,7 +87,12 @@ ${txHistory || 'Nessuna transazione recente.'}
 
 // ─── Main AI Chat Function ────────────────────────────────────────────────────
 
-export async function askAiChat(userMessage: string): Promise<AiChatResponse> {
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export async function askAiChat(userMessage: string, history: ChatMessage[] = []): Promise<AiChatResponse> {
   const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
   if (!apiKey) throw new Error('Missing Groq API Key');
 
@@ -136,6 +141,12 @@ FORMATO JSON OBBLIGATORIO:
   "timeline_data": { ... } | null
 }`;
 
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...history.slice(-5).map(h => ({ role: h.role, content: h.content })),
+    { role: 'user', content: userMessage },
+  ];
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -148,10 +159,7 @@ FORMATO JSON OBBLIGATORIO:
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
+        messages,
         max_tokens: 800,
         response_format: { type: 'json_object' },
       }),

@@ -38,31 +38,44 @@ interface QAState {
 export default function AiChatPage() {
   const router = useRouter();
   const [qa, setQa] = useState<QAState | null>(null);
+  const [history, setHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
+    const userMsg = text.trim();
     // Mostra subito la domanda, azzera la risposta precedente
-    setQa({ question: text.trim(), answer: null });
+    setQa({ question: userMsg, answer: null });
     setIsLoading(true);
 
     try {
-      const response = await askAiChat(text.trim());
-      setQa({ question: text.trim(), answer: response });
+      const response = await askAiChat(userMsg, history);
+      setQa({ question: userMsg, answer: response });
+
+      // Aggiorna la storia invisibile (solo testo per contesto)
+      setHistory(prev => [
+        ...prev,
+        { role: 'user', content: userMsg },
+        { role: 'assistant', content: response.text_response }
+      ].slice(-10)); // Manteniamo 5 coppie = 10 messaggi
+
     } catch (e) {
       setQa({
-        question: text.trim(),
+        question: userMsg,
         answer: {
           intent: 'text',
           text_response: 'Mi dispiace, non ho potuto elaborare la risposta. Riprova.',
-          chart: null,
-          list: null,
-        },
+        } as any,
       });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleReset = () => {
+    setQa(null);
+    setHistory([]);
   };
 
   const isEmpty = !qa;
@@ -85,7 +98,7 @@ export default function AiChatPage() {
         </View>
         {/* Tasto reset — torna alla schermata vuota */}
         <Pressable
-          onPress={() => setQa(null)}
+          onPress={handleReset}
           style={[styles.resetBtn, isEmpty && { opacity: 0 }]}
           disabled={isEmpty}
         >
