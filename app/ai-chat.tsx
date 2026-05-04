@@ -13,7 +13,7 @@ import JitDistribution from '../components/ai/JitDistribution';
 import JitList from '../components/ai/JitList';
 import JitTimeline from '../components/ai/JitTimeline';
 import VoiceInputBar from '../components/ai/VoiceInputBar';
-import { askAiChat, AiChatResponse } from '../services/aiChat';
+import { askAiChat, AiChatResponse, ChatMessage, aiChatStore } from '../services/aiChat';
 
 // ─── Suggested Prompts ────────────────────────────────────────────────────────
 const SUGGESTIONS = [
@@ -37,45 +37,60 @@ interface QAState {
  */
 export default function AiChatPage() {
   const router = useRouter();
-  const [qa, setQa] = useState<QAState | null>(null);
-  const [history, setHistory] = useState<ChatMessage[]>([]);
+  const [qa, setQa] = useState<QAState | null>(aiChatStore.qa);
+  const [history, setHistory] = useState<ChatMessage[]>(aiChatStore.history);
   const [isLoading, setIsLoading] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
-  const [debugData, setDebugData] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(aiChatStore.showDebug);
+  const [debugData, setDebugData] = useState<string | null>(aiChatStore.debugData);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
     const userMsg = text.trim();
-    setQa({ question: userMsg, answer: null });
+    const newQa = { question: userMsg, answer: null };
+    setQa(newQa);
+    aiChatStore.qa = newQa;
+    
     setDebugData(null);
+    aiChatStore.debugData = null;
+    
     setIsLoading(true);
 
     try {
       const response = await askAiChat(userMsg, history);
-      setQa({ question: userMsg, answer: response });
-      setDebugData(JSON.stringify(response, null, 2));
+      const finalQa = { question: userMsg, answer: response };
+      setQa(finalQa);
+      aiChatStore.qa = finalQa;
 
-      setHistory(prev => [
-        ...prev,
+      const rawJson = JSON.stringify(response, null, 2);
+      setDebugData(rawJson);
+      aiChatStore.debugData = rawJson;
+
+      const newHistory: ChatMessage[] = [
+        ...history,
         { role: 'user', content: userMsg },
         { role: 'assistant', content: response.text_response }
-      ].slice(-10));
+      ].slice(-10);
+      setHistory(newHistory);
+      aiChatStore.history = newHistory;
 
     } catch (e) {
-      setQa({
+      const errorQa = {
         question: userMsg,
         answer: {
           intent: 'text',
           text_response: 'Mi dispiace, non ho potuto elaborare la risposta. Riprova.',
         } as any,
-      });
+      };
+      setQa(errorQa);
+      aiChatStore.qa = errorQa;
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleReset = () => {
+    aiChatStore.reset();
     setQa(null);
     setHistory([]);
     setDebugData(null);
@@ -100,7 +115,14 @@ export default function AiChatPage() {
           </View>
         </View>
         <View style={styles.headerRight}>
-          <Pressable onPress={() => setShowDebug(!showDebug)} style={styles.iconBtn}>
+          <Pressable 
+            onPress={() => {
+              const newVal = !showDebug;
+              setShowDebug(newVal);
+              aiChatStore.showDebug = newVal;
+            }} 
+            style={styles.iconBtn}
+          >
             <Ionicons name="bug-outline" size={20} color={showDebug ? COLORS.accent : COLORS.secondary} />
           </Pressable>
           <Pressable

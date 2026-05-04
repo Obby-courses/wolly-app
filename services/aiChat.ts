@@ -48,6 +48,32 @@ export interface AiChatResponse {
   };
 }
 
+// ─── Global Chat Store (Persistence across navigation) ────────────────────────
+export class AiChatStore {
+  private static instance: AiChatStore;
+  public qa: { question: string; answer: AiChatResponse | null } | null = null;
+  public history: ChatMessage[] = [];
+  public debugData: string | null = null;
+  public showDebug: boolean = false;
+
+  private constructor() {}
+
+  public static getInstance(): AiChatStore {
+    if (!AiChatStore.instance) {
+      AiChatStore.instance = new AiChatStore();
+    }
+    return AiChatStore.instance;
+  }
+
+  public reset() {
+    this.qa = null;
+    this.history = [];
+    this.debugData = null;
+  }
+}
+
+export const aiChatStore = AiChatStore.getInstance();
+
 // ─── Context Builder ──────────────────────────────────────────────────────────
 
 async function buildFinancialContext(): Promise<string> {
