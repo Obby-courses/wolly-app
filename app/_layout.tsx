@@ -27,7 +27,7 @@ export default function RootLayout() {
   }
 
   // Pagine su cui il menu deve sparire
-  const hiddenOn = ['/manual-entry', '/expense-detail'];
+  const hiddenOn = ['/manual-entry', '/expense-detail', '/ai-chat'];
   const showMenu = !hiddenOn.includes(pathname);
 
   return (
