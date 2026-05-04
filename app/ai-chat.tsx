@@ -40,25 +40,27 @@ export default function AiChatPage() {
   const [qa, setQa] = useState<QAState | null>(null);
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugData, setDebugData] = useState<string | null>(null);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
     const userMsg = text.trim();
-    // Mostra subito la domanda, azzera la risposta precedente
     setQa({ question: userMsg, answer: null });
+    setDebugData(null);
     setIsLoading(true);
 
     try {
       const response = await askAiChat(userMsg, history);
       setQa({ question: userMsg, answer: response });
+      setDebugData(JSON.stringify(response, null, 2));
 
-      // Aggiorna la storia invisibile (solo testo per contesto)
       setHistory(prev => [
         ...prev,
         { role: 'user', content: userMsg },
         { role: 'assistant', content: response.text_response }
-      ].slice(-10)); // Manteniamo 5 coppie = 10 messaggi
+      ].slice(-10));
 
     } catch (e) {
       setQa({
@@ -76,6 +78,7 @@ export default function AiChatPage() {
   const handleReset = () => {
     setQa(null);
     setHistory([]);
+    setDebugData(null);
   };
 
   const isEmpty = !qa;
@@ -96,14 +99,18 @@ export default function AiChatPage() {
             <Text style={styles.headerSubtitle}>Il tuo consulente finanziario</Text>
           </View>
         </View>
-        {/* Tasto reset — torna alla schermata vuota */}
-        <Pressable
-          onPress={handleReset}
-          style={[styles.resetBtn, isEmpty && { opacity: 0 }]}
-          disabled={isEmpty}
-        >
-          <Ionicons name="refresh-outline" size={20} color={COLORS.secondary} />
-        </Pressable>
+        <View style={styles.headerRight}>
+          <Pressable onPress={() => setShowDebug(!showDebug)} style={styles.iconBtn}>
+            <Ionicons name="bug-outline" size={20} color={showDebug ? COLORS.accent : COLORS.secondary} />
+          </Pressable>
+          <Pressable
+            onPress={handleReset}
+            style={[styles.resetBtn, isEmpty && { opacity: 0 }]}
+            disabled={isEmpty}
+          >
+            <Ionicons name="refresh-outline" size={20} color={COLORS.secondary} />
+          </Pressable>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -186,6 +193,13 @@ export default function AiChatPage() {
                         data={qa.answer.timeline_data.data} 
                         granularity={qa.answer.timeline_data.granularity} 
                       />
+                    )}
+
+                    {showDebug && debugData && (
+                      <View style={styles.debugBox}>
+                        <Text style={styles.debugTitle}>AI RAW JSON (Debug)</Text>
+                        <Text style={styles.debugText}>{debugData}</Text>
+                      </View>
                     )}
                   </ScrollView>
                 )}
@@ -358,5 +372,33 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamily,
     fontSize: TYPOGRAPHY.sizes.base,
     color: COLORS.secondary,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconBtn: {
+    padding: 8,
+  },
+  debugBox: {
+    marginTop: SPACING.lg,
+    padding: SPACING.md,
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+    width: '100%',
+  },
+  debugTitle: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: 10,
+    color: COLORS.accent,
+    marginBottom: 8,
+  },
+  debugText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 11,
+    color: '#94A3B8',
   },
 });

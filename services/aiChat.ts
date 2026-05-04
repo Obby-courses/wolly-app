@@ -148,6 +148,11 @@ FORMATO JSON OBBLIGATORIO:
     { role: 'user', content: userMessage },
   ];
 
+  console.log('--- AI REQUEST ---');
+  console.log('History length:', history.length);
+  console.log('Last message:', userMessage);
+  // console.log('Full messages:', JSON.stringify(messages, null, 2)); // Opzionale se serve tutto
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -172,6 +177,9 @@ FORMATO JSON OBBLIGATORIO:
     if (!response.ok) throw new Error(`Groq API Error: ${response.status}`);
 
     const data = await response.json();
+    console.log('--- AI RESPONSE ---');
+    console.log(data.choices[0].message.content);
+    
     const parsed: AiChatResponse = JSON.parse(data.choices[0].message.content);
     return parsed;
   } catch (error: any) {
