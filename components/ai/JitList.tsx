@@ -18,12 +18,13 @@ interface JitListProps {
 }
 
 export default function JitList({ title, items, totalCount }: JitListProps) {
-  const displayItems = items.slice(0, 5);
+  const displayItems = items || [];
+  const safeTitle = (title || 'Lista').toUpperCase();
   const hasMore = totalCount > 5;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title.toUpperCase()}</Text>
+      <Text style={styles.title}>{safeTitle}</Text>
       <View style={styles.listCard}>
         {displayItems.map((item, index) => (
           <View key={item.id || index} style={[styles.item, index === displayItems.length - 1 && !hasMore && styles.lastItem]}>

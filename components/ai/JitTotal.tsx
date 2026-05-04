@@ -13,10 +13,11 @@ interface JitTotalProps {
   periodLabel: string;
 }
 
-export default function JitTotal({ value, comparison, periodLabel }: JitTotalProps) {
+export default function JitTotal({ value, comparison, periodLabel = 'Periodo' }: JitTotalProps) {
+  const label = (periodLabel || 'Periodo').toUpperCase();
   return (
     <View style={styles.container}>
-      <Text style={styles.periodLabel}>{periodLabel.toUpperCase()}</Text>
+      <Text style={styles.periodLabel}>{label}</Text>
       
       <View style={styles.valueRow}>
         <Text style={styles.currency}>€</Text>

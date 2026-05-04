@@ -12,15 +12,18 @@ interface JitTimelineProps {
 }
 
 export default function JitTimeline({ type, title, data, granularity }: JitTimelineProps) {
+  const safeTitle = (title || 'Timeline').toUpperCase();
+  const displayData = data || [];
+
   if (type === 'bar_vertical') {
-    const max = Math.max(...data.map(d => d.value), 1);
+    const max = Math.max(...displayData.map(d => d.value), 1);
     
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>{title.toUpperCase()}</Text>
+        <Text style={styles.title}>{safeTitle}</Text>
         <View style={styles.barCard}>
           <View style={styles.barsRow}>
-            {data.map((d, i) => {
+            {displayData.map((d, i) => {
               const height = (d.value / max) * 100;
               const isPeak = d.value === max && d.value > 0;
               return (
@@ -46,7 +49,7 @@ export default function JitTimeline({ type, title, data, granularity }: JitTimel
   // Heatmap Calendar (Simplified Mockup for the contract)
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title.toUpperCase()}</Text>
+      <Text style={styles.title}>{safeTitle}</Text>
       <View style={styles.heatmapCard}>
         <View style={styles.calendarGrid}>
           {['L','M','M','G','V','S','D'].map(d => (

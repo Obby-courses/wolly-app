@@ -8,11 +8,14 @@ interface JitDistributionProps {
 }
 
 export default function JitDistribution({ title, items }: JitDistributionProps) {
+  const safeTitle = (title || 'Distribuzione').toUpperCase();
+  const displayItems = items || [];
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title.toUpperCase()}</Text>
+      <Text style={styles.title}>{safeTitle}</Text>
       <View style={styles.card}>
-        {items.map((item, index) => (
+        {displayItems.map((item, index) => (
           <View key={index} style={styles.row}>
             <View style={styles.labelRow}>
               <Text style={styles.label}>{item.label}</Text>
