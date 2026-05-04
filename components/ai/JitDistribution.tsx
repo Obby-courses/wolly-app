@@ -19,7 +19,7 @@ export default function JitDistribution({ title, items }: JitDistributionProps) 
           <View key={index} style={styles.row}>
             <View style={styles.labelRow}>
               <Text style={styles.label}>{item.label}</Text>
-              <Text style={styles.value}>€{item.value.toFixed(0)} <Text style={styles.percentage}>{item.percentage.toFixed(0)}%</Text></Text>
+              <Text style={styles.value}>€{(item.value || 0).toFixed(0)} <Text style={styles.percentage}>{(item.percentage || 0).toFixed(0)}%</Text></Text>
             </View>
             <View style={styles.barContainer}>
               <View 

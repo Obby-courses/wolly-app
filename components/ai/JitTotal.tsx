@@ -21,7 +21,7 @@ export default function JitTotal({ value, comparison, periodLabel = 'Periodo' }:
       
       <View style={styles.valueRow}>
         <Text style={styles.currency}>€</Text>
-        <Text style={styles.value}>{value.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</Text>
+        <Text style={styles.value}>{(value || 0).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</Text>
       </View>
 
       {comparison && (

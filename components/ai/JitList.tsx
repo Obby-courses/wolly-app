@@ -40,8 +40,8 @@ export default function JitList({ title, items, totalCount }: JitListProps) {
                 </View>
               </View>
             </View>
-            <Text style={[styles.amount, { color: item.amount > 0 ? COLORS.success : COLORS.primary }]}>
-              {item.amount > 0 ? '+' : ''}€{Math.abs(item.amount).toFixed(2)}
+            <Text style={[styles.amount, { color: (item.amount || 0) > 0 ? COLORS.success : COLORS.primary }]}>
+              {(item.amount || 0) > 0 ? '+' : ''}€{Math.abs(item.amount || 0).toFixed(2)}
             </Text>
           </View>
         ))}
