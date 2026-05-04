@@ -153,6 +153,7 @@ export default function AiChatPage() {
         <VoiceInputBar
           onSubmit={sendMessage}
           isLoading={isLoading}
+          onBack={() => router.back()}
           placeholder="Chiedi a Wolly…"
         />
       </KeyboardAvoidingView>

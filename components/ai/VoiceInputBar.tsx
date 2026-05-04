@@ -13,6 +13,7 @@ interface VoiceInputBarProps {
   onSubmit: (text: string) => void;
   isLoading?: boolean;
   placeholder?: string;
+  onBack?: () => void;
 }
 
 const RECORDING_LIMIT = 15000;
@@ -25,6 +26,7 @@ export default function VoiceInputBar({
   onSubmit,
   isLoading = false,
   placeholder = 'Chiedi qualcosa...',
+  onBack,
 }: VoiceInputBarProps) {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -96,12 +98,18 @@ export default function VoiceInputBar({
 
   return (
     <View style={styles.wrapper}>
-      {/* Cancel button when recording */}
-      {isRecording && (
-        <Pressable onPress={handleCancelRecording} style={styles.sideBtn}>
-          <Ionicons name="close" size={22} color={COLORS.danger} />
-        </Pressable>
-      )}
+      {/* Left button: Back or Close (when recording) */}
+      <Pressable 
+        onPress={() => isRecording ? handleCancelRecording() : onBack?.()} 
+        style={[styles.sideBtn, (!onBack && !isRecording) && { opacity: 0 }]}
+        disabled={!onBack && !isRecording}
+      >
+        <Ionicons 
+          name={isRecording ? "close" : "chevron-back"} 
+          size={24} 
+          color={COLORS.primary} 
+        />
+      </Pressable>
 
       <View style={styles.inputBox}>
         {busy ? (
@@ -153,13 +161,14 @@ export default function VoiceInputBar({
         )}
       </View>
 
-      {/* Mic / Stop button */}
+      {/* Right button: Mic / Stop / Loading */}
       <Pressable
         onPress={() => isRecording ? handleStopRecording() : handleStartRecording()}
         disabled={isTranscribing || isLoading}
         style={[
           styles.sideBtn,
           isRecording && styles.sideBtnActive,
+          (isTranscribing || isLoading) && { borderColor: COLORS.accent }
         ]}
       >
         {isTranscribing || isLoading ? (
@@ -167,7 +176,7 @@ export default function VoiceInputBar({
         ) : isRecording ? (
           <View style={styles.stopSquare} />
         ) : (
-          <Ionicons name="mic-outline" size={24} color={COLORS.secondary} />
+          <Ionicons name="mic-outline" size={26} color={COLORS.secondary} />
         )}
       </Pressable>
     </View>
