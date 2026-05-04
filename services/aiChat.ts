@@ -120,9 +120,11 @@ Il tuo compito è analizzare la domanda dell'utente e rispondere usando uno dei 
    - JSON: popola "timeline_data" con type "bar_vertical" (per giorni settimana) o "heatmap_calendar" (per mese).
 
 REGOLE:
-- text_response: sempre presente, max 2 frasi, introduce il risultato.
+- FOCUS ASSOLUTO: Rispondi SOLO a ciò che l'utente ha chiesto. Non includere metriche, dati o analisi extra non richiesti.
+- Se l'utente chiede un totale, non mostrare la lista. Se chiede la lista, non mostrare la distribuzione, a meno che non sia strettamente necessario per la risposta.
+- text_response: max 1-2 frasi, dritta al punto.
 - Usa SOLO i dati reali forniti nel contesto sopra.
-- Se la domanda non rientra negli archetipi, usa intent "text" e suggerisci come riformulare.
+- Se la domanda non rientra negli archetipi, usa intent "text" e rispondi in modo conciso.
 
 FORMATO JSON OBBLIGATORIO:
 {
