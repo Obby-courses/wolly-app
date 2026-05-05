@@ -3,7 +3,7 @@
     "name": "Wolly",
     "scheme": "wolly",
     "slug": "wolly",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./wolly_favicon.png",
     "userInterfaceStyle": "light",
