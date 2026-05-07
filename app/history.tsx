@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
+import { getCategory } from '../constants/categories';
+import { getCategoryColor } from '../components/CategoryPill';
 import TimeFilter, { TimeRange } from '../components/TimeFilter';
 
 export default function HistoryScreen() {
@@ -89,7 +91,11 @@ export default function HistoryScreen() {
 
   const renderTransaction = ({ item }: { item: any }) => {
     const isIncome = item.direction === 'in';
-    const categoryColor = COLORS.categories[item.category_key as keyof typeof COLORS.categories] || COLORS.categories.default;
+    
+    // Trova i dettagli della categoria per label e colore coerenti
+    const category = getCategory(item.category_key);
+    const categoryColor = getCategoryColor(item.category_key);
+    const displayCategory = category ? category.label : item.category_key.replace(/_/g, ' ');
 
     return (
       <Pressable
@@ -98,11 +104,11 @@ export default function HistoryScreen() {
       >
         <View style={[styles.categoryIndicator, { backgroundColor: categoryColor }]} />
         <View style={styles.transactionInfo}>
-          <Text style={styles.transactionTitle}>
-            {item.description || item.subcategory_key?.replace('_', ' ') || item.category_key?.replace('_', ' ')}
+          <Text style={styles.transactionTitle} numberOfLines={1}>
+            {item.description || displayCategory}
           </Text>
           <Text style={styles.transactionMeta}>
-            {item.subcategory_key?.replace('_', ' ') || item.category_key?.replace('_', ' ')} • {new Date(item.date).toLocaleDateString('it-IT')}
+            {displayCategory} • {new Date(item.date).toLocaleDateString('it-IT')}
           </Text>
         </View>
         <View style={styles.amountContainer}>

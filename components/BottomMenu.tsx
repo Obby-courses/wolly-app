@@ -4,9 +4,11 @@ import { useRouter, usePathname, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '../constants/Theme';
 import { startRecording, stopRecording, parseFromVoice } from '../modules/registration/voiceParser';
+import { transcribeAudio } from '../services/groq';
 import { parseFromReceipt } from '../modules/registration/receiptParser';
 import { parseExpenseWithAI } from '../services/groqParser';
 import { getCurrentLocationContext } from '../services/location';
+import { routeInput } from '../services/inputRouter';
 
 const { width } = Dimensions.get('window');
 const RECORDING_LIMIT = 15000; // 15 secondi
@@ -21,7 +23,9 @@ export default function BottomMenu() {
   const [recording, setRecording] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingProgress] = useState(new Animated.Value(0));
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const timerRef = React.useRef<any>(null);
+  const toastTimerRef = React.useRef<any>(null);
 
   // Aggiorna lo stato se il parametro cambia (es. quando torniamo indietro)
   useEffect(() => {
@@ -32,23 +36,36 @@ export default function BottomMenu() {
 
    const isActive = (path: string) => pathname === path;
 
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  const navigateByRoute = async (text: string) => {
+    const route = routeInput(text);
+    if (route === 'expense') {
+      const locContext = await getCurrentLocationContext();
+      const parsed = await parseExpenseWithAI(text, 'text', locContext);
+      router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
+    } else if (route === 'query') {
+      router.push({ pathname: '/ai-chat', params: { message: text } });
+    } else {
+      showToast("Non ho capito 😅  Prova: \"Ho speso 5€ al bar\" o \"Quanto ho speso questo mese?\"");
+    }
+  };
+
   const handleSend = async () => {
     if (inputText.trim()) {
       try {
         setIsProcessing(true);
-        const locContext = await getCurrentLocationContext();
-        const parsed = await parseExpenseWithAI(inputText, 'text', locContext);
-        
-        setIsProcessing(false);
-        router.push({ 
-          pathname: '/expense-detail', 
-          params: { data: JSON.stringify(parsed) } 
-        });
-        
+        const text = inputText.trim();
         setInputText('');
         setIsExpanded(false);
+        await navigateByRoute(text);
+        setIsProcessing(false);
       } catch (error) {
-        console.error('Error parsing text:', error);
+        console.error('Error routing text:', error);
         setIsProcessing(false);
       }
     }
@@ -132,14 +149,30 @@ export default function BottomMenu() {
     
     try {
       const uri = await stopRecording(currentRecording);
-      const locContext = await getCurrentLocationContext();
-      const parsed = await parseFromVoice(uri, locContext);
       
-      setIsProcessing(false);
-      router.push({ 
-        pathname: '/expense-detail', 
-        params: { data: JSON.stringify(parsed) } 
-      });
+      // Passo 1: Trascrizione audio
+      const transcribedText = await transcribeAudio(uri);
+      if (!transcribedText) {
+        setIsProcessing(false);
+        showToast('Non sono riuscito a capire l\'audio. Riprova.');
+        return;
+      }
+
+      // Passo 2: Routing basato sul testo trascritto
+      const route = routeInput(transcribedText);
+
+      if (route === 'expense') {
+        const locContext = await getCurrentLocationContext();
+        const parsed = await parseFromVoice(uri, locContext);
+        setIsProcessing(false);
+        router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
+      } else if (route === 'query') {
+        setIsProcessing(false);
+        router.push({ pathname: '/ai-chat', params: { message: transcribedText } });
+      } else {
+        setIsProcessing(false);
+        showToast("Non ho capito 😅  Prova: \"Ho speso 5€ al bar\" o \"Quanto ho speso questo mese?\"");
+      }
     } catch (error) {
       console.error('Error stopping voice record:', error);
       setIsProcessing(false);
@@ -212,7 +245,7 @@ export default function BottomMenu() {
               <>
                 <TextInput
                   style={styles.input}
-                  placeholder="Scrivi spesa..."
+                  placeholder="Parla o scrivi..."
                   placeholderTextColor={COLORS.secondary}
                   value={inputText}
                   onChangeText={setInputText}
@@ -315,19 +348,26 @@ export default function BottomMenu() {
             </Pressable>
           </View>
 
-          {/* AI Chat Button */}
+          {/* Settings Button */}
           <View style={styles.menuItem}>
             <Pressable 
-              onPress={() => router.push('/ai-chat')}
+              onPress={() => router.push('/settings')}
               style={styles.menuItemInner}
             >
               <Ionicons 
-                name={isActive('/ai-chat') ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} 
+                name={isActive('/settings') ? "settings" : "settings-outline"} 
                 size={26} 
-                color={isActive('/ai-chat') ? COLORS.accent : COLORS.secondary} 
+                color={isActive('/settings') ? COLORS.primary : COLORS.secondary} 
               />
             </Pressable>
           </View>
+        </View>
+      )}
+
+      {/* Toast feedback per input non compreso */}
+      {toastMsg && (
+        <View style={styles.toast}>
+          <Text style={styles.toastText}>{toastMsg}</Text>
         </View>
       )}
     </KeyboardAvoidingView>
@@ -462,5 +502,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.medium,
-  }
+  },
+  toast: {
+    position: 'absolute',
+    bottom: 80,
+    left: SPACING.lg,
+    right: SPACING.lg,
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    ...SHADOWS.medium,
+    alignItems: 'center',
+  },
+  toastText: {
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: '#F1F5F9',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });

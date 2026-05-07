@@ -126,16 +126,25 @@ function LineChart({ data }: { data: ChartDataPoint[] }) {
 // ─── Legend ───────────────────────────────────────────────────────────────────
 function Legend({ data, type }: { data: ChartDataPoint[]; type: 'bar' | 'pie' | 'line' }) {
   if (type === 'line') return null;
+  const total = data.reduce((a, c) => a + c.value, 0) || 1;
+
   return (
     <View style={styles.legend}>
-      {data.slice(0, 5).map((d, i) => (
-        <View key={i} style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: d.color || PALETTE[i % PALETTE.length] }]} />
-          <Text style={styles.legendLabel} numberOfLines={1}>
-            {d.label} <Text style={styles.legendValue}>€{d.value.toFixed(0)}</Text>
-          </Text>
-        </View>
-      ))}
+      {data.slice(0, 5).map((d, i) => {
+        const perc = ((d.value / total) * 100).toFixed(0);
+        return (
+          <View key={i} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: d.color || PALETTE[i % PALETTE.length] }]} />
+            <Text style={styles.legendLabel} numberOfLines={1}>
+              {d.label}
+            </Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.legendValue}>€{d.value.toFixed(0)}</Text>
+              {type === 'pie' && <Text style={styles.legendPerc}>{perc}%</Text>}
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -211,6 +220,12 @@ const styles = StyleSheet.create({
   },
   legendValue: {
     fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: TYPOGRAPHY.sizes.xs,
     color: COLORS.primary,
+  },
+  legendPerc: {
+    fontSize: 9,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
   },
 });

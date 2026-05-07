@@ -3,16 +3,10 @@ import { View, Text, StyleSheet } from 'react-native';
 import { getDomainForCategory } from '../constants/categories';
 import { COLORS } from '../constants/Theme';
 
-export const CATEGORY_COLORS: Record<string, string> = {
-  cibo_bevande: '#6366F1', acquisti: '#06B6D4', alloggio: '#8B5CF6',
-  trasporti: '#3B82F6', veicolo: '#F59E0B', vita_intrattenimento: '#EC4899',
-  comunicazione_pc: '#10B981', spese_finanziarie: '#EF4444',
-  investimenti: '#D97706', entrata: '#059669',
-};
-
 export function getCategoryColor(categoryKey: string): string {
   const domain = getDomainForCategory(categoryKey);
-  return domain ? (CATEGORY_COLORS[domain.key] || '#9CA3AF') : '#9CA3AF';
+  if (!domain) return COLORS.categories.default;
+  return COLORS.categories[domain.key as keyof typeof COLORS.categories] || COLORS.categories.default;
 }
 
 interface CategoryPillProps {

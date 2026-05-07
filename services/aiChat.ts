@@ -1,19 +1,35 @@
-import { TransactionRepository } from './database/repositories/TransactionRepository';
+import { parseQueryIntent, QueryIntent } from './aiQueryParser';
+import { executeQueryIntent, ExecutionResult, DistributionItem } from './queryExecutor';
+import { SubscriptionRepository, Subscription } from './database/repositories/SubscriptionRepository';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface ChartDataPoint {
+  label: string;
+  value: number;
+  color?: string;
+}
+
+export interface AiChartPayload {
+  type: 'bar' | 'pie' | 'line';
+  title: string;
+  data: ChartDataPoint[];
+}
+
 export interface AiChatResponse {
-  intent: 'total' | 'distribution' | 'list' | 'timeline' | 'text';
+  intent: string;
+  queryIntent?: QueryIntent; // PER FEEDBACK BAR
   text_response: string;
-  analysis_steps?: string[]; // I passaggi logici seguiti
-  
+  analysis_steps?: string[];
+  chart?: AiChartPayload | null;
+
   // Archetipo QUANTO
   total_data?: {
     value: number;
     comparison?: {
       diff: number;
       percentage: number;
-      is_better: boolean; // true se spesa diminuita o entrata aumentata
+      is_better: boolean;
     };
     period_label: string;
   };
@@ -36,19 +52,28 @@ export interface AiChatResponse {
       amount: number;
       category_key: string;
       is_impulsive?: boolean;
+      subscription_name?: string;
     }[];
   };
 
   // Archetipo QUANDO
   timeline_data?: {
-    type: 'bar_vertical' | 'heatmap_calendar';
+    type: 'month' | 'year' | 'bar_vertical' | 'heatmap_calendar';
     title: string;
-    data: { label: string; value: number; intensity?: number }[];
-    granularity: 'weekday' | 'day';
+    data: any[];
+    granularity: string;
+  };
+
+  // Archetipo ABBONAMENTI
+  subscription_data?: {
+    total_monthly: number;
+    active_count: number;
+    items: Subscription[];
   };
 }
 
-// ─── Global Chat Store (Persistence across navigation) ────────────────────────
+// ─── Global Chat Store ────────────────────────────────────────────────────────
+
 export class AiChatStore {
   private static instance: AiChatStore;
   public qa: { question: string; answer: AiChatResponse | null } | null = null;
@@ -74,166 +99,311 @@ export class AiChatStore {
 
 export const aiChatStore = AiChatStore.getInstance();
 
-// ─── Context Builder ──────────────────────────────────────────────────────────
-
-async function buildFinancialContext(): Promise<string> {
-  try {
-    const now = new Date();
-    const thisMonthStats = await TransactionRepository.getDailyStatsForMonth(
-      now.getFullYear(),
-      now.getMonth() + 1
-    );
-    const recentTx = await TransactionRepository.getRecentForAi(50);
-    const catDist = await TransactionRepository.getCategoryDistribution('Mese');
-
-    const monthIncome = thisMonthStats.reduce((a, c) => a + c.income, 0);
-    const monthExpense = thisMonthStats.reduce((a, c) => a + c.expense, 0);
-
-    const topCats = catDist
-      .slice(0, 5)
-      .map((c) => `${c.category_key}: €${c.total.toFixed(2)}`)
-      .join(', ');
-
-    const txHistory = recentTx
-      .map(t => `[${t.date}] ${t.direction === 'in' ? '+' : '-'}€${t.amount.toFixed(2)} | ${t.category_key} | ${t.city || 'N/A'} | ${t.description}`)
-      .join('\n');
-
-    // Mappa categorie per aiutare l'IA con le label
-    const categoryMapping = `Mappa Categorie (chiave: Etichetta): cibo_bevande: Cibo, trasporti: Trasporti, alloggio: Casa, vita_intrattenimento: Vita, acquisti: Acquisti, comunicazione_pc: Tech, spese_finanziarie: Finanza, investimenti: Investimenti, veicolo: Auto, entrata: Entrate`;
-
-    return `
-${categoryMapping}
-
-CONTESTO FINANZIARIO UTENTE:
-- Mese corrente (${now.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}): Entrate €${monthIncome.toFixed(2)}, Uscite €${monthExpense.toFixed(2)}, Saldo €${(monthIncome - monthExpense).toFixed(2)}
-- Categorie principali (questo mese): ${topCats || 'nessuna'}
-
-ULTIME 50 TRANSAZIONI (Formato: [Data] Importo | Categoria | Città | Nota):
-${txHistory || 'Nessuna transazione recente.'}
-    `.trim();
-  } catch (e) {
-    console.error('[aiChat] Failed to build context:', e);
-    return 'CONTESTO: nessun dato disponibile nel database.';
-  }
-}
-
-// ─── Main AI Chat Function ────────────────────────────────────────────────────
+// ─── Chat Message ─────────────────────────────────────────────────────────────
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-export async function askAiChat(userMessage: string, history: ChatMessage[] = []): Promise<AiChatResponse> {
+// ─── Response Builder (codice TS, niente AI) ─────────────────────────────────
+function buildAnalysisSteps(intent: QueryIntent, extra?: string[]): string[] {
+  const steps = [
+    `Periodo: ${intent.period_label || 'Non specificato'}`,
+    `Direzione: ${intent.direction === 'both' ? 'Tutte' : intent.direction === 'in' ? 'Entrate' : 'Uscite'}`,
+  ];
+
+  if (intent.category_filter) steps.push(`Categoria: ${intent.category_filter}`);
+  if (intent.domain_filter) steps.push(`Dominio: ${intent.domain_filter}`);
+  if (intent.merchant_filter) steps.push(`Merchant: ${intent.merchant_filter}`);
+  if (intent.city_filter) steps.push(`Città: ${intent.city_filter}`);
+  if (intent.social_context_filter) steps.push(`Contesto: ${intent.social_context_filter}`);
+  if (intent.person_filter) steps.push(`Persona: ${intent.person_filter}`);
+
+  if (extra) steps.push(...extra);
+  return steps;
+}
+
+function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): AiChatResponse {
+  const label = result.period_label;
+
+  // ── SUBSCRIPTIONS ────────────────────────────────────────────────────────────
+  if (result.archetype === 'subscriptions' && result.subscriptions) {
+    const subs = result.subscriptions;
+    const active = subs.filter(s => s.is_active);
+    const total = active.reduce((acc, s) => {
+      let val = s.amount;
+      if (s.frequency === 'weekly') val *= 4.33;
+      else if (s.frequency === 'biweekly') val *= 2.17;
+      else if (s.frequency === 'yearly') val /= 12;
+      return acc + val;
+    }, 0);
+
+    // Trova il più costoso per dare una risposta più intelligente
+    const mostExpensive = [...active].sort((a, b) => b.amount - a.amount)[0];
+    let extraText = '';
+    if (mostExpensive) {
+      extraText = ` Il più costoso è ${mostExpensive.name} (€${mostExpensive.amount.toFixed(2)}).`;
+    }
+
+    const isYearly = intent.period.type === 'year';
+    const displayAmount = isYearly ? total * 12 : total;
+    const periodName = isYearly ? 'all\'anno' : 'al mese';
+
+    return {
+      intent: 'subscriptions',
+      text_response: `Hai ${active.length} abbonamenti attivi, per un costo stimato di €${displayAmount.toFixed(2)} ${periodName}.${extraText}`,
+      analysis_steps: buildAnalysisSteps(intent, [
+        `Trovati ${subs.length} abbonamenti nel database`,
+        `${active.length} abbonamenti risultano attivi`,
+        `Costo ${periodName}: €${displayAmount.toFixed(2)}`,
+        mostExpensive ? `Top spesa: ${mostExpensive.name}` : 'Nessuna spesa attiva',
+      ]),
+      subscription_data: {
+        total_monthly: total,
+        active_count: active.length,
+        items: subs,
+      },
+    };
+  }
+
+
+  // ── TOTAL ────────────────────────────────────────────────────────────────────
+  if (result.archetype === 'total' && result.total !== undefined) {
+    const value = result.total;
+    const dirLabel = intent.direction === 'in' ? 'guadagnato' : 'speso';
+    const filterLabel = intent.category_filter
+      ? ` in "${intent.category_filter.replace(/_/g, ' ')}"`
+      : intent.domain_filter
+      ? ` in "${intent.domain_filter.replace(/_/g, ' ')}"`
+      : '';
+    
+    const cityLabel = intent.city_filter ? ` a ${intent.city_filter}` : '';
+
+    let compText = '';
+    if (result.comparison) {
+      const c = result.comparison;
+      const sign = c.diff > 0 ? '+' : '';
+      compText = ` (${sign}€${Math.abs(c.diff).toFixed(0)}, ${c.percentage.toFixed(0)}% vs periodo precedente)`;
+    }
+
+    return {
+      intent: 'total',
+      text_response: `${label} hai ${dirLabel}${filterLabel}${cityLabel} €${value.toFixed(2)}${compText}.`,
+      analysis_steps: buildAnalysisSteps(intent, [
+        `Totale calcolato dal DB: €${value.toFixed(2)}`,
+      ]),
+      total_data: {
+        value,
+        comparison: result.comparison ? {
+          diff: result.comparison.diff,
+          percentage: result.comparison.percentage,
+          is_better: result.comparison.is_better,
+        } : undefined,
+        period_label: label,
+      },
+    };
+  }
+
+  // ── DISTRIBUTION ─────────────────────────────────────────────────────────────
+  if (result.archetype === 'distribution' && result.distribution_items) {
+    const items = result.distribution_items;
+    const top = items[0];
+    const unitLabel = intent.group_by === 'city' ? 'La città' : 'La categoria';
+    const topText = top ? ` ${unitLabel} principale è "${top.label}" con €${top.value.toFixed(2)} (${top.percentage}%).` : '';
+
+    return {
+      intent: 'distribution',
+      text_response: `${label}: ecco come hai distribuito le tue ${intent.direction === 'in' ? 'entrate' : 'spese'}.${topText}`,
+      analysis_steps: buildAnalysisSteps(intent, [
+        `Raggruppato per ${intent.group_by || 'categoria'}`,
+        `${items.length} voci trovate`,
+        `Ordinate per importo decrescente`,
+      ]),
+      distribution_data: {
+        title: `Distribuzione ${intent.direction === 'in' ? 'entrate' : 'spese'} — ${label}`,
+        items: items.map(i => ({
+          label: i.label,
+          value: i.value,
+          percentage: i.percentage,
+          color: i.color,
+        })),
+      },
+    };
+  }
+
+  // ── LIST ─────────────────────────────────────────────────────────────────────
+  if (result.archetype === 'list' && result.transactions) {
+    const tx = result.transactions;
+    const count = result.transaction_count ?? tx.length;
+    const shown = tx.length;
+
+    return {
+      intent: 'list',
+      text_response: `${label}: trovate ${count} transazioni${shown < count ? `, mostro le prime ${shown}` : ''}.`,
+      analysis_steps: buildAnalysisSteps(intent, [
+        `${count} transazioni trovate`,
+      ]),
+      list_data: {
+        title: `Transazioni — ${label}`,
+        total_count: count,
+        items: tx.map((t: any) => ({
+          id: t.id,
+          date: t.date,
+          time: t.time,
+          description: t.description,
+          amount: t.direction === 'in' ? t.amount : -t.amount,
+          category_key: t.category_key,
+          is_impulsive: false,
+          subscription_name: t.subscription_name ? ` (${t.subscription_name})` : undefined,
+        })),
+      },
+    };
+  }
+
+  // ── TIMELINE ─────────────────────────────────────────────────────────────────
+  if (result.archetype === 'timeline' && result.timeline_data) {
+    const isMonthly = intent.period.type === 'year';
+    return {
+      intent: 'timeline',
+      text_response: `Ecco l'andamento delle ${intent.direction === 'in' ? 'entrate' : 'spese'} ${label}.`,
+      analysis_steps: [
+        `Periodo: ${label}`,
+        `Granularità: ${isMonthly ? 'mensile' : 'giornaliera'}`,
+      ],
+      timeline_data: {
+        type: 'bar_vertical',
+        title: `Andamento — ${label}`,
+        data: result.timeline_data,
+        granularity: isMonthly ? 'weekday' : 'day',
+      },
+    };
+  }
+
+  // ── TEXT fallback ─────────────────────────────────────────────────────────────
+  return {
+    intent: 'text',
+    text_response: 'Non ho trovato dati per questa richiesta. Prova a riformulare la domanda.',
+  };
+}
+
+// ─── Text-only AI response (per domande conversazionali) ─────────────────────
+
+async function askTextQuestion(userMessage: string, history: ChatMessage[]): Promise<string> {
   const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
-  if (!apiKey) throw new Error('Missing Groq API Key');
+  if (!apiKey) return 'Chiave API non configurata.';
 
-  const financialContext = await buildFinancialContext();
-  const now = new Date();
-  const currentDateISO = now.toISOString().split('T')[0];
-
-  const systemPrompt = `Sei Wolly, un assistente finanziario personale intelligente e amichevole.
-Rispondi SEMPRE in italiano, in modo conciso e utile.
-Oggi è ${currentDateISO}.
-
-${financialContext}
-
-Usa uno dei 4 ARCHEIPI definiti per la visualizzazione:
-1. QUANTO: popola "total_data".
-2. COME: popola "distribution_data".
-3. COSA: popola "list_data".
-4. QUANDO: popola "timeline_data".
-
-Il tuo compito è analizzare la domanda dell'utente seguendo una CATENA DI RAGIONAMENTO (Chain of Thought):
-1. Filtra i dati dal contesto (es. per data o città).
-2. Aggrega o calcola i valori necessari.
-3. Ordina i risultati decrescente/crescente.
-4. Produci il risultato visivo finale.
-
-REGOLE:
-- ANALYSIS STEPS: In ogni risposta, popola l'array "analysis_steps" con i passaggi logici seguiti (es: ["Filtro transazioni di Febbraio", "Raggruppo per categoria", "Ordino in modo decrescente"]).
-- FOCUS ASSOLUTO: Rispondi SOLO a ciò che l'utente ha chiesto.
-- PERIODO TEMPORALE: Specifica SEMPRE il periodo (es. "A febbraio..."). Sii ESTREMAMENTE preciso con le date.
-- LINGUAGGIO UMANO: Nella "text_response" usa i nomi leggibili delle categorie.
-- Se l'utente chiede un totale, non mostrare la lista. Se chiede la lista, non mostrare la distribuzione.
-- text_response: max 1-2 frasi, dritta al punto.
-- Usa SOLO i dati reali forniti.
-- Se la domanda non rientra negli archetipi o i dati sono assenti, usa intent "text".
-
-FORMATO JSON OBBLIGATORIO (Segui ESATTAMENTE questi nomi campo):
-{
-  "intent": "total" | "distribution" | "list" | "timeline" | "text",
-  "text_response": "stringa concisa con periodo temporale",
-  "analysis_steps": ["step 1", "step 2", ...],
-  "total_data": {
-    "value": numero,
-    "comparison": { "diff": numero, "percentage": numero, "is_better": boolean },
-    "period_label": "stringa (es: Questa settimana)"
-  } | null,
-  "distribution_data": {
-    "title": "stringa",
-    "items": [{ "label": "stringa", "value": numero, "percentage": numero, "color": "stringa HEX" }]
-  } | null,
-  "list_data": {
-    "title": "stringa",
-    "total_count": numero,
-    "items": [{ "id": "stringa", "date": "YYYY-MM-DD", "description": "stringa", "amount": numero, "category_key": "stringa", "is_impulsive": boolean }]
-  } | null,
-  "timeline_data": {
-    "type": "bar_vertical" | "heatmap_calendar",
-    "title": "stringa",
-    "data": [{ "label": "stringa", "value": numero }],
-    "granularity": "weekday" | "day"
-  } | null
-}`;
+  // Fetch subscription context for textual questions
+  const allSubs = await SubscriptionRepository.getAll();
+  const activeSubs = allSubs.filter(s => s.is_active);
+  const subSummary = activeSubs.length > 0 
+    ? `L'utente ha ${activeSubs.length} abbonamenti attivi: ${activeSubs.map(s => `${s.name} (€${s.amount}/${s.frequency})`).join(', ')}.`
+    : "L'utente non ha abbonamenti attivi.";
 
   const messages = [
-    { role: 'system', content: systemPrompt },
-    ...history.slice(-5).map(h => ({ role: h.role, content: h.content })),
+    {
+      role: 'system',
+      content: `Sei Wolly, un assistente finanziario personale. Rispondi in italiano, in modo conciso (max 3 frasi). 
+      
+      CONTESTO ABBONAMENTI:
+      ${subSummary}
+      
+      Se l'utente chiede consigli su come risparmiare, considera questi abbonamenti.`
+    },
+    ...history.slice(-4).map(h => ({ role: h.role, content: h.content })),
     { role: 'user', content: userMessage },
   ];
 
-  console.log('--- AI REQUEST ---');
-  console.log('History length:', history.length);
-  console.log('Last message:', userMessage);
-  // console.log('Full messages:', JSON.stringify(messages, null, 2)); // Opzionale se serve tutto
-
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        max_tokens: 800,
-        response_format: { type: 'json_object' },
-      }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, max_tokens: 300 }),
       signal: controller.signal,
     });
-
     clearTimeout(timeoutId);
-
-    if (!response.ok) throw new Error(`Groq API Error: ${response.status}`);
-
+    if (!response.ok) throw new Error(`${response.status}`);
     const data = await response.json();
-    console.log('--- AI RESPONSE ---');
-    console.log(data.choices[0].message.content);
-    
-    const parsed: AiChatResponse = JSON.parse(data.choices[0].message.content);
-    return parsed;
-  } catch (error: any) {
+    const content = data.choices[0].message.content;
+    console.log(`💬 [ORCHESTRATOR] Text response: "${content}"`);
+    return content;
+  } catch (e: any) {
     clearTimeout(timeoutId);
+    return 'Non riesco a rispondere in questo momento.';
+  }
+}
+
+// ─── Main Orchestrator ────────────────────────────────────────────────────────
+
+export async function askAiChat(
+  userMessage: string, 
+  history: ChatMessage[] = [],
+  preParsedIntent?: QueryIntent
+): Promise<AiChatResponse> {
+  console.log('\n' + '='.repeat(60));
+  console.log('🤖 [WOLLY AI — NUOVA ARCHITETTURA]');
+  console.log(`📝 INPUT: "${userMessage}"`);
+  console.log('-'.repeat(60));
+
+  try {
+    let intent: QueryIntent;
+    
+    if (preParsedIntent) {
+      console.log('⚡ [EXECUTOR] Usando intento pre-parificato (Feedback Bar)');
+      intent = preParsedIntent;
+    } else {
+      // ── FASE 1: AI Parser ───────────────────────────────────────────────────
+      intent = await parseQueryIntent(userMessage, history);
+    }
+
+    console.log('🔍 [PARSER] DETTAGLI INTENT:');
+    console.log(`   • Archetipo: ${intent.archetype}`);
+    console.log(`   • Periodo: ${intent.period.type} (${intent.period.year || ''}${intent.period.month ? '/' + intent.period.month : ''})`);
+    console.log(`   • Filtri: ${intent.category_filter || intent.domain_filter || 'Nessuno'}`);
+    if (intent.city_filter) console.log(`   • Città: ${intent.city_filter}`);
+    if (intent.social_context_filter) console.log(`   • Contesto: ${intent.social_context_filter}`);
+    if (intent.merchant_filter) console.log(`   • Merchant: ${intent.merchant_filter}`);
+
+    // ── FASE 2: Esecuzione DB ───────────────────────────────────────────────
+    const result = await executeQueryIntent(intent);
+    console.log('⚙️ [EXECUTOR] RISULTATO DB:');
+    if (result.total !== undefined) console.log(`   • Totale: €${result.total.toFixed(2)}`);
+    if (result.distribution_items) console.log(`   • Distribuzione: ${result.distribution_items.length} categorie`);
+    if (result.transactions) console.log(`   • Transazioni: ${result.transactions.length} righe`);
+    if (result.subscriptions) console.log(`   • Abbonamenti: ${result.subscriptions.length} trovati`);
+
+    // ── FASE 3: Composizione ────────────────────────────────────────────────
+    let finalResponse: AiChatResponse;
+
+    if (result.archetype === 'text') {
+      console.log('💬 [ORCHESTRATOR] Domanda testuale → AI conversazionale');
+      const textReply = await askTextQuestion(userMessage, history);
+      finalResponse = { intent: 'text', text_response: textReply, queryIntent: intent };
+    } else {
+      console.log(`✅ [ORCHESTRATOR] Dati pronti → composizione TS (archetype: ${result.archetype})`);
+      finalResponse = buildResponseFromResult(intent, result);
+      finalResponse.queryIntent = intent; // Assicuriamoci che sia presente
+    }
+
+    if (finalResponse.analysis_steps && finalResponse.analysis_steps.length > 0) {
+      console.log('🧠 [RAGIONAMENTO]:');
+      finalResponse.analysis_steps.forEach(step => console.log(`   • ${step}`));
+    }
+
+    console.log(`📤 RISPOSTA FINALE: "${finalResponse.text_response}"`);
+    console.log('='.repeat(60) + '\n');
+
+    return finalResponse;
+
+  } catch (error: any) {
     console.error('[aiChat] Error:', error.message);
+    console.log('='.repeat(60) + '\n');
     return {
       intent: 'text',
       text_response: 'Mi dispiace, non sono riuscito a elaborare la tua richiesta. Riprova tra un momento.',
-      chart: null,
     };
   }
 }

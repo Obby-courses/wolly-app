@@ -148,73 +148,72 @@ export default function IncomesScreen() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('Mese');
   const [baseDate, setBaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [domainDist, setDomainDist] = useState<DataPoint[]>([]);
   const [catDist, setCatDist] = useState<DataPoint[]>([]);
-  const [subDist, setSubDist] = useState<DataPoint[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [trendPoints, setTrendPoints] = useState<any[]>([]);
   const [sortBy, setSortBy] = useState<'date' | 'amount_asc' | 'amount_desc'>('date');
   
+  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       loadStats();
-    }, [timeRange, baseDate, selectedCategory, selectedSubcategory, sortBy])
+    }, [timeRange, baseDate, selectedDomain, selectedCategory, sortBy])
   );
 
   const loadStats = async () => {
     setLoading(true);
     try {
-      let filteredCatKey: string | undefined = undefined;
-      if (selectedSubcategory) {
-        CATEGORIES_CONFIG.forEach(c => {
-          if (c.subcategories.find(s => s.key === selectedSubcategory)) {
-            filteredCatKey = c.key;
-          }
+      // 1. Domain Distribution
+      const dData = await TransactionRepository.getDomainDistribution(timeRange, 'in', baseDate);
+      setDomainDist(dData.map(item => {
+        const config = CATEGORIES_CONFIG.find(c => c.key === item.domain_key);
+        return {
+          key: item.domain_key,
+          total: item.total,
+          label: config?.label || item.domain_key,
+          color: COLORS.categories[item.domain_key as keyof typeof COLORS.categories] || COLORS.categories.default
+        };
+      }));
+
+      // 2. Category Distribution (filtered by domain if selected)
+      const cData = await TransactionRepository.getCategoryDistribution(timeRange, 'in', baseDate);
+      
+      let filteredCats = cData;
+      if (selectedDomain) {
+        filteredCats = cData.filter(item => {
+          const cat = CATEGORIES_CONFIG.flatMap(d => d.subcategories.map(s => ({...s, domainKey: d.key})))
+            .find(s => s.key === item.category_key);
+          return cat?.domainKey === selectedDomain;
         });
       }
 
-      // 1. Distribution (Direction: 'in')
-      const cData = await TransactionRepository.getCategoryDistribution(timeRange, 'in', baseDate);
-      let catPoints = cData.map(item => {
-        const config = CATEGORIES_CONFIG.find(c => c.key === item.category_key);
-        return {
-          key: item.category_key,
-          total: item.total,
-          label: config?.label || item.category_key,
-          color: COLORS.categories[item.category_key as keyof typeof COLORS.categories] || COLORS.categories.default
-        };
-      });
-      if (filteredCatKey) setSelectedCategory(filteredCatKey); 
-      setCatDist(catPoints);
-
-      const sData = await TransactionRepository.getSubcategoryDistribution(timeRange, 'in', selectedCategory || undefined, baseDate);
-      setSubDist(sData.map(item => {
-         let label = item.subcategory_key;
-         let color = COLORS.primary;
-         CATEGORIES_CONFIG.forEach(c => {
-           const sub = c.subcategories.find(s => s.key === item.subcategory_key);
-           if (sub) {
-             label = sub.label;
-             color = COLORS.categories[c.key as keyof typeof COLORS.categories] || COLORS.categories.default;
-           }
-         });
-         return { key: item.subcategory_key, total: item.total, label, color };
+      setCatDist(filteredCats.map(item => {
+        let label = item.category_key;
+        let color = COLORS.primary;
+        CATEGORIES_CONFIG.forEach(c => {
+          const sub = c.subcategories.find(s => s.key === item.category_key);
+          if (sub) {
+            label = sub.label;
+            color = COLORS.categories[c.key as keyof typeof COLORS.categories] || COLORS.categories.default;
+          }
+        });
+        return { key: item.category_key, total: item.total, label, color };
       }));
 
-      // 2. Transactions
+      // 3. Transactions
       const txs = await TransactionRepository.getFilteredTransactions(timeRange, {
         direction: 'in',
+        domain_key: selectedDomain || undefined,
         category_key: selectedCategory || undefined,
-        subcategory_key: selectedSubcategory || undefined
       }, sortBy, baseDate);
       setTransactions(txs);
 
-      // 3. Trend
+      // 4. Trend
       const trend = await TransactionRepository.getFilteredTrend(timeRange, 'in', {
         category_key: selectedCategory || undefined,
-        subcategory_key: selectedSubcategory || undefined
       }, baseDate);
       setTrendPoints(trend);
 
@@ -222,14 +221,13 @@ export default function IncomesScreen() {
     finally { setLoading(false); }
   };
 
-  const handleSelectCategory = (key: string | null) => {
-    setSelectedCategory(key);
-    setSelectedSubcategory(null);
+  const handleSelectDomain = (key: string | null) => {
+    setSelectedDomain(key);
+    setSelectedCategory(null);
   };
 
-  const handleSelectSubcategory = (key: string | null) => {
-    setSelectedSubcategory(key);
-    if (key === null) setSelectedCategory(null);
+  const handleSelectCategory = (key: string | null) => {
+    setSelectedCategory(key);
   };
 
   return (
@@ -258,19 +256,19 @@ export default function IncomesScreen() {
             </View>
 
             <DistributionCard 
-              title="Fonti di Entrata"
-              data={catDist}
-              selectedKey={selectedCategory}
-              onSelect={handleSelectCategory}
-              emptyMessage="Nessuna entrata registrata"
+              title="Domini (Macro)"
+              data={domainDist}
+              selectedKey={selectedDomain}
+              onSelect={handleSelectDomain}
+              emptyMessage="Nessun dato registrato"
             />
 
             <DistributionCard 
-              title="Dettaglio Fonti"
-              data={subDist}
-              selectedKey={selectedSubcategory}
-              onSelect={handleSelectSubcategory} 
-              emptyMessage={selectedCategory ? "Nessun dettaglio in questo periodo" : "Tutte le entrate"}
+              title="Categorie"
+              data={catDist}
+              selectedKey={selectedCategory}
+              onSelect={handleSelectCategory} 
+              emptyMessage={selectedDomain ? "Nessuna categoria in questo dominio" : "Seleziona un dominio per filtrare"}
             />
 
             {/* Transaction List */}
@@ -294,15 +292,26 @@ export default function IncomesScreen() {
                 <Text style={styles.emptyText}>Nessuna entrata trovata</Text>
               ) : (
                 transactions.map((tx, idx) => (
-                  <View key={tx.id} style={[styles.txItem, idx === transactions.length - 1 && { borderBottomWidth: 0 }]}>
+                  <Pressable 
+                    key={tx.id} 
+                    style={({ pressed }) => [
+                      styles.txItem, 
+                      idx === transactions.length - 1 && { borderBottomWidth: 0 },
+                      pressed && { backgroundColor: '#F3F4F6' }
+                    ]}
+                    onPress={() => router.push({ pathname: "/transaction/[id]", params: { id: tx.id } })}
+                  >
                     <View style={styles.txInfo}>
                       <Text style={styles.txDesc} numberOfLines={1}>{tx.description || 'Entrata generica'}</Text>
                       <Text style={styles.txMeta}>{tx.date} • {tx.subcategory_key}</Text>
                     </View>
-                    <Text style={[styles.txAmount, styles.txIn]}>
-                      + € {tx.amount.toFixed(2)}
-                    </Text>
-                  </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[styles.txAmount, styles.txIn]}>
+                        + € {tx.amount.toFixed(2)}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={14} color={COLORS.border} style={{ marginLeft: 6 }} />
+                    </View>
+                  </Pressable>
                 ))
               )}
             </View>

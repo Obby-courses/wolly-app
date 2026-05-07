@@ -5,17 +5,19 @@ import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../../constants/Theme';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface JitTimelineProps {
-  type: 'bar_vertical' | 'heatmap_calendar';
+  type: 'month' | 'year' | 'bar_vertical' | 'heatmap_calendar';
   title: string;
   data: { label: string; value: number; intensity?: number }[];
-  granularity: 'weekday' | 'day';
+  granularity: string;
 }
 
 export default function JitTimeline({ type, title, data, granularity }: JitTimelineProps) {
   const safeTitle = (title || 'Timeline').toUpperCase();
   const displayData = data || [];
 
-  if (type === 'bar_vertical') {
+  const isBarChart = type === 'bar_vertical' || type === 'month' || type === 'year';
+
+  if (isBarChart) {
     const max = Math.max(...displayData.map(d => d.value), 1);
     
     return (

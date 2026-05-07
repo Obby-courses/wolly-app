@@ -29,9 +29,9 @@ export default function JitTotal({ value, comparison, periodLabel = 'Periodo' }:
           <Ionicons 
             name={comparison.is_better ? 'arrow-down' : 'arrow-up'} 
             size={14} 
-            color={comparison.is_better ? COLORS.success : COLORS.error} 
+            color={comparison.is_better ? COLORS.success : COLORS.danger} 
           />
-          <Text style={[styles.comparisonText, { color: comparison.is_better ? COLORS.success : COLORS.error }]}>
+          <Text style={[styles.comparisonText, { color: comparison.is_better ? COLORS.success : COLORS.danger }]}>
             €{Math.abs(comparison.diff).toFixed(0)} ({comparison.percentage.toFixed(0)}%) rispetto al periodo precedente
           </Text>
         </View>

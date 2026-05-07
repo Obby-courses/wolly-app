@@ -42,6 +42,15 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Finanze</Text>
+          <Pressable style={styles.item} onPress={() => router.push('/subscriptions')}>
+            <Ionicons name="repeat-outline" size={22} color={COLORS.primary} />
+            <Text style={styles.itemText}>Abbonamenti & Ricorrenti</Text>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>App</Text>
           <View style={styles.item}>
             <Ionicons name="notifications-outline" size={22} color={COLORS.primary} />

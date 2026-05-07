@@ -8,7 +8,7 @@ export class TransactionRepository {
   /**
    * Transforms a ParsedExpense into a DB row and inserts it.
    */
-  static async insert(expense: ParsedExpense): Promise<void> {
+  static async insert(expense: ParsedExpense, subscription_id?: string | null): Promise<string> {
     const db = await getDBConnection();
 
     const domainKey = getDomainForCategory(expense.category_key)?.key || null;
@@ -18,12 +18,12 @@ export class TransactionRepository {
         id, created_at, date, time, amount, net_amount, currency, direction,
         payment_method, category_key, subcategory_key, domain_key, description,
         social_context, location_type, location_name, city, address,
-        is_travel, is_online, split_people, input_method, raw_input, synced_at, is_deleted
+        is_travel, is_online, split_people, input_method, raw_input, synced_at, is_deleted, people_mentioned, subscription_id
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `, [
       expense.id,
@@ -50,12 +50,15 @@ export class TransactionRepository {
       expense.input_method,
       expense.raw_input,
       null, // synced_at
-      0 // is_deleted
+      0, // is_deleted
+      expense.people_mentioned ? expense.people_mentioned.join(',') : null,
+      subscription_id || null,
     ]);
 
     // Sincronizzazione Patrimonio: Incrementa o Decrementa
     const delta = expense.direction === 'in' ? expense.amount : -expense.amount;
     await NetWorthRepository.incrementTotal(delta);
+    return expense.id;
   }
 
   /**
@@ -262,19 +265,50 @@ export class TransactionRepository {
   }
 
   /**
+   * Retrieves domain distribution for a specific time range, direction and base date.
+   */
+  static async getDomainDistribution(
+    timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto', 
+    direction: 'in' | 'out' = 'out',
+    baseDate: string = new Date().toISOString().split('T')[0],
+  ): Promise<{ domain_key: string, total: number }[]> {
+    const db = await getDBConnection();
+    let query = `
+      SELECT domain_key, SUM(amount) as total
+      FROM transactions
+      WHERE is_deleted = 0 AND direction = '${direction}' AND domain_key IS NOT NULL
+    `;
+
+    if (timeRange === 'Settimana') query += ` AND date >= date('${baseDate}', '-7 days') AND date <= '${baseDate}'`;
+    else if (timeRange === 'Mese') query += ` AND strftime('%Y-%m', date) = strftime('%Y-%m', '${baseDate}')`;
+    else if (timeRange === 'Anno') query += ` AND strftime('%Y', date) = strftime('%Y', '${baseDate}')`;
+
+    query += " GROUP BY domain_key ORDER BY total DESC";
+
+    const results = await db.getAllAsync(query);
+    return results as any[];
+  }
+
+  /**
    * Retrieves category distribution for a specific time range, direction and base date.
    */
   static async getCategoryDistribution(
     timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto', 
     direction: 'in' | 'out' = 'out',
-    baseDate: string = new Date().toISOString().split('T')[0]
+    baseDate: string = new Date().toISOString().split('T')[0],
+    filters: { city?: string, socialContext?: string, personName?: string, merchantName?: string } = {}
   ): Promise<{ category_key: string, total: number }[]> {
     const db = await getDBConnection();
+    const { city, socialContext, personName, merchantName } = filters;
     let query = `
       SELECT category_key, SUM(amount) as total
       FROM transactions
       WHERE is_deleted = 0 AND direction = '${direction}'
     `;
+    if (city) query += ` AND city = '${city}'`;
+    if (socialContext) query += ` AND social_context = '${socialContext}'`;
+    if (personName) query += ` AND people_mentioned LIKE '%${personName}%'`;
+    if (merchantName) query += ` AND location_name LIKE '%${merchantName}%'`;
 
     if (timeRange === 'Settimana') query += ` AND date >= date('${baseDate}', '-7 days') AND date <= '${baseDate}'`;
     else if (timeRange === 'Mese') query += ` AND strftime('%Y-%m', date) = strftime('%Y-%m', '${baseDate}')`;
@@ -287,13 +321,78 @@ export class TransactionRepository {
   }
 
   /**
+   * Retrieves city distribution for a specific time range, direction and base date.
+   */
+  static async getCityDistribution(
+    timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto',
+    direction: 'in' | 'out' = 'out',
+    baseDate: string = new Date().toISOString().split('T')[0],
+    filters: { category_key?: string, socialContext?: string, personName?: string, merchantName?: string } = {}
+  ): Promise<{ city: string, total: number }[]> {
+    const db = await getDBConnection();
+    const { category_key, socialContext, personName, merchantName } = filters;
+    let query = `
+      SELECT city, SUM(amount) as total
+      FROM transactions
+      WHERE is_deleted = 0 AND direction = '${direction}' AND city IS NOT NULL AND city != ''
+    `;
+    if (category_key) query += ` AND category_key = '${category_key}'`;
+    if (socialContext) query += ` AND social_context = '${socialContext}'`;
+    if (personName) query += ` AND people_mentioned LIKE '%${personName}%'`;
+    if (merchantName) query += ` AND location_name LIKE '%${merchantName}%'`;
+
+    if (timeRange === 'Settimana') query += ` AND date >= date('${baseDate}', '-7 days') AND date <= '${baseDate}'`;
+    else if (timeRange === 'Mese') query += ` AND strftime('%Y-%m', date) = strftime('%Y-%m', '${baseDate}')`;
+    else if (timeRange === 'Anno') query += ` AND strftime('%Y', date) = strftime('%Y', '${baseDate}')`;
+
+    query += " GROUP BY city ORDER BY total DESC";
+
+    const results = await db.getAllAsync(query);
+    return results as any[];
+  }
+
+  /**
+   * Retrieves all unique city names present in the database.
+   */
+  static async getDistinctCities(): Promise<string[]> {
+    const db = await getDBConnection();
+    const results = await db.getAllAsync('SELECT DISTINCT city FROM transactions WHERE city IS NOT NULL AND city != "" AND is_deleted = 0');
+    return results.map((r: any) => r.city);
+  }
+
+  /**
+   * Retrieves all unique social contexts present in the database.
+   */
+  static async getDistinctSocialContexts(): Promise<string[]> {
+    const db = await getDBConnection();
+    const results = await db.getAllAsync('SELECT DISTINCT social_context FROM transactions WHERE social_context IS NOT NULL AND social_context != "" AND is_deleted = 0');
+    return results.map((r: any) => r.social_context);
+  }
+
+  /**
+   * Retrieves all unique people mentioned in the database.
+   */
+  static async getDistinctPeople(): Promise<string[]> {
+    const db = await getDBConnection();
+    const results = await db.getAllAsync('SELECT DISTINCT people_mentioned FROM transactions WHERE people_mentioned IS NOT NULL AND people_mentioned != "" AND is_deleted = 0');
+    
+    const allPeople = new Set<string>();
+    results.forEach((r: any) => {
+      r.people_mentioned.split(',').forEach((p: string) => allPeople.add(p.trim()));
+    });
+    
+    return Array.from(allPeople);
+  }
+
+  /**
    * Retrieves subcategory distribution for a specific time range, direction and base date.
    */
   static async getSubcategoryDistribution(
     timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto', 
     direction: 'in' | 'out' = 'out', 
     categoryKey?: string,
-    baseDate: string = new Date().toISOString().split('T')[0]
+    baseDate: string = new Date().toISOString().split('T')[0],
+    city?: string
   ): Promise<{ subcategory_key: string, total: number }[]> {
     const db = await getDBConnection();
     let query = `
@@ -301,6 +400,7 @@ export class TransactionRepository {
       FROM transactions
       WHERE is_deleted = 0 AND direction = '${direction}'
     `;
+    if (city) query += ` AND city = '${city}'`;
 
     if (timeRange === 'Settimana') query += ` AND date >= date('${baseDate}', '-7 days') AND date <= '${baseDate}'`;
     else if (timeRange === 'Mese') query += ` AND strftime('%Y-%m', date) = strftime('%Y-%m', '${baseDate}')`;
@@ -321,30 +421,37 @@ export class TransactionRepository {
    */
   static async getFilteredTransactions(
     timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto',
-    filters: { category_key?: string, subcategory_key?: string, direction?: 'in' | 'out' },
+    filters: { domain_key?: string, category_key?: string, subcategory_key?: string, direction?: 'in' | 'out', city?: string, social_context?: string, person?: string, merchant_name?: string },
     sortBy: 'date' | 'amount_asc' | 'amount_desc',
     baseDate: string = new Date().toISOString().split('T')[0]
   ): Promise<any[]> {
     const db = await getDBConnection();
     let query = `
-      SELECT * FROM transactions
-      WHERE is_deleted = 0 AND direction != 'adj'
+      SELECT t.*, s.name as subscription_name 
+      FROM transactions t
+      LEFT JOIN subscriptions s ON t.subscription_id = s.id
+      WHERE t.is_deleted = 0 AND t.direction != 'adj'
     `;
 
     // Time Filter
-    if (timeRange === 'Settimana') query += ` AND date >= date('${baseDate}', '-7 days') AND date <= '${baseDate}'`;
-    else if (timeRange === 'Mese') query += ` AND strftime('%Y-%m', date) = strftime('%Y-%m', '${baseDate}')`;
-    else if (timeRange === 'Anno') query += ` AND strftime('%Y', date) = strftime('%Y', '${baseDate}')`;
+    if (timeRange === 'Settimana') query += ` AND t.date >= date('${baseDate}', '-7 days') AND t.date <= '${baseDate}'`;
+    else if (timeRange === 'Mese') query += ` AND strftime('%Y-%m', t.date) = strftime('%Y-%m', '${baseDate}')`;
+    else if (timeRange === 'Anno') query += ` AND strftime('%Y', t.date) = strftime('%Y', '${baseDate}')`;
 
-    // Category Filters
-    if (filters.direction) query += ` AND direction = '${filters.direction}'`;
-    if (filters.category_key) query += ` AND category_key = '${filters.category_key}'`;
-    if (filters.subcategory_key) query += ` AND subcategory_key = '${filters.subcategory_key}'`;
+    // Category & Domain & Merchant Filters
+    if (filters.direction) query += ` AND t.direction = '${filters.direction}'`;
+    if (filters.domain_key) query += ` AND t.domain_key = '${filters.domain_key}'`;
+    if (filters.category_key) query += ` AND t.category_key = '${filters.category_key}'`;
+    if (filters.subcategory_key) query += ` AND t.subcategory_key = '${filters.subcategory_key}'`;
+    if (filters.merchant_name) query += ` AND t.location_name LIKE '%${filters.merchant_name}%'`;
+    if (filters.city) query += ` AND t.city = '${filters.city}'`;
+    if (filters.social_context) query += ` AND t.social_context = '${filters.social_context}'`;
+    if (filters.person) query += ` AND t.people_mentioned LIKE '%${filters.person}%'`;
 
     // Sorting
-    if (sortBy === 'date') query += " ORDER BY date DESC, time DESC";
-    else if (sortBy === 'amount_asc') query += " ORDER BY amount ASC";
-    else if (sortBy === 'amount_desc') query += " ORDER BY amount DESC";
+    if (sortBy === 'date') query += " ORDER BY t.date DESC, t.time DESC";
+    else if (sortBy === 'amount_asc') query += " ORDER BY t.amount ASC";
+    else if (sortBy === 'amount_desc') query += " ORDER BY t.amount DESC";
 
     const results = await db.getAllAsync(query);
     return results;
@@ -436,7 +543,7 @@ export class TransactionRepository {
         date = ?, time = ?, amount = ?, net_amount = ?, currency = ?, direction = ?,
         payment_method = ?, category_key = ?, subcategory_key = ?, description = ?,
         social_context = ?, location_type = ?, location_name = ?, city = ?, address = ?,
-        is_travel = ?, is_online = ?, split_people = ?
+        is_travel = ?, is_online = ?, split_people = ?, subscription_id = ?
       WHERE id = ?
     `, [
       updates.date || oldTx.date,
@@ -457,6 +564,7 @@ export class TransactionRepository {
       updates.is_travel !== undefined ? (updates.is_travel ? 1 : 0) : oldTx.is_travel,
       updates.is_online !== undefined ? (updates.is_online ? 1 : 0) : oldTx.is_online,
       updates.split_people !== undefined ? updates.split_people : oldTx.split_people,
+      updates.subscription_id !== undefined ? updates.subscription_id : oldTx.subscription_id,
       id
     ]);
 
@@ -477,6 +585,13 @@ export class TransactionRepository {
       ORDER BY date DESC, time DESC
       LIMIT ?
     `, [limit]);
+  }
+
+  static async getUniqueMerchants(): Promise<string[]> {
+    const db = await getDBConnection();
+    const query = "SELECT DISTINCT location_name FROM transactions WHERE location_name IS NOT NULL AND is_deleted = 0";
+    const results = await db.getAllAsync<{ location_name: string }>(query);
+    return results.map(r => r.location_name);
   }
 }
 

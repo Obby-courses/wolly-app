@@ -3,11 +3,21 @@ import uuid from 'react-native-uuid';
 import { parseFromManual } from '../modules/registration/manualParser';
 import { DOMAINS_CONFIG, ALL_CATEGORIES, getDomainForCategory } from '../constants/categories';
 
+export interface SubscriptionSuggestion {
+  suggest_subscription: boolean;
+  subscription_name?: string;
+  subscription_amount?: number;
+  subscription_frequency?: 'monthly' | 'weekly' | 'biweekly' | 'yearly';
+  subscription_day?: number; // day-of-month or day-of-week
+}
+
+export type ParsedExpenseWithSuggestion = ParsedExpense & { subscription?: SubscriptionSuggestion };
+
 export async function parseExpenseWithAI(
   text: string, 
   context: 'voice' | 'receipt' | 'manual' | 'text', 
   locationContext?: { city: string | null; address: string | null }
-): Promise<ParsedExpense> {
+): Promise<ParsedExpenseWithSuggestion> {
   const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
   if (!apiKey) throw new Error('Missing Groq API Key (EXPO_PUBLIC_GROQ_FINANCE_API)');
 
@@ -82,12 +92,18 @@ JSON OUTPUT FORMAT:
   "address": string|null,
   "is_travel": boolean,
   "is_online": boolean,
-  "is_recurring_pattern": boolean,
   "reason": string|null,
   "description": "string",
   "refund": null,
-  "split": null
+  "split": null,
+  "suggest_subscription": boolean,
+  "subscription_name": string|null,
+  "subscription_amount": number|null,
+  "subscription_frequency": "monthly"|"weekly"|"biweekly"|"yearly"|null,
+  "subscription_day": number|null
 }
+
+REGOLA ABBONAMENTO: Imposta "suggest_subscription": true SOLO se l'importo ha pattern da servizio in abbonamento (es. importi fissi come 9.99, 15.99, nomi noti come Netflix, Spotify, Amazon Prime, Adobe, palestra, affitto, assicurazione, etc.). In tutti gli altri casi imposta false e gli altri campi abbonamento a null.
 `;
 
   try {
@@ -181,6 +197,46 @@ JSON OUTPUT FORMAT:
           result.group_size = null;
         }
 
+        // --- LOGICA PASTO (MEAL TYPE) ---
+        // Una transazione in un bar o ristorante tra 07:00–10:30 è colazione. 
+        // Tra 12:00–14:30 è pranzo. Tra 19:00–22:30 è cena.
+        if (result.category_key === 'ristorante_fast_food' || result.category_key === 'bar_caffe') {
+          const time = result.time || (result.date === currentDateISO ? now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') : null);
+          
+          if (time) {
+            const [hours, minutes] = time.split(':').map(Number);
+            const totalMinutes = hours * 60 + minutes;
+            let mealTypeLabel = '';
+
+            if (totalMinutes >= 7 * 60 && totalMinutes <= 10 * 60 + 30) {
+              mealTypeLabel = 'Colazione';
+            } else if (totalMinutes >= 12 * 60 && totalMinutes <= 14 * 60 + 30) {
+              mealTypeLabel = 'Pranzo';
+            } else if (totalMinutes >= 19 * 60 && totalMinutes <= 22 * 60 + 30) {
+              mealTypeLabel = 'Cena';
+            }
+
+            if (mealTypeLabel) {
+              result.description = result.description 
+                ? `${result.description} (${mealTypeLabel})` 
+                : mealTypeLabel;
+            }
+          }
+        }
+
+        // Extract subscription suggestion from AI response
+        const subscriptionSuggestion: SubscriptionSuggestion = {
+          suggest_subscription: !!(result as any).suggest_subscription,
+          subscription_name: (result as any).subscription_name || undefined,
+          subscription_amount: (result as any).subscription_amount || undefined,
+          subscription_frequency: (result as any).subscription_frequency || undefined,
+          subscription_day: (result as any).subscription_day || undefined,
+        };
+
+        if (subscriptionSuggestion.suggest_subscription) {
+          console.log(`📅 [SUBSCRIPTION SUGGESTION]: ${subscriptionSuggestion.subscription_name} ${subscriptionSuggestion.subscription_frequency}`);
+        }
+
         return {
           id: uuid.v4().toString(),
           created_at: currentTimestamp,
@@ -191,7 +247,9 @@ JSON OUTPUT FORMAT:
           input_method: context,
           raw_input: text,
           is_deleted: false,
-          synced_at: null
+          is_recurring_pattern: false,
+          synced_at: null,
+          subscription: subscriptionSuggestion,
         };
       } catch (error: any) {
         lastError = error;

@@ -2,6 +2,7 @@ export type TimeOfDay = 'mattina' | 'pomeriggio' | 'sera' | 'notte' | null;
 export type SocialContext = 'solo' | 'coppia' | 'amici' | 'famiglia' | 'colleghi' | 'sconosciuti' | null;
 export type LocationType = 'casa' | 'ristorante' | 'negozio_fisico' | 'online' | 'trasporti' | 'lavoro' | 'viaggio' | 'estero' | null;
 export type EmotionalCategory = 'necessità' | 'cura_di_sé' | 'amicizie' | 'passioni' | 'impulso' | 'ansia' | 'obiettivi';
+export type InputMethod = 'voice' | 'receipt' | 'manual' | 'text' | 'ocr';
 
 export interface Refund {
   amount: number;
@@ -51,14 +52,14 @@ export interface ParsedExpense {
   address: string | null;
   is_travel: boolean;
   is_online: boolean;
-  is_recurring_pattern: boolean;
+  is_recurring_pattern?: boolean;
 
   // Input & Relations
   refund: Refund | null;
   split: Split | null;
   reason: string | null;
   description: string;
-  input_method: 'voice' | 'receipt' | 'manual';
+  input_method: InputMethod;
   raw_input: string;
 
   // Sync
@@ -90,7 +91,7 @@ export interface RawParsingResult {
   address: string | null;
   is_travel: boolean;
   is_online: boolean;
-  is_recurring_pattern: boolean;
+  is_recurring_pattern?: boolean;
   reason: string | null;
   description: string;
   refund: Refund | null;

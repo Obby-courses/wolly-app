@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
   Platform, Pressable, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import ChatBubble from '../components/ai/ChatBubble';
@@ -12,16 +12,10 @@ import JitTotal from '../components/ai/JitTotal';
 import JitDistribution from '../components/ai/JitDistribution';
 import JitList from '../components/ai/JitList';
 import JitTimeline from '../components/ai/JitTimeline';
+import JitSubscriptions from '../components/ai/JitSubscriptions';
+import FeedbackBar from '../components/ai/FeedbackBar';
 import VoiceInputBar from '../components/ai/VoiceInputBar';
 import { askAiChat, AiChatResponse, ChatMessage, aiChatStore } from '../services/aiChat';
-
-// ─── Suggested Prompts ────────────────────────────────────────────────────────
-const SUGGESTIONS = [
-  'Come sto andando questo mese?',
-  'Mostrami le spese per categoria',
-  'Dove spendo di più?',
-  'Confronta entrate e uscite di quest\'anno',
-];
 
 // ─── State types ──────────────────────────────────────────────────────────────
 interface QAState {
@@ -37,11 +31,21 @@ interface QAState {
  */
 export default function AiChatPage() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ message?: string }>();
   const [qa, setQa] = useState<QAState | null>(aiChatStore.qa);
   const [history, setHistory] = useState<ChatMessage[]>(aiChatStore.history);
   const [isLoading, setIsLoading] = useState(false);
   const [showDebug, setShowDebug] = useState(aiChatStore.showDebug);
   const [debugData, setDebugData] = useState<string | null>(aiChatStore.debugData);
+  const [autoSentRef] = useState({ done: false });
+
+  // Auto-send message when navigated with params.message
+  useEffect(() => {
+    if (params.message && !autoSentRef.done) {
+      autoSentRef.done = true;
+      sendMessage(params.message);
+    }
+  }, [params.message]);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -68,8 +72,8 @@ export default function AiChatPage() {
 
       const newHistory: ChatMessage[] = [
         ...history,
-        { role: 'user', content: userMsg },
-        { role: 'assistant', content: response.text_response }
+        { role: 'user' as const, content: userMsg },
+        { role: 'assistant' as const, content: response.text_response }
       ].slice(-10);
       setHistory(newHistory);
       aiChatStore.history = newHistory;
@@ -84,6 +88,22 @@ export default function AiChatPage() {
       };
       setQa(errorQa);
       aiChatStore.qa = errorQa;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const reRunQuery = async (newIntent: any) => {
+    if (isLoading || !qa) return;
+    setIsLoading(true);
+    try {
+      const response = await askAiChat(qa.question, history, newIntent);
+      const updatedQa = { ...qa, answer: response };
+      setQa(updatedQa);
+      aiChatStore.qa = updatedQa;
+      setDebugData(JSON.stringify(response, null, 2));
+    } catch (e) {
+      console.error('Re-run error:', e);
     } finally {
       setIsLoading(false);
     }
@@ -142,24 +162,15 @@ export default function AiChatPage() {
         <View style={styles.flex}>
           {/* ─── Stato vuoto ─────────────────────────────────────────── */}
           {isEmpty && (
-            <ScrollView contentContainerStyle={styles.emptyContent}>
+            <View style={styles.emptyContent}>
               <View style={styles.emptyIconWrapper}>
-                <Ionicons name="chatbubbles-outline" size={52} color={COLORS.secondary} />
+                <Text style={styles.wollyEmoji}>✦</Text>
               </View>
-              <Text style={styles.emptyTitle}>Ciao! Sono Wolly 👋</Text>
+              <Text style={styles.emptyTitle}>Wolly è pronto</Text>
               <Text style={styles.emptySubtitle}>
-                Chiedimi qualcosa sui tuoi dati finanziari.{'\n'}
-                Posso risponderti con testo o grafici.
+                Usa il microfono o scrivi per fare domande sui tuoi dati.
               </Text>
-              <View style={styles.suggestions}>
-                {SUGGESTIONS.map((s, i) => (
-                  <Pressable key={i} style={styles.chip} onPress={() => sendMessage(s)}>
-                    <Text style={styles.chipText}>{s}</Text>
-                    <Ionicons name="arrow-forward" size={14} color={COLORS.secondary} />
-                  </Pressable>
-                ))}
-              </View>
-            </ScrollView>
+            </View>
           )}
 
           {/* ─── Q&A View Centrata ────────────────────────────────────── */}
@@ -183,6 +194,13 @@ export default function AiChatPage() {
                     contentContainerStyle={styles.answerScrollContent}
                     showsVerticalScrollIndicator={false}
                   >
+                    {qa.answer.queryIntent && qa.answer.intent !== 'text' && (
+                      <FeedbackBar 
+                        intent={qa.answer.queryIntent} 
+                        onUpdate={reRunQuery} 
+                      />
+                    )}
+
                     {qa.answer.analysis_steps && qa.answer.analysis_steps.length > 0 && (
                       <View style={styles.stepsContainer}>
                         {qa.answer.analysis_steps.map((step, idx) => (
@@ -225,6 +243,13 @@ export default function AiChatPage() {
                         title={qa.answer.timeline_data.title} 
                         data={qa.answer.timeline_data.data} 
                         granularity={qa.answer.timeline_data.granularity} 
+                      />
+                    )}
+
+                    {qa.answer.intent === 'subscriptions' && qa.answer.subscription_data && (
+                      <JitSubscriptions 
+                        items={qa.answer.subscription_data.items}
+                        totalMonthly={qa.answer.subscription_data.total_monthly}
                       />
                     )}
 
@@ -298,21 +323,24 @@ const styles = StyleSheet.create({
 
   // ─── Empty state ──────────────────────────────────────────────────────────
   emptyContent: {
-    flexGrow: 1,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.xxl,
-    paddingVertical: SPACING.huge,
   },
   emptyIconWrapper: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: COLORS.surface,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.xl,
     ...SHADOWS.soft,
+  },
+  wollyEmoji: {
+    fontSize: 36,
+    color: '#FFFFFF',
   },
   emptyTitle: {
     fontFamily: TYPOGRAPHY.fontBold,
@@ -327,9 +355,7 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: SPACING.xxl,
   },
-  suggestions: { gap: SPACING.sm, width: '100%' },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

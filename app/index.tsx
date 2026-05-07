@@ -8,6 +8,8 @@ import { SubscriptionManager } from '../services/database/SubscriptionManager';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 import { NetWorthRepository } from '../services/database/repositories/NetWorthRepository';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
+import { getCategory } from '../constants/categories';
+import { getCategoryColor } from '../components/CategoryPill';
 import AnnualChart from '../components/AnnualChart';
 
 export default function Home() {
@@ -109,7 +111,11 @@ export default function Home() {
 
   const renderTransaction = ({ item }: { item: any }) => {
     const isIncome = item.direction === 'in';
-    const categoryColor = COLORS.categories[item.category_key as keyof typeof COLORS.categories] || COLORS.categories.default;
+    
+    // Trova i dettagli della categoria per label e colore coerenti
+    const category = getCategory(item.category_key);
+    const categoryColor = getCategoryColor(item.category_key);
+    const displayCategory = category ? category.label : item.category_key.replace(/_/g, ' ');
 
     return (
       <Pressable 
@@ -118,11 +124,11 @@ export default function Home() {
       >
         <View style={[styles.categoryIndicator, { backgroundColor: categoryColor }]} />
         <View style={styles.transactionInfo}>
-          <Text style={styles.transactionTitle}>
-            {item.description || item.category_key.replace('_', ' ')}
+          <Text style={styles.transactionTitle} numberOfLines={1}>
+            {item.description || displayCategory}
           </Text>
           <Text style={styles.transactionCategory}>
-            {item.category_key.replace('_', ' ')} • {item.date}
+            {displayCategory} • {item.date}
           </Text>
         </View>
         <View style={styles.amountContainer}>

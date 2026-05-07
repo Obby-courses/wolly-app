@@ -27,15 +27,18 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
       input_method TEXT NOT NULL,
       raw_input TEXT,
       synced_at TEXT,
-      is_deleted INTEGER NOT NULL DEFAULT 0
+      is_deleted INTEGER NOT NULL DEFAULT 0,
+      people_mentioned TEXT,
+      subscription_id TEXT
     );
   `);
 
-  // Migration: Add city, address and domain_key if they don't exist
+  // Migrations on transactions
   try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN city TEXT;`); } catch (e) {}
   try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN address TEXT;`); } catch (e) {}
   try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN domain_key TEXT;`); } catch (e) {}
-
+  try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN people_mentioned TEXT;`); } catch (e) {}
+  try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN subscription_id TEXT;`); } catch (e) {}
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS net_worth (
@@ -53,6 +56,7 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
     await db.execAsync(`INSERT INTO net_worth (id, amount, updated_at) VALUES ('${defaultId}', 1000.0, '${initDate}')`);
   }
 
+  // Legacy table — kept for data safety, no longer used by the app
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS recurring_payments (
       id TEXT PRIMARY KEY NOT NULL,
@@ -71,9 +75,33 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
       synced_at TEXT
     );
   `);
+
+  // New subscriptions table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id TEXT PRIMARY KEY NOT NULL,
+      created_at TEXT NOT NULL,
+      name TEXT NOT NULL,
+      amount REAL NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'EUR',
+      direction TEXT NOT NULL DEFAULT 'out',
+      category_key TEXT NOT NULL,
+      frequency TEXT NOT NULL,
+      recurrence_day INTEGER,
+      start_date TEXT NOT NULL,
+      end_date TEXT,
+      auto_detected INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      synced_at TEXT
+    );
+  `);
+
+  // Migrations on subscriptions (for future fields)
+  try { await db.execAsync(`ALTER TABLE subscriptions ADD COLUMN end_date TEXT;`); } catch (e) {}
 }
 
 export async function dropTables(db: SQLite.SQLiteDatabase) {
   await db.execAsync(`DROP TABLE IF EXISTS transactions;`);
   await db.execAsync(`DROP TABLE IF EXISTS recurring_payments;`);
+  await db.execAsync(`DROP TABLE IF EXISTS subscriptions;`);
 }

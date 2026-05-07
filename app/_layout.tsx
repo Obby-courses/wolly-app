@@ -38,6 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="manual-entry" />
         <Stack.Screen name="expense-detail" />
         <Stack.Screen name="seed-data" />
+        <Stack.Screen name="subscriptions" />
       </Stack>
       {showMenu && <BottomMenu />}
     </View>
