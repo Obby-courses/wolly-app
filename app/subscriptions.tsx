@@ -350,17 +350,6 @@ export default function SubscriptionsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color={COLORS.primary} />
-        </Pressable>
-        <Text style={styles.title}>Abbonamenti</Text>
-        <Pressable onPress={() => setShowModal(true)} style={styles.addBtn}>
-          <Ionicons name="add" size={26} color="#FFF" />
-        </Pressable>
-      </View>
-
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>
       ) : (

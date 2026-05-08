@@ -9,9 +9,6 @@ export default function SettingsScreen() {
   const router = useRouter();
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Impostazioni</Text>
-      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>

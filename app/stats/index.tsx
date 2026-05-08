@@ -10,10 +10,6 @@ export default function StatsHubScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Statistiche</Text>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         <Pressable style={styles.card} onPress={() => router.push('/stats/net-worth')}>
