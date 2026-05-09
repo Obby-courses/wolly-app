@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, Text, View, Pressable, FlatList, ActivityIndicator, TextInput, KeyboardAvoidingView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
+
+// ... (rest of imports)
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { initDatabase } from '../services/database/db';
@@ -32,6 +35,13 @@ export default function Home() {
       try {
         await initDatabase();
         await SubscriptionManager.processDueSubscriptions();
+        
+        // Carica preferenza privacy patrimonio
+        const savedVisibility = await AsyncStorage.getItem('isNetWorthVisible');
+        if (savedVisibility !== null) {
+          setIsNetWorthVisible(savedVisibility === 'true');
+        }
+        
         setIsDbReady(true);
       } catch (error) {
         console.error('[DB] Errore inizializzazione:', error);
@@ -109,6 +119,12 @@ export default function Home() {
     loadData(); // Ricarica per aggiornare eventuali sync in dashboard
   };
 
+  const toggleNetWorthVisibility = async () => {
+    const newValue = !isNetWorthVisible;
+    setIsNetWorthVisible(newValue);
+    await AsyncStorage.setItem('isNetWorthVisible', newValue.toString());
+  };
+
   const renderTransaction = ({ item }: { item: any }) => {
     const isIncome = item.direction === 'in';
     
@@ -171,7 +187,7 @@ export default function Home() {
                 <View style={styles.netWorthHeader}>
                   <Text style={styles.netWorthLabel}>Patrimonio Totale</Text>
                   <Pressable 
-                    onPress={() => setIsNetWorthVisible(!isNetWorthVisible)}
+                    onPress={toggleNetWorthVisibility}
                     style={styles.privacyToggle}
                   >
                     <Ionicons 

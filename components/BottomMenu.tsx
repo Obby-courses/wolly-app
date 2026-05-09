@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Pressable, Dimensions, TextInput, KeyboardAvoidingView, Platform, Text, Animated, ActivityIndicator } from 'react-native';
+import { 
+  StyleSheet, View, Pressable, Dimensions, TextInput, 
+  KeyboardAvoidingView, Platform, Text, Animated, 
+  ActivityIndicator, PanResponder 
+} from 'react-native';
 import { useRouter, usePathname, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '../constants/Theme';
@@ -12,29 +16,38 @@ import { routeInput } from '../services/inputRouter';
 
 const { width } = Dimensions.get('window');
 const RECORDING_LIMIT = 15000; // 15 secondi
+const CANCEL_THRESHOLD = -80; // Pixel di scorrimento a sinistra per annullare
 
 export default function BottomMenu() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useLocalSearchParams<{ menu?: string }>();
   const [inputText, setInputText] = useState('');
-  const [isExpanded, setIsExpanded] = useState(params.menu === 'expanded');
+  const [isExpanded, setIsExpanded] = useState(params.menu === 'expanded' || pathname === '/ai-chat');
   const [isRecording, setIsRecording] = useState(false);
-  const [recording, setRecording] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [recordingProgress] = useState(new Animated.Value(0));
+  const [isSlidingToCancel, setIsSlidingToCancel] = useState(false);
+  
+  const recordingRef = useRef<any>(null);
+  const lastStartTime = useRef<number>(0);
+  const recordingProgress = useRef(new Animated.Value(0)).current;
+  const slideX = useRef(new Animated.Value(0)).current;
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const timerRef = React.useRef<any>(null);
-  const toastTimerRef = React.useRef<any>(null);
+  
+  const timerRef = useRef<any>(null);
+  const toastTimerRef = useRef<any>(null);
+  const isStartingRecording = useRef(false);
 
-  // Aggiorna lo stato se il parametro cambia (es. quando torniamo indietro)
+  // Gestione espansione automatica su AI Chat
   useEffect(() => {
-    if (params.menu === 'expanded') {
+    if (pathname === '/ai-chat') {
       setIsExpanded(true);
+    } else {
+      setIsExpanded(false);
     }
-  }, [params.menu]);
+  }, [pathname]);
 
-   const isActive = (path: string) => pathname === path;
+  const isActive = (path: string) => pathname === path;
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -93,16 +106,25 @@ export default function BottomMenu() {
   };
 
   const handleStartRecording = async () => {
-    // Evita clic multipli durante l'avvio
-    if (isRecording || recording || isProcessing) return;
+    if (isRecording || isProcessing || isStartingRecording.current) return;
     
-    setIsRecording(true); // Imposta subito lo stato UI
+    isStartingRecording.current = true;
+    lastStartTime.current = Date.now();
+    
+    // Sicurezza: pulizia preventiva
+    if (recordingRef.current) {
+      try { await recordingRef.current.stopAndUnloadAsync(); } catch(e){}
+      recordingRef.current = null;
+    }
+
+    setIsRecording(true);
+    setIsSlidingToCancel(false);
+    slideX.setValue(0);
     
     try {
       const rec = await startRecording();
-      setRecording(rec);
+      recordingRef.current = rec;
       
-      // Avvia animazione progress bar
       recordingProgress.setValue(0);
       Animated.timing(recordingProgress, {
         toValue: 1,
@@ -110,83 +132,67 @@ export default function BottomMenu() {
         useNativeDriver: false,
       }).start();
 
-      // Timeout per stop automatico dopo 15 secondi
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-        handleStopRecording(rec);
+        handleStopRecording();
       }, RECORDING_LIMIT);
 
     } catch (error) {
       console.error('Error starting voice record:', error);
       setIsRecording(false);
-      setRecording(null);
+      recordingRef.current = null;
+    } finally {
+      isStartingRecording.current = false;
     }
   };
 
-  const handleStopRecording = async (recordingOverride?: any) => {
-    const currentRecording = recordingOverride || recording;
+  const handleStopRecording = async () => {
+    const duration = Date.now() - lastStartTime.current;
     
-    // Se non abbiamo una registrazione attiva, resettiamo e usciamo
+    // Se il tocco è stato troppo breve (< 200ms), annulla invece di processare
+    if (duration < 200) {
+      await handleCancelRecording();
+      return;
+    }
+
+    const currentRecording = recordingRef.current;
     if (!currentRecording) {
       setIsRecording(false);
       setIsProcessing(false);
       return;
     }
 
-    // Forza subito lo stato di caricamento UI
     setIsProcessing(true);
     setIsRecording(false);
+    setIsSlidingToCancel(false);
     
-    // Ferma timer e animazione subito
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
     recordingProgress.stopAnimation();
-
-    // Reset stati locali prima del parsing
-    setRecording(null);
+    recordingRef.current = null;
     
     try {
       const uri = await stopRecording(currentRecording);
-      
-      // Passo 1: Trascrizione audio
       const transcribedText = await transcribeAudio(uri);
       if (!transcribedText) {
         setIsProcessing(false);
         showToast('Non sono riuscito a capire l\'audio. Riprova.');
         return;
       }
-
-      // Passo 2: Routing basato sul testo trascritto
-      const route = routeInput(transcribedText);
-
-      if (route === 'expense') {
-        const locContext = await getCurrentLocationContext();
-        const parsed = await parseFromVoice(uri, locContext);
-        setIsProcessing(false);
-        router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
-      } else if (route === 'query') {
-        setIsProcessing(false);
-        router.push({ pathname: '/ai-chat', params: { message: transcribedText } });
-      } else {
-        setIsProcessing(false);
-        showToast("Non ho capito 😅  Prova: \"Ho speso 5€ al bar\" o \"Quanto ho speso questo mese?\"");
-      }
+      await navigateByRoute(transcribedText);
+      setIsProcessing(false);
     } catch (error) {
       console.error('Error stopping voice record:', error);
       setIsProcessing(false);
-      // Pulizia di sicurezza
       setIsRecording(false);
-      setRecording(null);
+      recordingRef.current = null;
     }
   };
 
   const handleCancelRecording = async () => {
-    if (!recording) {
-      setIsRecording(false);
-      return;
-    }
+    const currentRecording = recordingRef.current;
     
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -195,16 +201,51 @@ export default function BottomMenu() {
     recordingProgress.stopAnimation();
     recordingProgress.setValue(0);
 
-    const currentRecording = recording;
-    setRecording(null);
+    recordingRef.current = null;
     setIsRecording(false);
+    setIsSlidingToCancel(false);
+    slideX.setValue(0);
 
-    try {
-      await currentRecording.stopAndUnloadAsync();
-    } catch (e) {
-      console.error('Error cancelling recording:', e);
+    if (currentRecording) {
+      try {
+        await currentRecording.stopAndUnloadAsync();
+      } catch (e) {
+        console.error('Error cancelling recording:', e);
+      }
     }
   };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        handleStartRecording();
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (!isRecording) return;
+        
+        // Tracciamo lo scorrimento a sinistra
+        if (gestureState.dx < 0) {
+          slideX.setValue(gestureState.dx);
+          if (gestureState.dx < CANCEL_THRESHOLD) {
+            setIsSlidingToCancel(true);
+          } else {
+            setIsSlidingToCancel(false);
+          }
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dx < CANCEL_THRESHOLD) {
+          handleCancelRecording();
+        } else {
+          handleStopRecording();
+        }
+      },
+      onPanResponderTerminate: () => {
+        handleCancelRecording();
+      },
+    })
+  ).current;
 
   return (
     <KeyboardAvoidingView 
@@ -213,7 +254,7 @@ export default function BottomMenu() {
     >
       {isExpanded ? (
         <View style={styles.navWrapper}>
-          {/* Icona sinistra (Back o Annulla) */}
+          {/* 1. Icona sinistra (Back o Annulla) */}
           <Pressable 
             onPress={() => isRecording ? handleCancelRecording() : setIsExpanded(false)} 
             style={styles.navIcon}
@@ -221,25 +262,34 @@ export default function BottomMenu() {
             <Ionicons name={isRecording ? "close" : "chevron-back"} size={24} color={COLORS.primary} />
           </Pressable>
 
-          {/* WhatsApp-style Input Bar */}
+          {/* 2. Campo di Testo centrale */}
           <View style={styles.inputContainer}>
-            {(isRecording || isProcessing) ? (
-              <View style={styles.progressBarWrapper}>
-                <Animated.View 
+            {isRecording ? (
+              <View style={styles.recordingOverlay}>
+                <View style={styles.recordingIndicatorRow}>
+                  <View style={styles.recordingDot} />
+                  <Text style={styles.recordingText}>Registrazione...</Text>
+                </View>
+                <Animated.Text 
                   style={[
-                    styles.progressBar, 
+                    styles.cancelHint,
+                    isSlidingToCancel && styles.cancelHintActive,
                     { 
-                      width: isProcessing ? '100%' : recordingProgress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%']
-                      }),
-                      backgroundColor: isProcessing ? COLORS.accent : recordingProgress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['#FFF', COLORS.danger]
+                      transform: [{ translateX: slideX }],
+                      opacity: slideX.interpolate({
+                        inputRange: [CANCEL_THRESHOLD, 0],
+                        outputRange: [0.5, 1]
                       })
                     }
-                  ]} 
-                />
+                  ]}
+                >
+                  {isSlidingToCancel ? "Rilascia per annullare" : "< Scorri qui per annullare"}
+                </Animated.Text>
+              </View>
+            ) : isProcessing ? (
+              <View style={styles.processingWrapper}>
+                <ActivityIndicator size="small" color={COLORS.accent} />
+                <Text style={styles.processingText}>Wolly sta pensando...</Text>
               </View>
             ) : (
               <>
@@ -251,120 +301,67 @@ export default function BottomMenu() {
                   onChangeText={setInputText}
                   onSubmitEditing={handleSend}
                 />
-                <View style={styles.inputActions}>
-                  {inputText.length > 0 ? (
-                    <Pressable onPress={handleSend} style={styles.actionIcon}>
-                      <Ionicons name="send" size={22} color={COLORS.accent} />
-                    </Pressable>
-                  ) : (
-                    <Pressable onPress={handleCamera} style={styles.actionIcon}>
-                      <Ionicons name="camera-outline" size={24} color={COLORS.secondary} />
-                    </Pressable>
-                  )}
-                </View>
+                {inputText.length > 0 && (
+                  <Pressable onPress={handleSend} style={styles.actionIcon}>
+                    <Ionicons name="send" size={22} color={COLORS.accent} />
+                  </Pressable>
+                )}
               </>
-            )}
-
-            {(isRecording || isProcessing) && (
-               <View style={styles.recordingIndicatorSection}>
-                 <View style={styles.recordingDot} />
-                 <Text style={styles.recordingText}>
-                   {isProcessing ? "Analisi in corso..." : "Registrazione..."}
-                 </Text>
-               </View>
             )}
           </View>
           
-          {/* Tasto Azione Destra: Registrazione / Stop / Caricamento */}
-          <Pressable 
-            onPress={() => isRecording ? handleStopRecording() : handleStartRecording()}
+          {/* 3. Tasto Audio (Mic) con PanResponder */}
+          <View
+            {...panResponder.panHandlers}
             style={[
               styles.navIcon, 
               isRecording && styles.recordingActiveButton,
-              isProcessing && { borderColor: COLORS.accent }
+              isSlidingToCancel && { backgroundColor: COLORS.danger + '20' }
             ]}
-            disabled={isProcessing}
           >
-            {isProcessing ? (
-              <ActivityIndicator size="small" color={COLORS.accent} />
-            ) : isRecording ? (
-              <View style={styles.stopSquare} />
-            ) : (
-              <Ionicons name="mic-outline" size={28} color={COLORS.secondary} />
-            )}
+            <Ionicons 
+              name={isRecording ? "mic" : "mic-outline"} 
+              size={28} 
+              color={isRecording ? COLORS.danger : COLORS.secondary} 
+            />
+          </View>
+
+          {/* 4. Tasto Foto */}
+          <Pressable
+            onPress={handleCamera}
+            disabled={isProcessing || isRecording}
+            style={[styles.navIcon, (isProcessing || isRecording) && { opacity: 0.5 }]}
+          >
+            <Ionicons name="camera-outline" size={28} color={COLORS.secondary} />
           </Pressable>
         </View>
       ) : (
         <View style={styles.menuBar}>
-          {/* Home Button */}
-          <View style={styles.menuItem}>
-            <Pressable 
-              onPress={() => router.push('/')}
-              style={styles.menuItemInner}
-            >
-              <Ionicons 
-                name={isActive('/') ? "home" : "home-outline"} 
-                size={28} 
-                color={isActive('/') ? COLORS.primary : COLORS.secondary} 
-              />
-            </Pressable>
-          </View>
+          <Pressable onPress={() => router.push('/')} style={styles.menuItem}>
+            <Ionicons name="home-outline" size={24} color={isActive('/') ? COLORS.primary : COLORS.secondary} />
+          </Pressable>
 
-          {/* Stats Button */}
-          <View style={styles.menuItem}>
-            <Pressable 
-              onPress={() => router.push('/stats')}
-              style={styles.menuItemInner}
-            >
-              <Ionicons 
-                name={isActive('/stats') ? "pie-chart" : "pie-chart-outline"} 
-                size={28} 
-                color={isActive('/stats') ? COLORS.primary : COLORS.secondary} 
-              />
-            </Pressable>
-          </View>
+          <Pressable onPress={() => router.push('/stats')} style={styles.menuItem}>
+            <Ionicons name="pie-chart-outline" size={24} color={isActive('/stats') ? COLORS.primary : COLORS.secondary} />
+          </Pressable>
 
-          {/* Add Button - Center FAB */}
-          <View style={styles.menuItem}>
-            <Pressable 
-              onPress={() => setIsExpanded(true)}
-              style={styles.fab}
-            >
-              <Ionicons name="add" size={36} color="#FFF" />
-            </Pressable>
-          </View>
+          {/* Center Plus Button */}
+          <Pressable onPress={() => setIsExpanded(true)} style={styles.fab}>
+            <View style={styles.fabInner}>
+              <Ionicons name="add" size={32} color="#FFF" />
+            </View>
+          </Pressable>
 
-          {/* History Button */}
-          <View style={styles.menuItem}>
-            <Pressable 
-              onPress={() => router.push('/history')}
-              style={styles.menuItemInner}
-            >
-              <Ionicons 
-                name={isActive('/history') ? "list" : "list-outline"} 
-                size={28} 
-                color={isActive('/history') ? COLORS.primary : COLORS.secondary} 
-              />
-            </Pressable>
-          </View>
+          <Pressable onPress={() => router.push('/history')} style={styles.menuItem}>
+            <Ionicons name="list-outline" size={24} color={isActive('/history') ? COLORS.primary : COLORS.secondary} />
+          </Pressable>
 
-          {/* Settings Button */}
-          <View style={styles.menuItem}>
-            <Pressable 
-              onPress={() => router.push('/settings')}
-              style={styles.menuItemInner}
-            >
-              <Ionicons 
-                name={isActive('/settings') ? "settings" : "settings-outline"} 
-                size={26} 
-                color={isActive('/settings') ? COLORS.primary : COLORS.secondary} 
-              />
-            </Pressable>
-          </View>
+          <Pressable onPress={() => router.push('/settings')} style={styles.menuItem}>
+            <Ionicons name="settings-outline" size={24} color={isActive('/settings') ? COLORS.primary : COLORS.secondary} />
+          </Pressable>
         </View>
       )}
 
-      {/* Toast feedback per input non compreso */}
       {toastMsg && (
         <View style={styles.toast}>
           <Text style={styles.toastText}>{toastMsg}</Text>
@@ -381,17 +378,17 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: SPACING.md,
   },
-  // --- Expanded Chat Bar Styles ---
   navWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: 'transparent',
+    gap: SPACING.xs,
   },
   navIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -403,14 +400,14 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
-    borderRadius: 30,
-    marginHorizontal: SPACING.md,
+    borderRadius: 28,
     paddingHorizontal: SPACING.md,
-    height: 60,
+    height: 56,
     alignItems: 'center',
     ...SHADOWS.medium,
     borderWidth: 1,
     borderColor: COLORS.border,
+    overflow: 'hidden',
   },
   input: {
     flex: 1,
@@ -419,63 +416,63 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.base,
     color: COLORS.primary,
   },
-  inputActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
   actionIcon: {
     padding: 6,
   },
   // --- Recording UI ---
-  progressBarWrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    borderRadius: 25,
-    overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
-  },
-  progressBar: {
-    height: '100%',
-  },
-  recordingIndicatorSection: {
-    position: 'absolute',
-    left: 25,
+  recordingOverlay: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  recordingIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   recordingDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: COLORS.danger,
-    marginRight: 8,
   },
   recordingText: {
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.primary,
+    color: COLORS.danger,
+  },
+  cancelHint: {
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.secondary,
+  },
+  cancelHintActive: {
+    color: COLORS.danger,
+    fontFamily: TYPOGRAPHY.fontBold,
+  },
+  processingWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  processingText: {
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.secondary,
   },
   recordingActiveButton: {
-    backgroundColor: '#FEE2E2', // Rosa molto chiaro
-    borderColor: '#FCA5A5',
+    borderColor: COLORS.danger,
+    transform: [{ scale: 1.1 }],
+    backgroundColor: '#FFF',
   },
-  stopSquare: {
-    width: 16,
-    height: 16,
-    backgroundColor: COLORS.danger,
-    borderRadius: 2,
-  },
-  // --- Classic Menu Styles ---
+
+  // --- Normal Menu Bar Styles ---
   menuBar: {
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
-    width: '100%',
-    height: 70,
-    borderRadius: 35,
+    borderRadius: 32,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 10,
@@ -484,24 +481,24 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   menuItem: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  menuItemInner: {
-    width: '100%',
+    width: 60,
     height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   fab: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    marginTop: -32,
+  },
+  fabInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.medium,
+    borderWidth: 4,
+    borderColor: COLORS.background,
   },
   toast: {
     position: 'absolute',

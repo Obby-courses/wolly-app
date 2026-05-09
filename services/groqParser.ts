@@ -27,11 +27,14 @@ export async function parseExpenseWithAI(
   const currentDayName = currentDayNames[now.getDay()];
 
   const currentDateISO = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
   const systemPrompt = `Sei l'Analista Finanziario Senior di Wolly. Il tuo compito è estrarre dati strutturati con precisione millimetrica.
 REQUISITO: Restituisci SOLO un oggetto JSON valido.
 
-TIMESTAMP DI RIFERIMENTO: Oggi è ${currentDateISO} (${currentDayName}).
+CONTESTO TEMPORALE (TELEFONO UTENTE):
+- Data di oggi: ${currentDateISO} (${currentDayName})
+- Ora attuale: ${currentTime}
 
 TASSONOMIA UFFICIALE:
 Ogni transazione ha una CATEGORIA specifica (voce dettagliata) che appartiene univocamente a un DOMINIO (macro-gruppo).
@@ -56,7 +59,9 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
 4. IMPORTO (amount): Cerca il "TOTALE" finale. Esempio Scontrini: se vedi "Totale 19,00" e "Contanti 20,00", l'amount è 19,00.
 5. SCONTRINI (receipt): "social_context": null, "is_social": false.
 6. BRAND: SUBDUED -> category_key: "abbigliamento_scarpe", domain_key: "acquisti".
-7. DATE RELATIVE: Se l'input contiene riferimenti temporali relativi, calcola la data ISO reale partendo da oggi (${currentDateISO}). Restituisci SEMPRE YYYY-MM-DD o null.
+7. DATA E ORA: Se l'input contiene riferimenti temporali relativi (es. "poco fa", "stasera", "ieri"), calcola la data/ora reale partendo da ${currentDateISO} ${currentTime}. 
+   - "date": deve essere sempre "YYYY-MM-DD". Default: ${currentDateISO}.
+   - "time": deve essere sempre "HH:mm". Default: ${currentTime} se non specificato diversamente.
 8. DIRECTION: Deduci da contesto ("pagato", "speso" → "out"; "ricevuto", "stipendio", "rimborso" → "in"). Default: "out".
 9. VENDITORE vs GEOGRAFIA: 
    - location_name: Estrai il nome del brand o negozio (es: "Esselunga", "Amazon", "McDonald's"). Se è un acquisto online, metti is_online = true e location_type = "online".
@@ -64,11 +69,6 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
    - FALLBACK GEOGRAFICO: Se la città/indirizzo NON sono detti esplicitamente, usa questi dati del telefono dell'utente: Città: ${locationContext?.city || 'non disponibile'}, Indirizzo: ${locationContext?.address || 'non disponibile'}.
 10. PERSONE: Estrai nomi propri menzionati in people_mentioned. Deduci social_context: "amici", "famiglia", "colleghi", "coppia". Se non specificato o se è "da solo", metti null. DIVIETO: NON usare mai la stringa "solo".
 11. LOCATION TYPE: Deduci location_type tra: "casa", "ristorante", "negozio_fisico", "online", "trasporti", "lavoro", "viaggio", "estero".
-
-DATE FORMAT: "YYYY-MM-DD".
-
-JSON OUTPUT FORMAT:
-{
   "amount": number,
   "net_amount": number,
   "currency": "EUR",
