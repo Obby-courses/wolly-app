@@ -28,11 +28,13 @@ export interface QueryIntent {
   group_by?: 'category' | 'city'; // come raggruppare i dati (default: category)
   social_context_filter?: string; // contesto sociale (es: "Amici", "Famiglia")
   person_filter?: string;         // persona specifica (es: "Marco", "Stefano")
+  holiday_filter?: string;        // festività (es: "Natale", "Pasqua")
+  tag_filter?: string;            // tag specifico (es: "viaggio", "trasferta")
 }
 
 // ─── Prompt Builder (Dinamico) ───────────────────────────────────────────────
 
-function buildParserPrompt(currentDateISO: string, cities: string[], socialContexts: string[], people: string[]): string {
+function buildParserPrompt(currentDateISO: string, cities: string[], socialContexts: string[], people: string[], holidays: string[], tags: string[]): string {
   const domainList = DOMAINS_CONFIG.map(d => d.key).join(', ');
   const categoryList = DOMAINS_CONFIG.flatMap(d => 
     d.categories.map(c => `${c.key}→${d.key}`)
@@ -40,6 +42,8 @@ function buildParserPrompt(currentDateISO: string, cities: string[], socialConte
   const cityList = cities.length > 0 ? cities.join(', ') : 'nessuna città ancora registrata';
   const socialList = socialContexts.length > 0 ? socialContexts.join(', ') : 'nessun contesto ancora registrato (es: Amici, Famiglia)';
   const peopleList = people.length > 0 ? people.join(', ') : 'nessuna persona ancora registrata';
+  const holidayList = holidays.length > 0 ? holidays.join(', ') : 'nessuna festività ancora registrata (es: Natale, Pasqua)';
+  const tagList = tags.length > 0 ? tags.join(', ') : 'nessun tag ancora registrato (es: viaggio, trasferta)';
 
   return `Sei un parser di query finanziarie. La tua UNICA funzione è trasformare la domanda dell'utente in un oggetto JSON che descrive COME filtrare i dati. NON calcoli, NON numeri, solo filtri.
 Oggi è ${currentDateISO}.
@@ -49,9 +53,11 @@ TASSONOMIA DISPONIBILE:
 - CITTÀ CONOSCIUTE (city_filter): ${cityList}
 - CONTESTI SOCIALI (social_context_filter): ${socialList}
 - PERSONE CONOSCIUTE (person_filter): ${peopleList}
+- FESTIVITÀ CONOSCIUTE (holiday_filter): ${holidayList}
+- TAG REGISTRATI (tag_filter): ${tagList}
 
 L'AI funge da estrattore rigido. Trasforma la frase in un JSON con tre parametri logici:
-1. COSA: category_filter, domain_filter o merchant_filter.
+1. COSA: category_filter, domain_filter, merchant_filter, holiday_filter o tag_filter.
 2. QUANDO: period (mese, settimana, anno, custom).
 3. COME: aggregation_type (total, average, count).
 
@@ -83,10 +89,14 @@ FORMATO JSON OBBLIGATORIO:
   "city_filter": string|null,
   "group_by": "category"|"city"|null,
   "social_context_filter": string|null,
-  "person_filter": string|null
+  "person_filter": string|null,
+  "holiday_filter": string|null,
+  "tag_filter": string|null
 }
 
 REGOLE:
+- Se l'utente nomina una festività (es: "Natale", "Pasqua", "Ferragosto") → holiday_filter="nome festività"
+- Se l'utente nomina un tag o una tipologia (es: "viaggio", "trasferta") → tag_filter="tag"
 - Se l'utente nomina un negozio specifico (es: "Coca Cola", "Esselunga", "Amazon") → merchant_filter="nome negozio"
 - Se l'utente chiede "quante volte" → aggregation_type="count", archetype="total"
 - Se l'utente chiede "media" o "in media" → aggregation_type="average", archetype="total"
@@ -112,14 +122,16 @@ export async function parseQueryIntent(
   const currentDateISO = now.toISOString().split('T')[0];
   
   // Fetch dynamic data
-  const [cities, socialContexts, people] = await Promise.all([
+  const [cities, socialContexts, people, holidays, tags] = await Promise.all([
     TransactionRepository.getDistinctCities(),
     TransactionRepository.getDistinctSocialContexts(),
-    TransactionRepository.getDistinctPeople()
+    TransactionRepository.getDistinctPeople(),
+    TransactionRepository.getDistinctHolidays(),
+    TransactionRepository.getDistinctTags()
   ]);
 
   const messages = [
-    { role: 'system', content: buildParserPrompt(currentDateISO, cities, socialContexts, people) },
+    { role: 'system', content: buildParserPrompt(currentDateISO, cities, socialContexts, people, holidays, tags) },
     // Includi solo gli ultimi 2 messaggi per dare contesto minimo alla conversazione
     ...history.slice(-2).map(h => ({ role: h.role, content: h.content })),
     { role: 'user', content: userMessage },

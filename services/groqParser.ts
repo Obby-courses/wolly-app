@@ -44,7 +44,7 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
 - cibo_bevande -> [alimentari, ristorante_fast_food, bar_caffe]
 - acquisti -> [abbigliamento_scarpe, gioielli_accessori, salute_bellezza, bambini, casa_giardino, animali, elettronica_accessori, regali_gioia, cancelleria_attrezzi, tempo_libero, drogheria_farmacia]
 - alloggio -> [affitto, mutuo, energia_utenze, manutenzione_riparazioni, assicurazione_proprieta]
-- trasporti -> [trasporto_pubblico, taxi, lunga_distanza, viaggi_lavoro]
+- trasporti -> [trasporto_pubblico, taxi, lunga_distanza]
 - veicolo -> [carburante, parcheggio, manutenzione_veicoli, noleggio, assicurazione_veicolo, leasing]
 - vita_intrattenimento -> [assistenza_sanitaria, wellness_bellezza, sport_fitness, cultura_eventi, eventi_vita, hobby, formazione_sviluppo, libri_audio_abbonamenti, tv_streaming, vacanze_viaggi_hotel, beneficienza_regali, alcool_tabacco, lotteria_azzardo]
 - comunicazione_pc -> [telefono_cellulare, internet, software_app_giochi, servizi_postali]
@@ -96,12 +96,19 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
   "description": "string",
   "refund": null,
   "split": null,
+  "holiday": string|null,
+  "tags": string[]|null,
   "suggest_subscription": boolean,
   "subscription_name": string|null,
   "subscription_amount": number|null,
   "subscription_frequency": "monthly"|"weekly"|"biweekly"|"yearly"|null,
   "subscription_day": number|null
 }
+
+REGOLE AGGIUNTIVE:
+12. HOLIDAY: Estrai il nome della festività (es: "Natale", "Pasqua", "Ferragosto") SOLO se menzionata esplicitamente. Altrimenti null.
+13. TAGS: Estrai tag come "viaggio", "trasferta" o altri termini qualificanti SOLO se esplicitati. Restituisci un array di stringhe o null.
+14. AMBIGUITÀ VIAGGIO: Se l'utente dice "viaggio di lavoro" o "viaggio" senza specificare cosa ha comprato (es: "5€ viaggio"), NON usare categorie di trasporto. Usa category_key: "tempo_libero" e inserisci "viaggio" o "viaggio di lavoro" nel campo tags.
 
 REGOLA ABBONAMENTO: Imposta "suggest_subscription": true SOLO se l'importo ha pattern da servizio in abbonamento (es. importi fissi come 9.99, 15.99, nomi noti come Netflix, Spotify, Amazon Prime, Adobe, palestra, affitto, assicurazione, etc.). In tutti gli altri casi imposta false e gli altri campi abbonamento a null.
 `;
@@ -304,7 +311,9 @@ REGOLA ABBONAMENTO: Imposta "suggest_subscription": true SOLO se l'importo ha pa
       is_deleted: false,
       synced_at: null,
       refund: null,
-      split: null
+      split: null,
+      holiday: null,
+      tags: null
     };
   }
 }

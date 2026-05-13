@@ -289,52 +289,6 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
 
 // ─── Text-only AI response (per domande conversazionali) ─────────────────────
 
-async function askTextQuestion(userMessage: string, history: ChatMessage[]): Promise<string> {
-  const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
-  if (!apiKey) return 'Chiave API non configurata.';
-
-  // Fetch subscription context for textual questions
-  const allSubs = await SubscriptionRepository.getAll();
-  const activeSubs = allSubs.filter(s => s.is_active);
-  const subSummary = activeSubs.length > 0 
-    ? `L'utente ha ${activeSubs.length} abbonamenti attivi: ${activeSubs.map(s => `${s.name} (€${s.amount}/${s.frequency})`).join(', ')}.`
-    : "L'utente non ha abbonamenti attivi.";
-
-  const messages = [
-    {
-      role: 'system',
-      content: `Sei Wolly, un assistente finanziario personale. Rispondi in italiano, in modo conciso (max 3 frasi). 
-      
-      CONTESTO ABBONAMENTI:
-      ${subSummary}
-      
-      Se l'utente chiede consigli su come risparmiare, considera questi abbonamenti.`
-    },
-    ...history.slice(-4).map(h => ({ role: h.role, content: h.content })),
-    { role: 'user', content: userMessage },
-  ];
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, max_tokens: 300 }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (!response.ok) throw new Error(`${response.status}`);
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    console.log(`💬 [ORCHESTRATOR] Text response: "${content}"`);
-    return content;
-  } catch (e: any) {
-    clearTimeout(timeoutId);
-    return 'Non riesco a rispondere in questo momento.';
-  }
-}
 
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
 
@@ -379,9 +333,12 @@ export async function askAiChat(
     let finalResponse: AiChatResponse;
 
     if (result.archetype === 'text') {
-      console.log('💬 [ORCHESTRATOR] Domanda testuale → AI conversazionale');
-      const textReply = await askTextQuestion(userMessage, history);
-      finalResponse = { intent: 'text', text_response: textReply, queryIntent: intent };
+      console.log('💬 [ORCHESTRATOR] Domanda testuale → Blocco risposta');
+      finalResponse = { 
+        intent: 'text', 
+        text_response: 'Non posso aiutarti con questo. Sono qui solo per analizzare i tuoi dati finanziari.', 
+        queryIntent: intent 
+      };
     } else {
       console.log(`✅ [ORCHESTRATOR] Dati pronti → composizione TS (archetype: ${result.archetype})`);
       finalResponse = buildResponseFromResult(intent, result);

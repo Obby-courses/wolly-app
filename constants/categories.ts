@@ -71,7 +71,6 @@ export const DOMAINS_CONFIG: Domain[] = [
       { key: 'trasporto_pubblico', label: 'Trasporto pubblico', domain_key: 'trasporti' },
       { key: 'taxi', label: 'Taxi', domain_key: 'trasporti' },
       { key: 'lunga_distanza', label: 'Lunga distanza', domain_key: 'trasporti' },
-      { key: 'viaggi_lavoro', label: 'Viaggi di lavoro', domain_key: 'trasporti' },
     ]
   },
   {

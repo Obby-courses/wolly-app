@@ -29,7 +29,9 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
       synced_at TEXT,
       is_deleted INTEGER NOT NULL DEFAULT 0,
       people_mentioned TEXT,
-      subscription_id TEXT
+      subscription_id TEXT,
+      holiday TEXT,
+      tags TEXT
     );
   `);
 
@@ -39,6 +41,19 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
   try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN domain_key TEXT;`); } catch (e) {}
   try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN people_mentioned TEXT;`); } catch (e) {}
   try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN subscription_id TEXT;`); } catch (e) {}
+  try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN holiday TEXT;`); } catch (e) {}
+  try { await db.execAsync(`ALTER TABLE transactions ADD COLUMN tags TEXT;`); } catch (e) {}
+
+  // Migrate 'viaggi_lavoro' to 'lunga_distanza' + tag 'trasferta'
+  try {
+    await db.execAsync(`
+      UPDATE transactions 
+      SET category_key = 'lunga_distanza', 
+          subcategory_key = 'lunga_distanza',
+          tags = CASE WHEN tags IS NULL OR tags = '' THEN 'trasferta' ELSE tags || ',trasferta' END
+      WHERE category_key = 'viaggi_lavoro';
+    `);
+  } catch (e) {}
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS net_worth (

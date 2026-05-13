@@ -18,12 +18,12 @@ export class TransactionRepository {
         id, created_at, date, time, amount, net_amount, currency, direction,
         payment_method, category_key, subcategory_key, domain_key, description,
         social_context, location_type, location_name, city, address,
-        is_travel, is_online, split_people, input_method, raw_input, synced_at, is_deleted, people_mentioned, subscription_id
+        is_travel, is_online, split_people, input_method, raw_input, synced_at, is_deleted, people_mentioned, subscription_id, holiday, tags
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `, [
       expense.id,
@@ -53,6 +53,8 @@ export class TransactionRepository {
       0, // is_deleted
       expense.people_mentioned ? expense.people_mentioned.join(',') : null,
       subscription_id || null,
+      expense.holiday || null,
+      expense.tags ? expense.tags.join(',') : null,
     ]);
 
     // Sincronizzazione Patrimonio: Incrementa o Decrementa
@@ -121,14 +123,12 @@ export class TransactionRepository {
       ORDER BY month ASC
     `, [year.toString()]);
 
-    // Initialize all 12 months
     const stats = Array.from({ length: 12 }, (_, i) => ({
       month: i + 1,
       income: 0,
       expense: 0
     }));
 
-    // Merge DB results
     results.forEach((row: any) => {
       if (row.month >= 1 && row.month <= 12) {
         stats[row.month - 1].income = row.income;
@@ -159,11 +159,16 @@ export class TransactionRepository {
     `, [`${yearStr}-${monthStr}`]);
 
     const lastDay = new Date(year, month, 0).getDate();
-    const stats = Array.from({ length: lastDay }, (_, i) => ({
-      day: i + 1,
-      income: 0,
-      expense: 0
-    }));
+    const stats = Array.from({ length: lastDay }, (_, i) => {
+      const dayNum = i + 1;
+      const dayStr = dayNum < 10 ? `0${dayNum}` : `${dayNum}`;
+      return {
+        day: dayNum,
+        date: `${yearStr}-${monthStr}-${dayStr}`,
+        income: 0,
+        expense: 0
+      };
+    });
 
     results.forEach((row: any) => {
       if (row.day >= 1 && row.day <= lastDay) {
@@ -178,7 +183,7 @@ export class TransactionRepository {
   /**
    * Retrieves daily stats for the current week (Mon-Sun).
    */
-  static async getDailyStatsForRecentDays(days: number): Promise<{ label: string, income: number, expense: number }[]> {
+  static async getDailyStatsForRecentDays(days: number, offsetDays: number = 0): Promise<{ label: string, income: number, expense: number }[]> {
     const db = await getDBConnection();
     const results = await db.getAllAsync(`
       SELECT 
@@ -186,19 +191,20 @@ export class TransactionRepository {
         SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END) as income,
         SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END) as expense
       FROM transactions
-      WHERE date >= date('now', ?) AND is_deleted = 0 AND direction != 'adj'
+      WHERE date >= date('now', ?) AND date <= date('now', ?) AND is_deleted = 0 AND direction != 'adj'
       GROUP BY date
       ORDER BY date ASC
-    `, [`-${days} days`]);
+    `, [`-${days + offsetDays} days`, `-${offsetDays} days`]);
 
     const stats = [];
-    for (let i = days; i >= 0; i--) {
+    for (let i = days + offsetDays; i >= offsetDays; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const match = results.find((r: any) => r.date === dateStr);
       stats.push({
         label: d.toLocaleDateString('it-IT', { weekday: 'short' }),
+        date: dateStr,
         income: match ? (match as any).income : 0,
         expense: match ? (match as any).expense : 0
       });
@@ -417,11 +423,35 @@ export class TransactionRepository {
   }
 
   /**
+   * Retrieves all unique holidays present in the database.
+   */
+  static async getDistinctHolidays(): Promise<string[]> {
+    const db = await getDBConnection();
+    const results = await db.getAllAsync('SELECT DISTINCT holiday FROM transactions WHERE holiday IS NOT NULL AND holiday != "" AND is_deleted = 0');
+    return results.map((r: any) => r.holiday);
+  }
+
+  /**
+   * Retrieves all unique tags present in the database.
+   */
+  static async getDistinctTags(): Promise<string[]> {
+    const db = await getDBConnection();
+    const results = await db.getAllAsync('SELECT DISTINCT tags FROM transactions WHERE tags IS NOT NULL AND tags != "" AND is_deleted = 0');
+    
+    const allTags = new Set<string>();
+    results.forEach((r: any) => {
+      r.tags.split(',').forEach((t: string) => allTags.add(t.trim()));
+    });
+    
+    return Array.from(allTags);
+  }
+
+  /**
    * Retrieves transactions filtered by period, category, subcategory and sorted.
    */
   static async getFilteredTransactions(
     timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto',
-    filters: { domain_key?: string, category_key?: string, subcategory_key?: string, direction?: 'in' | 'out', city?: string, social_context?: string, person?: string, merchant_name?: string },
+    filters: { domain_key?: string, category_key?: string, subcategory_key?: string, direction?: 'in' | 'out', city?: string, social_context?: string, person?: string, merchant_name?: string, holiday?: string, tag?: string },
     sortBy: 'date' | 'amount_asc' | 'amount_desc',
     baseDate: string = new Date().toISOString().split('T')[0]
   ): Promise<any[]> {
@@ -447,6 +477,8 @@ export class TransactionRepository {
     if (filters.city) query += ` AND t.city = '${filters.city}'`;
     if (filters.social_context) query += ` AND t.social_context = '${filters.social_context}'`;
     if (filters.person) query += ` AND t.people_mentioned LIKE '%${filters.person}%'`;
+    if (filters.holiday) query += ` AND t.holiday = '${filters.holiday}'`;
+    if (filters.tag) query += ` AND t.tags LIKE '%${filters.tag}%'`;
 
     // Sorting
     if (sortBy === 'date') query += " ORDER BY t.date DESC, t.time DESC";
@@ -543,7 +575,7 @@ export class TransactionRepository {
         date = ?, time = ?, amount = ?, net_amount = ?, currency = ?, direction = ?,
         payment_method = ?, category_key = ?, subcategory_key = ?, description = ?,
         social_context = ?, location_type = ?, location_name = ?, city = ?, address = ?,
-        is_travel = ?, is_online = ?, split_people = ?, subscription_id = ?
+        is_travel = ?, is_online = ?, split_people = ?, subscription_id = ?, holiday = ?, tags = ?
       WHERE id = ?
     `, [
       updates.date || oldTx.date,
@@ -565,6 +597,8 @@ export class TransactionRepository {
       updates.is_online !== undefined ? (updates.is_online ? 1 : 0) : oldTx.is_online,
       updates.split_people !== undefined ? updates.split_people : oldTx.split_people,
       updates.subscription_id !== undefined ? updates.subscription_id : oldTx.subscription_id,
+      updates.holiday !== undefined ? updates.holiday : oldTx.holiday,
+      updates.tags !== undefined ? (Array.isArray(updates.tags) ? updates.tags.join(',') : updates.tags) : oldTx.tags,
       id
     ]);
 
@@ -579,7 +613,7 @@ export class TransactionRepository {
   static async getRecentForAi(limit: number = 50): Promise<any[]> {
     const db = await getDBConnection();
     return db.getAllAsync(`
-      SELECT date, amount, direction, category_key, description, city, location_name
+      SELECT date, amount, direction, category_key, description, city, location_name, holiday, tags
       FROM transactions
       WHERE is_deleted = 0
       ORDER BY date DESC, time DESC

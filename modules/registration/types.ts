@@ -61,6 +61,8 @@ export interface ParsedExpense {
   description: string;
   input_method: InputMethod;
   raw_input: string;
+  holiday: string | null;
+  tags: string[] | null;
 
   // Sync
   is_deleted: boolean;
@@ -96,4 +98,6 @@ export interface RawParsingResult {
   description: string;
   refund: Refund | null;
   split: Split | null;
+  holiday: string | null;
+  tags: string[] | null;
 }

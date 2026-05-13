@@ -8,6 +8,7 @@ import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { getCategory } from '../constants/categories';
 import { getCategoryColor } from '../components/CategoryPill';
 import TimeFilter, { TimeRange } from '../components/TimeFilter';
+import TransactionItem from '../components/TransactionItem';
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -89,36 +90,9 @@ export default function HistoryScreen() {
     fetchMetadata();
   }, [selectedCategory]);
 
-  const renderTransaction = ({ item }: { item: any }) => {
-    const isIncome = item.direction === 'in';
-    
-    // Trova i dettagli della categoria per label e colore coerenti
-    const category = getCategory(item.category_key);
-    const categoryColor = getCategoryColor(item.category_key);
-    const displayCategory = category ? category.label : item.category_key.replace(/_/g, ' ');
-
-    return (
-      <Pressable
-        style={styles.transactionCard}
-        onPress={() => router.push(`/transaction/${item.id}`)}
-      >
-        <View style={[styles.categoryIndicator, { backgroundColor: categoryColor }]} />
-        <View style={styles.transactionInfo}>
-          <Text style={styles.transactionTitle} numberOfLines={1}>
-            {item.description || displayCategory}
-          </Text>
-          <Text style={styles.transactionMeta}>
-            {displayCategory} • {new Date(item.date).toLocaleDateString('it-IT')}
-          </Text>
-        </View>
-        <View style={styles.amountContainer}>
-          <Text style={[styles.transactionAmount, isIncome ? styles.income : styles.expense]}>
-            {!isIncome ? '- ' : '+ '}€{Math.abs(item.amount).toFixed(2)}
-          </Text>
-        </View>
-      </Pressable>
-    );
-  };
+  const renderTransaction = ({ item }: { item: any }) => (
+    <TransactionItem item={item} />
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -279,44 +253,6 @@ const styles = StyleSheet.create({
   listContent: {
     padding: SPACING.lg,
     paddingBottom: 120, // Increased to avoid BottomMenu
-  },
-  transactionCard: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: 20,
-    marginBottom: SPACING.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...SHADOWS.soft
-  },
-  categoryIndicator: {
-    width: 4,
-    height: 30,
-    borderRadius: 2,
-    marginRight: SPACING.md,
-  },
-  transactionInfo: {
-    flex: 1,
-  },
-  transactionTitle: {
-    fontSize: TYPOGRAPHY.sizes.base,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
-    textTransform: 'capitalize',
-  },
-  transactionMeta: {
-    fontSize: TYPOGRAPHY.sizes.xs,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    color: COLORS.secondary,
-    textTransform: 'uppercase',
-    marginTop: 2,
-  },
-  amountContainer: {
-    alignItems: 'flex-end',
-  },
-  transactionAmount: {
-    fontSize: TYPOGRAPHY.sizes.base,
-    fontFamily: TYPOGRAPHY.fontBold,
   },
   income: {
     color: COLORS.success,

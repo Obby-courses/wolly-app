@@ -127,7 +127,9 @@ async function fetchComparisonTotal(
   domainFilter?: string,
   cityFilter?: string,
   socialContextFilter?: string,
-  personFilter?: string
+  personFilter?: string,
+  holidayFilter?: string,
+  tagFilter?: string
 ): Promise<number> {
   const now = new Date();
   let compPeriod: QueryPeriod;
@@ -144,7 +146,9 @@ async function fetchComparisonTotal(
   const dist = await TransactionRepository.getCategoryDistribution(timeRange, direction, baseDate, {
     city: cityFilter,
     socialContext: socialContextFilter,
-    personName: personFilter
+    personName: personFilter,
+    holiday: holidayFilter,
+    tag: tagFilter
   });
 
   if (categoryFilter) {
@@ -203,6 +207,8 @@ export async function executeQueryIntent(intent: QueryIntent): Promise<Execution
       city: intent.city_filter,
       social_context: intent.social_context_filter,
       person: intent.person_filter,
+      holiday: intent.holiday_filter,
+      tag: intent.tag_filter,
     };
     
     const transactions = await TransactionRepository.getFilteredTransactions(timeRange, filters, 'date', baseDate);
@@ -234,7 +240,7 @@ export async function executeQueryIntent(intent: QueryIntent): Promise<Execution
     if (intent.comparison_period && agg === 'total') {
       const prevTotal = await fetchComparisonTotal(
         intent.period, intent.comparison_period, direction,
-        intent.category_filter, intent.domain_filter, intent.city_filter, intent.social_context_filter, intent.person_filter
+        intent.category_filter, intent.domain_filter, intent.city_filter, intent.social_context_filter, intent.person_filter, intent.holiday_filter, intent.tag_filter
       );
       const diff = finalValue - prevTotal;
       const percentage = prevTotal > 0 ? Math.abs((diff / prevTotal) * 100) : 0;
@@ -253,7 +259,9 @@ export async function executeQueryIntent(intent: QueryIntent): Promise<Execution
         category_key: intent.category_filter,
         socialContext: intent.social_context_filter,
         personName: intent.person_filter,
-        merchantName: resolvedMerchant || intent.merchant_filter || undefined
+        merchantName: resolvedMerchant || intent.merchant_filter || undefined,
+        holiday: intent.holiday_filter,
+        tag: intent.tag_filter
       });
       const grandTotal = dist.reduce((a, c) => a + c.total, 0);
       const items: DistributionItem[] = dist.slice(0, 8).map(d => ({
@@ -271,7 +279,9 @@ export async function executeQueryIntent(intent: QueryIntent): Promise<Execution
       city: intent.city_filter,
       socialContext: intent.social_context_filter,
       personName: intent.person_filter,
-      merchantName: resolvedMerchant || intent.merchant_filter || undefined
+      merchantName: resolvedMerchant || intent.merchant_filter || undefined,
+      holiday: intent.holiday_filter,
+      tag: intent.tag_filter
     });
 
     let filtered = dist;

@@ -60,4 +60,32 @@ export class NetWorthRepository {
     const diff = (results as any)?.diff || 0;
     return currentTotal - diff;
   }
+
+  static async getNetWorthHistory(dataPoints: { label: string, date?: string, day?: number, month?: number }[], type: 'daily' | 'monthly'): Promise<number[]> {
+    const currentTotal = await this.getCurrentTotal();
+    const history: number[] = [];
+    
+    // We iterate backwards to calculate net worth at each point
+    // Net worth at point N = Current Total - Sum of changes after point N
+    
+    for (const point of dataPoints) {
+      let targetDate = '';
+      if (type === 'daily' && point.date) {
+        targetDate = point.date;
+      } else if (type === 'monthly' && point.month) {
+        // Net worth at end of month
+        const year = new Date().getFullYear(); // Simplified for now
+        targetDate = new Date(year, point.month, 0).toISOString().split('T')[0];
+      } else {
+        // Fallback or label based
+        history.push(currentTotal);
+        continue;
+      }
+      
+      const val = await this.getNetWorthAtDate(targetDate);
+      history.push(val);
+    }
+    
+    return history;
+  }
 }

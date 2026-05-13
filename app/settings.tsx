@@ -11,31 +11,12 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.item}>
-            <Ionicons name="person-outline" size={22} color={COLORS.primary} />
-            <Text style={styles.itemText}>Profilo Utente</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dati & Sicurezza</Text>
-          <View style={styles.item}>
-            <Ionicons name="shield-checkmark-outline" size={22} color={COLORS.primary} />
-            <Text style={styles.itemText}>Privacy & Sicurezza</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
-          </View>
+          <Text style={styles.sectionTitle}>Dati & Database</Text>
           <Pressable style={styles.item} onPress={() => router.push('/seed-data')}>
             <Ionicons name="server-outline" size={22} color={COLORS.primary} />
             <Text style={styles.itemText}>Gestione Dati & Seed</Text>
             <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
           </Pressable>
-          <View style={styles.item}>
-            <Ionicons name="cloud-download-outline" size={22} color={COLORS.primary} />
-            <Text style={styles.itemText}>Esporta Dati (Excel)</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
-          </View>
         </View>
 
         <View style={styles.section}>
@@ -45,20 +26,6 @@ export default function SettingsScreen() {
             <Text style={styles.itemText}>Abbonamenti & Ricorrenti</Text>
             <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
           </Pressable>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App</Text>
-          <View style={styles.item}>
-            <Ionicons name="notifications-outline" size={22} color={COLORS.primary} />
-            <Text style={styles.itemText}>Notifiche</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
-          </View>
-          <View style={styles.item}>
-            <Ionicons name="color-palette-outline" size={22} color={COLORS.primary} />
-            <Text style={styles.itemText}>Tema & Personalizzazione</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
