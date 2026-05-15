@@ -150,27 +150,60 @@ export const voiceStore = {
     try {
       // 1. Trascrizione STT
       const { transcribeAudio } = require('./stt');
-      const transcription = await transcribeAudio(uri);
+      let transcription = await transcribeAudio(uri);
       
-      if (!transcription || transcription.trim().length === 0) {
-        state = { ...state, qa: { question: "Non ho capito, puoi ripetere?", answer: null } };
-        notify();
-        setTimeout(() => voiceStore.close(), 2000);
+      // FILTRO ALLUCINAZIONI E INPUT INCOMPLETI (1-2 parole)
+      const words = transcription.trim().split(/\s+/);
+      const isHallucination = !transcription || 
+        transcription.trim() === "..." || 
+        transcription.toLowerCase().includes("grazie.") ||
+        transcription.toLowerCase().includes("sottotitoli");
+      
+      const isTooShort = words.length <= 2;
+
+      if (isHallucination || isTooShort) {
+        // Se è un'allucinazione o una frase troppo breve (1-2 parole), chiude senza disturbare
+        voiceStore.close();
         return;
       }
 
-      // 2. Analisi AI
+      // Se arriviamo qui, abbiamo almeno 3 parole. Proviamo l'analisi AI.
       state = { ...state, qa: { question: transcription, answer: null } };
       notify();
       
-      const { askAiChat } = require('./aiChat');
-      const response = await askAiChat(transcription);
-      
-      state = { ...state, qa: { question: transcription, answer: response } };
+      try {
+        const { askAiChat } = require('./aiChat');
+        const response = await askAiChat(transcription);
+        
+        // Se l'AI non ha capito nulla della richiesta (es: frase lunga senza senso)
+        if (!response || response.text_response === "") {
+          state = { 
+            ...state, 
+            qa: { 
+              question: transcription, 
+              answer: { intent: 'text', text_response: "Non ho capito la richiesta, prova a essere più specifico." } 
+            } 
+          };
+          notify();
+          setTimeout(() => voiceStore.close(), 3000);
+          return;
+        }
+
+        state = { ...state, qa: { question: transcription, answer: response } };
+      } catch (e) {
+        console.error("AI Analysis Error:", e);
+        state = { 
+          ...state, 
+          qa: { 
+            question: transcription, 
+            answer: { intent: 'text', text_response: "Si è verificato un errore nell'analisi AI." } 
+          } 
+        };
+        setTimeout(() => voiceStore.close(), 3000);
+      }
     } catch (e) {
-      console.error("STT/AI Flow Error:", e);
-      state = { ...state, qa: { question: "Errore nella trascrizione", answer: null } };
-      setTimeout(() => voiceStore.close(), 2000);
+      console.error("STT Process Error:", e);
+      voiceStore.close();
     } finally {
       state = { ...state, isLoading: false };
       notify();
