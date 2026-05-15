@@ -53,16 +53,12 @@ export const voiceStore = {
   },
 
   close: () => {
-    state = { ...state, isOpen: false, qa: null };
+    state = { ...state, isOpen: false, qa: null, isLoading: false };
     notify();
   },
 
   setQa: (qa: QaResult | null) => {
     state = { ...state, qa };
-    if (qa) {
-      // Quando arriva una risposta, resettiamo o cancelliamo timer di inattività?
-      // Forse meglio lasciarla visibile finché l'utente non interagisce.
-    }
     notify();
   },
 
@@ -77,12 +73,21 @@ export const voiceStore = {
   },
 
   startRecording: async () => {
+    // Reset state before starting
     if (state.isRecording || state.recording) {
       try {
         if (state.recording) await state.recording.stopAndUnloadAsync();
       } catch (_) {}
-      state = { ...state, recording: null, isRecording: false };
     }
+    
+    state = { 
+      ...state, 
+      recording: null, 
+      isRecording: false, 
+      isLoading: false, 
+      qa: null 
+    };
+    notify();
 
     try {
       await Audio.setAudioModeAsync({
@@ -100,12 +105,11 @@ export const voiceStore = {
         isRecording: true,
         recordingStartTime: Date.now(),
         isOpen: true,
-        qa: null, // Reset QA when starting new recording
       };
       notify();
     } catch (err) {
       console.error('[voiceStore] startRecording failed:', err);
-      state = { ...state, recording: null, isRecording: false };
+      state = { ...state, recording: null, isRecording: false, isOpen: false };
       notify();
     }
   },
@@ -147,12 +151,17 @@ export const voiceStore = {
     state = { ...state, isLoading: true, qa: { question: "Trascrizione in corso...", answer: null } };
     notify();
 
+    const processStartTime = Date.now();
+    console.log("\n" + "=".repeat(60));
+    console.log("🎤 [VOICE FLOW] INIZIO ELABORAZIONE VOCALE");
+
     try {
-      // 1. Trascrizione STT
+      console.log(`⏱️ [0ms] Avvio Trascrizione STT...`);
       const { transcribeAudio } = require('./stt');
       let transcription = await transcribeAudio(uri);
+      const sttTime = Date.now() - processStartTime;
+      console.log(`📝 [${sttTime}ms] Trascrizione: "${transcription}"`);
       
-      // FILTRO ALLUCINAZIONI E INPUT INCOMPLETI (1-2 parole)
       const words = transcription.trim().split(/\s+/);
       const isHallucination = !transcription || 
         transcription.trim() === "..." || 
@@ -162,20 +171,66 @@ export const voiceStore = {
       const isTooShort = words.length <= 2;
 
       if (isHallucination || isTooShort) {
-        // Se è un'allucinazione o una frase troppo breve (1-2 parole), chiude senza disturbare
+        console.log(`🛑 [${Date.now() - processStartTime}ms] ANNULLATO: Input troppo breve o silenzio.`);
+        console.log("=".repeat(60) + "\n");
         voiceStore.close();
         return;
       }
 
-      // Se arriviamo qui, abbiamo almeno 3 parole. Proviamo l'analisi AI.
+      const { routeInput } = require('./inputRouter');
+      const route = routeInput(transcription);
+      console.log(`🛤️ [${Date.now() - processStartTime}ms] Routing deciso: ${route.toUpperCase()}`);
+
+      if (route === 'expense') {
+        state = { ...state, qa: { question: transcription, answer: { intent: 'text', text_response: "Sto registrando la tua spesa..." } } };
+        notify();
+        
+        try {
+          const { parseExpenseWithAI } = require('./groqParser');
+          console.log(`🧠 [${Date.now() - processStartTime}ms] Contatto Groq per parsing spesa...`);
+          
+          // STRICT TIMEOUT: Previene il caricamento infinito se Groq si blocca
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout 15s superato")), 15000));
+          const parsed = await Promise.race([parseExpenseWithAI(transcription, 'voice'), timeoutPromise]) as any;
+          
+          const totalTime = Date.now() - processStartTime;
+          console.log(`✅ [${totalTime}ms] PARSING COMPLETATO!`);
+          console.log(`🗣️ DOMANDA: "${transcription}"`);
+          console.log(`🤖 AZIONE: Registrazione Spesa (€${parsed.amount} in ${parsed.category_key})`);
+          console.log("=".repeat(60) + "\n");
+          
+          voiceStore.close();
+          const { router } = require('expo-router');
+          router.push({
+            pathname: '/expense-detail',
+            params: { data: JSON.stringify(parsed) }
+          });
+        } catch (err: any) {
+          console.error(`❌ [${Date.now() - processStartTime}ms] ERRORE PARSING:`, err.message);
+          state = { ...state, qa: { question: transcription, answer: { intent: 'text', text_response: "Errore o timeout nel parsing della spesa." } } };
+          notify();
+          setTimeout(() => voiceStore.close(), 3000);
+        }
+        return;
+      }
+
       state = { ...state, qa: { question: transcription, answer: null } };
       notify();
       
       try {
         const { askAiChat } = require('./aiChat');
-        const response = await askAiChat(transcription);
+        console.log(`🧠 [${Date.now() - processStartTime}ms] Contatto Groq per Analisi AI...`);
         
-        // Se l'AI non ha capito nulla della richiesta (es: frase lunga senza senso)
+        // STRICT TIMEOUT per AI Chat
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout 15s superato")), 15000));
+        const response = await Promise.race([askAiChat(transcription), timeoutPromise]) as any;
+        
+        const totalTime = Date.now() - processStartTime;
+        console.log(`✅ [${totalTime}ms] ANALISI COMPLETATA!`);
+        console.log(`🗣️ DOMANDA: "${transcription}"`);
+        console.log(`🤖 RISPOSTA: "${response?.text_response || 'Nessuna risposta'}"`);
+        console.log("=".repeat(60) + "\n");
+        
         if (!response || response.text_response === "") {
           state = { 
             ...state, 
@@ -190,19 +245,19 @@ export const voiceStore = {
         }
 
         state = { ...state, qa: { question: transcription, answer: response } };
-      } catch (e) {
-        console.error("AI Analysis Error:", e);
+      } catch (e: any) {
+        console.error(`❌ [${Date.now() - processStartTime}ms] ERRORE AI CHAT:`, e.message);
         state = { 
           ...state, 
           qa: { 
             question: transcription, 
-            answer: { intent: 'text', text_response: "Si è verificato un errore nell'analisi AI." } 
+            answer: { intent: 'text', text_response: "Si è verificato un errore o un timeout nell'analisi AI." } 
           } 
         };
         setTimeout(() => voiceStore.close(), 3000);
       }
-    } catch (e) {
-      console.error("STT Process Error:", e);
+    } catch (e: any) {
+      console.error(`❌ [${Date.now() - processStartTime}ms] ERRORE GLOBALE VOCE:`, e.message);
       voiceStore.close();
     } finally {
       state = { ...state, isLoading: false };
