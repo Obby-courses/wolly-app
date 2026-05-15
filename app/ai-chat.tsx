@@ -29,6 +29,8 @@ interface QAState {
  * Non è una cronologia: ogni nuova domanda sostituisce la coppia precedente.
  * Layout: [domanda utente] → [risposta AI] → [grafico JIT se presente]
  */
+import { TextInput } from 'react-native';
+
 export default function AiChatPage() {
   const router = useRouter();
   const params = useLocalSearchParams<{ message?: string }>();
@@ -38,6 +40,9 @@ export default function AiChatPage() {
   const [showDebug, setShowDebug] = useState(aiChatStore.showDebug);
   const [debugData, setDebugData] = useState<string | null>(aiChatStore.debugData);
   const [autoSentRef] = useState({ done: false });
+
+  const [inputText, setInputText] = useState('');
+  const [isTyping, setIsTyping] = useState(!aiChatStore.qa);
 
   // Auto-send message when navigated with params.message
   useEffect(() => {
@@ -54,6 +59,8 @@ export default function AiChatPage() {
     const newQa = { question: userMsg, answer: null };
     setQa(newQa);
     aiChatStore.qa = newQa;
+    setIsTyping(false);
+    setInputText('');
     
     setDebugData(null);
     aiChatStore.debugData = null;
@@ -114,41 +121,20 @@ export default function AiChatPage() {
     setQa(null);
     setHistory([]);
     setDebugData(null);
+    setIsTyping(true);
   };
-
-  const isEmpty = !qa;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Header */}
+      {/* Header - Transparent and minimal */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
+          <Ionicons name="close" size={28} color={COLORS.primary} />
         </Pressable>
-        <View style={styles.headerCenter}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>W</Text>
-          </View>
-          <View>
-            <Text style={styles.headerTitle}>Wolly AI</Text>
-            <Text style={styles.headerSubtitle}>Il tuo consulente finanziario</Text>
-          </View>
-        </View>
         <View style={styles.headerRight}>
-          <Pressable 
-            onPress={() => {
-              const newVal = !showDebug;
-              setShowDebug(newVal);
-              aiChatStore.showDebug = newVal;
-            }} 
-            style={styles.iconBtn}
-          >
-            <Ionicons name="bug-outline" size={20} color={showDebug ? COLORS.accent : COLORS.secondary} />
-          </Pressable>
           <Pressable
             onPress={handleReset}
-            style={[styles.resetBtn, isEmpty && { opacity: 0 }]}
-            disabled={isEmpty}
+            style={[styles.iconBtn, !qa && { opacity: 0 }]}
           >
             <Ionicons name="refresh-outline" size={20} color={COLORS.secondary} />
           </Pressable>
@@ -160,102 +146,81 @@ export default function AiChatPage() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.flex}>
-          {/* ─── Stato vuoto ─────────────────────────────────────────── */}
-          {isEmpty && (
-            <View style={styles.emptyContent}>
-              <View style={styles.emptyIconWrapper}>
-                <Text style={styles.wollyEmoji}>✦</Text>
-              </View>
-              <Text style={styles.emptyTitle}>Wolly è pronto</Text>
-              <Text style={styles.emptySubtitle}>
-                Usa il microfono o scrivi per fare domande sui tuoi dati.
-              </Text>
+          {isTyping ? (
+            <View style={styles.fullScreenInput}>
+              <TextInput
+                autoFocus
+                multiline
+                style={styles.bigInput}
+                placeholder="Cosa vuoi sapere?"
+                placeholderTextColor={COLORS.secondary + '40'}
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={() => sendMessage(inputText)}
+                returnKeyType="send"
+              />
+              {inputText.length > 0 && (
+                <Pressable onPress={() => sendMessage(inputText)} style={styles.sendFab}>
+                  <Ionicons name="arrow-up" size={32} color="#FFF" />
+                </Pressable>
+              )}
             </View>
-          )}
-
-          {/* ─── Q&A View Centrata ────────────────────────────────────── */}
-          {qa && (
+          ) : (
             <View style={styles.qaContainer}>
-              {/* Domanda in alto centrata */}
-              <View style={styles.questionSection}>
-                <Text style={styles.questionLabel}>LA TUA DOMANDA</Text>
-                <Text style={styles.questionText}>{qa.question}</Text>
+              {/* Question small at top */}
+              <View style={styles.smallQuestionContainer}>
+                <Text style={styles.smallQuestionText}>{qa?.question}</Text>
               </View>
 
-              {/* Risposta al centro (50% altezza circa) */}
-              <View style={styles.answerSection}>
+              {/* Answer BIG in middle */}
+              <View style={styles.mainAnswerArea}>
                 {isLoading ? (
                   <View style={styles.loadingWrapper}>
-                    <ActivityIndicator size="large" color={COLORS.accent} />
-                    <Text style={styles.loadingText}>Analisi in corso...</Text>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <Text style={styles.loadingText}>Wolly sta analizzando...</Text>
                   </View>
-                ) : qa.answer && (
+                ) : qa?.answer && (
                   <ScrollView 
+                    style={styles.answerScroll}
                     contentContainerStyle={styles.answerScrollContent}
                     showsVerticalScrollIndicator={false}
                   >
-                    {qa.answer.queryIntent && qa.answer.intent !== 'text' && (
-                      <FeedbackBar 
-                        intent={qa.answer.queryIntent} 
-                        onUpdate={reRunQuery} 
-                      />
-                    )}
-
-                    {qa.answer.analysis_steps && qa.answer.analysis_steps.length > 0 && (
-                      <View style={styles.stepsContainer}>
-                        {qa.answer.analysis_steps.map((step, idx) => (
-                          <View key={idx} style={styles.stepItem}>
-                            <Ionicons name="checkmark-circle" size={12} color={COLORS.success} />
-                            <Text style={styles.stepText}>{step}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-
-                    <Text style={styles.answerText}>{qa.answer.text_response}</Text>
+                    <Text style={qa.answer.intent === 'text' ? styles.bigAnswerText : styles.answerContextText}>
+                      {qa.answer.text_response}
+                    </Text>
                     
-                    {qa.answer.intent === 'total' && qa.answer.total_data && (
-                      <JitTotal 
-                        value={qa.answer.total_data.value} 
-                        comparison={qa.answer.total_data.comparison} 
-                        periodLabel={qa.answer.total_data.period_label} 
-                      />
-                    )}
-
-                    {qa.answer.intent === 'distribution' && qa.answer.distribution_data && (
-                      <JitDistribution 
-                        title={qa.answer.distribution_data.title} 
-                        items={qa.answer.distribution_data.items} 
-                      />
-                    )}
-
-                    {qa.answer.intent === 'list' && qa.answer.list_data && (
-                      <JitList 
-                        title={qa.answer.list_data.title} 
-                        items={qa.answer.list_data.items} 
-                        totalCount={qa.answer.list_data.total_count} 
-                      />
-                    )}
-
-                    {qa.answer.intent === 'timeline' && qa.answer.timeline_data && (
-                      <JitTimeline 
-                        type={qa.answer.timeline_data.type} 
-                        title={qa.answer.timeline_data.title} 
-                        data={qa.answer.timeline_data.data} 
-                        granularity={qa.answer.timeline_data.granularity} 
-                      />
-                    )}
-
-                    {qa.answer.intent === 'subscriptions' && qa.answer.subscription_data && (
-                      <JitSubscriptions 
-                        items={qa.answer.subscription_data.items}
-                        totalMonthly={qa.answer.subscription_data.total_monthly}
-                      />
-                    )}
+                    {/* JIT Charts */}
+                    <View style={styles.jitWrapper}>
+                      {qa.answer.intent === 'total' && qa.answer.total_data && (
+                        <JitTotal 
+                          value={qa.answer.total_data.value}
+                          comparison={qa.answer.total_data.comparison}
+                          periodLabel={qa.answer.total_data.period_label}
+                        />
+                      )}
+                      {qa.answer.intent === 'distribution' && qa.answer.distribution_data && (
+                        <JitDistribution {...qa.answer.distribution_data} />
+                      )}
+                      {qa.answer.intent === 'list' && qa.answer.list_data && (
+                        <JitList 
+                          title={qa.answer.list_data.title}
+                          items={qa.answer.list_data.items}
+                          totalCount={qa.answer.list_data.total_count}
+                        />
+                      )}
+                      {qa.answer.intent === 'timeline' && qa.answer.timeline_data && (
+                        <JitTimeline {...qa.answer.timeline_data} />
+                      )}
+                      {qa.answer.intent === 'subscriptions' && qa.answer.subscription_data && (
+                        <JitSubscriptions 
+                          items={qa.answer.subscription_data.items}
+                          totalMonthly={qa.answer.subscription_data.total_monthly}
+                        />
+                      )}
+                    </View>
 
                     {showDebug && debugData && (
                       <View style={styles.debugBox}>
-                        <Text style={styles.debugTitle}>AI RAW JSON (Debug)</Text>
                         <Text style={styles.debugText}>{debugData}</Text>
                       </View>
                     )}
@@ -266,13 +231,14 @@ export default function AiChatPage() {
           )}
         </View>
 
-        {/* Input bar sempre visibile in fondo */}
-        <VoiceInputBar
-          onSubmit={sendMessage}
-          isLoading={isLoading}
-          onBack={() => router.back()}
-          placeholder="Chiedi a Wolly…"
-        />
+        {/* Floating actions if not typing */}
+        {!isTyping && !isLoading && (
+          <View style={styles.bottomActions}>
+            <Pressable style={styles.actionCircle} onPress={() => setIsTyping(true)}>
+              <Ionicons name="chatbubble-outline" size={24} color={COLORS.primary} />
+            </Pressable>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -282,204 +248,136 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   flex: { flex: 1 },
 
-  // ─── Header ───────────────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
+  // ─── Full Screen Input ──────────────────────────────────────────────────
+  fullScreenInput: {
+    flex: 1,
+    paddingHorizontal: SPACING.xl,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    zIndex: 10,
   },
-  backBtn: { width: 40, alignItems: 'flex-start' },
-  resetBtn: { width: 40, alignItems: 'flex-end' },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  bigInput: {
+    width: '100%',
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: 32,
+    color: COLORS.primary,
+    textAlign: 'center',
+    paddingVertical: 40,
+  },
+  sendFab: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#FFF',
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: TYPOGRAPHY.sizes.base,
-  },
-  headerTitle: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: TYPOGRAPHY.sizes.base,
-    color: COLORS.primary,
-  },
-  headerSubtitle: {
-    fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: TYPOGRAPHY.sizes.xs,
-    color: COLORS.secondary,
+    marginTop: 40,
+    ...SHADOWS.medium,
   },
 
-  // ─── Empty state ──────────────────────────────────────────────────────────
-  emptyContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xxl,
-  },
-  emptyIconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xl,
-    ...SHADOWS.soft,
-  },
-  wollyEmoji: {
-    fontSize: 36,
-    color: '#FFFFFF',
-  },
-  emptyTitle: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: TYPOGRAPHY.sizes.xl,
-    color: COLORS.primary,
-    marginBottom: SPACING.sm,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: TYPOGRAPHY.sizes.base,
-    color: COLORS.secondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.soft,
-  },
-  chipText: {
-    fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: TYPOGRAPHY.sizes.base,
-    color: COLORS.primary,
-    flex: 1,
-  },
-
-  // ─── Q&A Container ────────────────────────────────────────────────────────
+  // ─── QA Container ─────────────────────────────────────────────────────────
   qaContainer: {
     flex: 1,
-    justifyContent: 'space-between',
   },
-  questionSection: {
-    paddingTop: SPACING.xxl,
+  smallQuestionContainer: {
+    paddingTop: 20,
     paddingHorizontal: SPACING.xl,
     alignItems: 'center',
   },
-  questionLabel: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 10,
-    color: COLORS.secondary,
-    letterSpacing: 1.5,
-    marginBottom: SPACING.sm,
-  },
-  questionText: {
+  smallQuestionText: {
     fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: TYPOGRAPHY.sizes.lg,
-    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.secondary,
     textAlign: 'center',
-    lineHeight: 24,
+    opacity: 0.8,
   },
-  answerSection: {
+  mainAnswerArea: {
     flex: 1,
-    maxHeight: '60%', // Circa il 50-60% centrale
     justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
-    marginVertical: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
+  },
+  answerScroll: {
+    flex: 1,
   },
   answerScrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 40,
   },
-  answerText: {
+  bigAnswerText: {
     fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: TYPOGRAPHY.sizes.xl,
+    fontSize: 28,
     color: COLORS.primary,
     textAlign: 'center',
-    lineHeight: 32,
-    marginBottom: SPACING.xl,
+    lineHeight: 38,
   },
-  chartWrapper: {
-    width: '100%',
+  answerContextText: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: 18,
+    color: COLORS.secondary,
+    textAlign: 'center',
+    marginBottom: 0,
+  },
+  jitWrapper: {
+    marginTop: 40,
     alignItems: 'center',
+    width: '100%',
+  },
+
+  // ─── Header & Actions ─────────────────────────────────────────────────────
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  backBtn: {
+    padding: 8,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconBtn: {
+    padding: 8,
+  },
+  bottomActions: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  actionCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.soft,
   },
   loadingWrapper: {
     alignItems: 'center',
-    gap: SPACING.md,
+    gap: 16,
   },
   loadingText: {
     fontFamily: TYPOGRAPHY.fontFamily,
     fontSize: TYPOGRAPHY.sizes.base,
     color: COLORS.secondary,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  debugBox: {
+    marginTop: 40,
+    padding: 16,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
   },
-  iconBtn: {
-    padding: 8,
-  },
-  stepsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: SPACING.lg,
-    opacity: 0.7,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.border,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  stepText: {
-    fontFamily: TYPOGRAPHY.fontFamily,
+  debugText: {
+    fontFamily: 'monospace',
     fontSize: 10,
     color: COLORS.secondary,
   },
-  debugBox: {
-    marginTop: SPACING.lg,
-    padding: SPACING.md,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    width: '100%',
-  },
-  debugTitle: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 10,
-    color: COLORS.accent,
-    marginBottom: 8,
-  },
-  debugText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 11,
-    color: '#94A3B8',
-  },
 });
+
+

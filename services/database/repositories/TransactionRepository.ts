@@ -181,24 +181,38 @@ export class TransactionRepository {
   }
 
   /**
-   * Retrieves daily stats for the current week (Mon-Sun).
+   * Retrieves daily stats for a specific number of days, relative to today or a base date.
    */
-  static async getDailyStatsForRecentDays(days: number, offsetDays: number = 0): Promise<{ label: string, income: number, expense: number }[]> {
+  static async getDailyStatsForRecentDays(days: number, anchor: number | string = 0): Promise<{ label: string, income: number, expense: number }[]> {
     const db = await getDBConnection();
+    let startDateStr: string;
+    let endDateStr: string;
+
+    if (typeof anchor === 'number') {
+      startDateStr = `date('now', '-${days + anchor} days')`;
+      endDateStr = `date('now', '-${anchor} days')`;
+    } else {
+      startDateStr = `date('${anchor}', '-${days} days')`;
+      endDateStr = `'${anchor}'`;
+    }
+
     const results = await db.getAllAsync(`
       SELECT 
         date,
         SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END) as income,
         SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END) as expense
       FROM transactions
-      WHERE date >= date('now', ?) AND date <= date('now', ?) AND is_deleted = 0 AND direction != 'adj'
+      WHERE date > ${startDateStr} AND date <= ${endDateStr} AND is_deleted = 0 AND direction != 'adj'
       GROUP BY date
       ORDER BY date ASC
-    `, [`-${days + offsetDays} days`, `-${offsetDays} days`]);
+    `);
 
     const stats = [];
-    for (let i = days + offsetDays; i >= offsetDays; i--) {
-      const d = new Date();
+    const baseDate = typeof anchor === 'string' ? new Date(anchor) : new Date();
+    if (typeof anchor === 'number') baseDate.setDate(baseDate.getDate() - anchor);
+
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(baseDate);
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const match = results.find((r: any) => r.date === dateStr);
@@ -302,10 +316,10 @@ export class TransactionRepository {
     timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto', 
     direction: 'in' | 'out' = 'out',
     baseDate: string = new Date().toISOString().split('T')[0],
-    filters: { city?: string, socialContext?: string, personName?: string, merchantName?: string } = {}
+    filters: { city?: string, socialContext?: string, personName?: string, merchantName?: string, holiday?: string, tag?: string } = {}
   ): Promise<{ category_key: string, total: number }[]> {
     const db = await getDBConnection();
-    const { city, socialContext, personName, merchantName } = filters;
+    const { city, socialContext, personName, merchantName, holiday, tag } = filters;
     let query = `
       SELECT category_key, SUM(amount) as total
       FROM transactions
@@ -315,6 +329,8 @@ export class TransactionRepository {
     if (socialContext) query += ` AND social_context = '${socialContext}'`;
     if (personName) query += ` AND people_mentioned LIKE '%${personName}%'`;
     if (merchantName) query += ` AND location_name LIKE '%${merchantName}%'`;
+    if (holiday) query += ` AND holiday = '${holiday}'`;
+    if (tag) query += ` AND tags LIKE '%${tag}%'`;
 
     if (timeRange === 'Settimana') query += ` AND date >= date('${baseDate}', '-7 days') AND date <= '${baseDate}'`;
     else if (timeRange === 'Mese') query += ` AND strftime('%Y-%m', date) = strftime('%Y-%m', '${baseDate}')`;
@@ -333,10 +349,10 @@ export class TransactionRepository {
     timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto',
     direction: 'in' | 'out' = 'out',
     baseDate: string = new Date().toISOString().split('T')[0],
-    filters: { category_key?: string, socialContext?: string, personName?: string, merchantName?: string } = {}
+    filters: { category_key?: string, socialContext?: string, personName?: string, merchantName?: string, holiday?: string, tag?: string } = {}
   ): Promise<{ city: string, total: number }[]> {
     const db = await getDBConnection();
-    const { category_key, socialContext, personName, merchantName } = filters;
+    const { category_key, socialContext, personName, merchantName, holiday, tag } = filters;
     let query = `
       SELECT city, SUM(amount) as total
       FROM transactions
@@ -346,6 +362,8 @@ export class TransactionRepository {
     if (socialContext) query += ` AND social_context = '${socialContext}'`;
     if (personName) query += ` AND people_mentioned LIKE '%${personName}%'`;
     if (merchantName) query += ` AND location_name LIKE '%${merchantName}%'`;
+    if (holiday) query += ` AND holiday = '${holiday}'`;
+    if (tag) query += ` AND tags LIKE '%${tag}%'`;
 
     if (timeRange === 'Settimana') query += ` AND date >= date('${baseDate}', '-7 days') AND date <= '${baseDate}'`;
     else if (timeRange === 'Mese') query += ` AND strftime('%Y-%m', date) = strftime('%Y-%m', '${baseDate}')`;

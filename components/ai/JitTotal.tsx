@@ -37,12 +37,7 @@ export default function JitTotal({ value, comparison, periodLabel = 'Periodo' }:
         </View>
       )}
 
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: '65%' }]} />
-        </View>
-        <Text style={styles.progressText}>Budget mensile</Text>
-      </View>
+
     </View>
   );
 }

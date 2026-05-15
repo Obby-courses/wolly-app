@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   },
   netWorthHeaderContainer: {
     paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.huge,
+    marginTop: SPACING.lg,
     marginBottom: SPACING.xl,
     alignItems: 'center',
   },

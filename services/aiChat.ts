@@ -152,7 +152,7 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
 
     return {
       intent: 'subscriptions',
-      text_response: `Hai ${active.length} abbonamenti attivi, per un costo stimato di €${displayAmount.toFixed(2)} ${periodName}.${extraText}`,
+      text_response: `Hai ${active.length} abbonamenti attivi.${extraText}`,
       analysis_steps: buildAnalysisSteps(intent, [
         `Trovati ${subs.length} abbonamenti nel database`,
         `${active.length} abbonamenti risultano attivi`,
@@ -189,7 +189,7 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
 
     return {
       intent: 'total',
-      text_response: `${label} hai ${dirLabel}${filterLabel}${cityLabel} €${value.toFixed(2)}${compText}.`,
+      text_response: `Dunque, ${label.toLowerCase()} hai ${dirLabel}${filterLabel}${cityLabel} complessivamente:`,
       analysis_steps: buildAnalysisSteps(intent, [
         `Totale calcolato dal DB: €${value.toFixed(2)}`,
       ]),
@@ -214,7 +214,7 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
 
     return {
       intent: 'distribution',
-      text_response: `${label}: ecco come hai distribuito le tue ${intent.direction === 'in' ? 'entrate' : 'spese'}.${topText}`,
+      text_response: `Ecco come sono state distribuite le tue ${intent.direction === 'in' ? 'entrate' : 'spese'} per quanto riguarda ${label.toLowerCase()}.${topText}`,
       analysis_steps: buildAnalysisSteps(intent, [
         `Raggruppato per ${intent.group_by || 'categoria'}`,
         `${items.length} voci trovate`,
@@ -240,7 +240,7 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
 
     return {
       intent: 'list',
-      text_response: `${label}: trovate ${count} transazioni${shown < count ? `, mostro le prime ${shown}` : ''}.`,
+      text_response: `Per quanto riguarda ${label.toLowerCase()}, ho trovato ${count} transazioni in totale. Ecco le più rilevanti:`,
       analysis_steps: buildAnalysisSteps(intent, [
         `${count} transazioni trovate`,
       ]),
@@ -266,7 +266,7 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
     const isMonthly = intent.period.type === 'year';
     return {
       intent: 'timeline',
-      text_response: `Ecco l'andamento delle ${intent.direction === 'in' ? 'entrate' : 'spese'} ${label}.`,
+      text_response: `Dando un'occhiata all'andamento ${label.toLowerCase()}, ecco come si sono evolute le tue ${intent.direction === 'in' ? 'entrate' : 'spese'}:`,
       analysis_steps: [
         `Periodo: ${label}`,
         `Granularità: ${isMonthly ? 'mensile' : 'giornaliera'}`,
