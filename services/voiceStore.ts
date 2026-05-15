@@ -218,12 +218,14 @@ export const voiceStore = {
       notify();
       
       try {
-        const { askAiChat } = require('./aiChat');
-        console.log(`🧠 [${Date.now() - processStartTime}ms] Contatto Groq per Analisi AI...`);
+        const { askAiChat, aiChatStore } = require('./aiChat');
+        console.log(`🧠 [${Date.now() - processStartTime}ms] Contatto Groq per Analisi AI (con ${aiChatStore.history.length} messaggi di contesto)...`);
         
         // STRICT TIMEOUT per AI Chat
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout 15s superato")), 15000));
-        const response = await Promise.race([askAiChat(transcription), timeoutPromise]) as any;
+        
+        // Passiamo l'history attuale per mantenere il contesto ("e ieri?")
+        const response = await Promise.race([askAiChat(transcription, aiChatStore.history), timeoutPromise]) as any;
         
         const totalTime = Date.now() - processStartTime;
         console.log(`✅ [${totalTime}ms] ANALISI COMPLETATA!`);
@@ -243,6 +245,10 @@ export const voiceStore = {
           setTimeout(() => voiceStore.close(), 3000);
           return;
         }
+
+        // Salviamo nello storico globale così l'AI si ricorderà il contesto per la prossima domanda
+        aiChatStore.history.push({ role: 'user', content: transcription });
+        aiChatStore.history.push({ role: 'assistant', content: response.text_response });
 
         state = { ...state, qa: { question: transcription, answer: response } };
       } catch (e: any) {
