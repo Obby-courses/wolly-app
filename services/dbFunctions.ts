@@ -79,11 +79,11 @@ function buildWhereClause(
     params.push(`%${filters.merchant_name}%`);
   }
   if (filters.city) {
-    clauses.push(`${tableAlias}.city = ?`);
+    clauses.push(`${tableAlias}.city = ? COLLATE NOCASE`);
     params.push(filters.city);
   }
   if (filters.social_context) {
-    clauses.push(`${tableAlias}.social_context = ?`);
+    clauses.push(`${tableAlias}.social_context = ? COLLATE NOCASE`);
     params.push(filters.social_context);
   }
   if (filters.person) {
@@ -91,7 +91,7 @@ function buildWhereClause(
     params.push(`%${filters.person}%`);
   }
   if (filters.holiday) {
-    clauses.push(`${tableAlias}.holiday = ?`);
+    clauses.push(`${tableAlias}.holiday = ? COLLATE NOCASE`);
     params.push(filters.holiday);
   }
   if (filters.tag) {
@@ -99,11 +99,11 @@ function buildWhereClause(
     params.push(`%${filters.tag}%`);
   }
   if (filters.location_type) {
-    clauses.push(`${tableAlias}.location_type = ?`);
+    clauses.push(`${tableAlias}.location_type = ? COLLATE NOCASE`);
     params.push(filters.location_type);
   }
   if (filters.time_of_day) {
-    clauses.push(`${tableAlias}.time_of_day = ?`);
+    clauses.push(`${tableAlias}.time_of_day = ? COLLATE NOCASE`);
     params.push(filters.time_of_day);
   }
   if (filters.is_impulsive !== undefined) {
