@@ -64,6 +64,10 @@ export default function Home() {
   const [summary, setSummary] = useState({ income: 0, expense: 0 });
   const [netWorth, setNetWorth] = useState<number>(0);
   const [upcomingSubs, setUpcomingSubs] = useState<any[]>([]);
+  const [thisMonthExpenses, setThisMonthExpenses] = useState<number>(0);
+  const [prevMonthExpensesComp, setPrevMonthExpensesComp] = useState<number>(0);
+  const [percentageChange, setPercentageChange] = useState<number>(0);
+  const [subMonthlyEstimate, setSubMonthlyEstimate] = useState<number>(0);
   
   useEffect(() => {
     // Inizializza il DB solo la prima volta
@@ -135,6 +139,48 @@ export default function Home() {
         .sort((a: any, b: any) => a.nextDate.getTime() - b.nextDate.getTime());
       setUpcomingSubs(sortedSubs.slice(0, 3));
 
+      // 1. Spese di questo mese
+      const today = new Date();
+      const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      const todayStr = today.toISOString().split('T')[0];
+      const thisMonthSum = await TransactionRepository.getExpensesSumForPeriod(firstDayThisMonth, todayStr);
+      setThisMonthExpenses(thisMonthSum);
+
+      // Spese dello stesso periodo del mese precedente
+      const firstDayPrevMonthObj = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const sameDayPrevMonthObj = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+      
+      // Gestiamo l'eventualità in cui il mese precedente avesse meno giorni
+      if (sameDayPrevMonthObj.getMonth() !== firstDayPrevMonthObj.getMonth()) {
+        sameDayPrevMonthObj.setDate(0);
+      }
+      
+      const firstDayPrevMonth = firstDayPrevMonthObj.toISOString().split('T')[0];
+      const sameDayPrevMonth = sameDayPrevMonthObj.toISOString().split('T')[0];
+      const prevMonthSum = await TransactionRepository.getExpensesSumForPeriod(firstDayPrevMonth, sameDayPrevMonth);
+      setPrevMonthExpensesComp(prevMonthSum);
+      
+      // Calcolo percentuale
+      let pct = 0;
+      if (prevMonthSum > 0) {
+        pct = ((thisMonthSum - prevMonthSum) / prevMonthSum) * 100;
+      } else if (thisMonthSum > 0) {
+        pct = 100;
+      }
+      setPercentageChange(pct);
+
+      // 2. Calcolo totale mensile abbonamenti attivi
+      const subTotal = activeSubs.reduce((acc: number, sub: any) => {
+        switch (sub.frequency) {
+          case 'weekly': return acc + sub.amount * 4.33;
+          case 'biweekly': return acc + sub.amount * 2.16;
+          case 'monthly': return acc + sub.amount;
+          case 'yearly': return acc + sub.amount / 12;
+          default: return acc;
+        }
+      }, 0);
+      setSubMonthlyEstimate(subTotal);
+
     } catch (error) {
       console.error('Errore nel caricamento dati:', error);
     }
@@ -158,94 +204,127 @@ export default function Home() {
       ) : (
         <ScrollView 
           style={styles.container} 
-          contentContainerStyle={[styles.listContent, { flex: 1 }]}
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={false}
+          scrollEnabled={true}
         >
-          <View style={{ flex: 1, justifyContent: 'space-between' }}>
-            <View>
-              <View style={styles.netWorthHeaderContainer}>
-                <Text style={styles.netWorthLabel}>Patrimonio totale</Text>
-                <View style={styles.netWorthValueContainer}>
-                  <Text style={styles.netWorthValue}>
-                    <Text style={styles.netWorthCurrency}>€ </Text>
-                    <Text>{integerPart}</Text>
-                    <Text style={styles.netWorthCents}>,{centsPart}</Text>
+          {/* CARD 1: Patrimonio totale */}
+          <View style={styles.dashboardCard}>
+            <Text style={styles.cardLabel}>Patrimonio totale</Text>
+            <View style={styles.netWorthValueContainer}>
+              <Text style={styles.netWorthValue}>
+                <Text style={styles.netWorthCurrency}>€ </Text>
+                <Text>{integerPart}</Text>
+                <Text style={styles.netWorthCents}>,{centsPart}</Text>
+              </Text>
+            </View>
+          </View>
+
+          {/* CARD 2: Spese di questo mese */}
+          <View style={styles.dashboardCard}>
+            <Text style={styles.cardLabel}>Spese di questo mese</Text>
+            <View style={styles.expensesCompRow}>
+              <Text style={styles.expensesValue}>€ {thisMonthExpenses.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+              
+              {/* Percentuale di confronto */}
+              {percentageChange !== 0 && (
+                <View style={[
+                  styles.pctBadge, 
+                  percentageChange > 0 ? styles.pctBadgeDanger : styles.pctBadgeSuccess
+                ]}>
+                  <Ionicons 
+                    name={percentageChange > 0 ? "arrow-up" : "arrow-down"} 
+                    size={14} 
+                    color={percentageChange > 0 ? '#991B1B' : '#065F46'} 
+                  />
+                  <Text style={[
+                    styles.pctBadgeText, 
+                    percentageChange > 0 ? { color: '#991B1B' } : { color: '#065F46' }
+                  ]}>
+                    {Math.abs(percentageChange).toFixed(0)}%
                   </Text>
-                </View>
-              </View>
-
-              {/* Grafico temporaneamente nascosto ma mantenuto come componente
-              <AnnualChart 
-                data={chartData} 
-                previousData={previousChartData}
-                showNetWorth={true}
-                title="Ultimi 90 giorni"
-              />
-              */}
-
-              {/* Card Prossimi Acquisti Programmati */}
-              {upcomingSubs.length > 0 && (
-                <View style={styles.upcomingCard}>
-                  <Text style={styles.upcomingTitle}>Prossimi acquisti programmati</Text>
-                  
-                  {/* 1. Il prossimo in grande */}
-                  {(() => {
-                    const first = upcomingSubs[0];
-                    const color = getCategoryColor(first.category_key);
-                    const formattedDate = first.nextDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                    return (
-                      <View style={styles.firstUpcomingContainer}>
-                        <View style={[styles.firstUpcomingAccent, { backgroundColor: color }]} />
-                        <View style={styles.firstUpcomingContent}>
-                          <Text style={styles.firstUpcomingLabel}>IL PIÙ VICINO</Text>
-                          <Text style={styles.firstUpcomingName}>{first.name}</Text>
-                          <View style={styles.firstUpcomingMeta}>
-                            <Text style={styles.firstUpcomingAmount}>€{first.amount.toFixed(2)}</Text>
-                            <Text style={styles.firstUpcomingSep}>·</Text>
-                            <Text style={styles.firstUpcomingDate}>{formattedDate}</Text>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  })()}
-
-                  {/* 2. I successivi due piccoli */}
-                  {upcomingSubs.length > 1 && (
-                    <View style={styles.smallUpcomingRow}>
-                      {upcomingSubs.slice(1, 3).map((sub: any, idx: number) => {
-                        const color = getCategoryColor(sub.category_key);
-                        const formattedDate = sub.nextDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                        return (
-                          <View key={sub.id || idx} style={styles.smallUpcomingItem}>
-                            <View style={[styles.smallUpcomingAccent, { backgroundColor: color }]} />
-                            <View style={styles.smallUpcomingContent}>
-                              <Text style={styles.smallUpcomingName} numberOfLines={1}>{sub.name}</Text>
-                              <Text style={styles.smallUpcomingAmount}>€{sub.amount.toFixed(2)}</Text>
-                              <Text style={styles.smallUpcomingDate}>{formattedDate}</Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
                 </View>
               )}
             </View>
+            <Text style={styles.expensesSubText}>
+              rispetto allo stesso periodo del mese scorso (€ {prevMonthExpensesComp.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+            </Text>
+          </View>
 
-            <View style={{ marginBottom: 300 }}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Transazioni Recenti</Text>
-                <Pressable onPress={() => router.push('/history')}>
-                  <Text style={styles.seeAllText}>Vedi tutto</Text>
-                </Pressable>
+          {/* CARD 3: Spese programmate degli abbonamenti */}
+          <View style={styles.dashboardCard}>
+            <View style={styles.cardHeaderRow}>
+              <View>
+                <Text style={styles.cardLabel}>Spese programmate</Text>
+                <Text style={styles.subEstimateValue}>€ {subMonthlyEstimate.toFixed(2)} <Text style={styles.subEstimateLabel}>/ mese stimato</Text></Text>
               </View>
+            </View>
 
-              <View style={styles.transactionsPreview}>
-                {transactions.slice(0, 5).map((item) => (
+            {upcomingSubs.length > 0 && (
+              <View style={{ marginTop: SPACING.md }}>
+                <Text style={styles.upcomingSubtitle}>Prossime uscite a venire</Text>
+                
+                {/* 1. Il prossimo in grande */}
+                {(() => {
+                  const first = upcomingSubs[0];
+                  const color = getCategoryColor(first.category_key);
+                  const formattedDate = first.nextDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+                  return (
+                    <View style={styles.firstUpcomingContainer}>
+                      <View style={[styles.firstUpcomingAccent, { backgroundColor: color }]} />
+                      <View style={styles.firstUpcomingContent}>
+                        <Text style={styles.firstUpcomingLabel}>IL PIÙ VICINO</Text>
+                        <Text style={styles.firstUpcomingName}>{first.name}</Text>
+                        <View style={styles.firstUpcomingMeta}>
+                          <Text style={styles.firstUpcomingAmount}>€{first.amount.toFixed(2)}</Text>
+                          <Text style={styles.firstUpcomingSep}>·</Text>
+                          <Text style={styles.firstUpcomingDate}>{formattedDate}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                {/* 2. I successivi due piccoli */}
+                {upcomingSubs.length > 1 && (
+                  <View style={styles.smallUpcomingRow}>
+                    {upcomingSubs.slice(1, 3).map((sub: any, idx: number) => {
+                      const color = getCategoryColor(sub.category_key);
+                      const formattedDate = sub.nextDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+                      return (
+                        <View key={sub.id || idx} style={styles.smallUpcomingItem}>
+                          <View style={[styles.smallUpcomingAccent, { backgroundColor: color }]} />
+                          <View style={styles.smallUpcomingContent}>
+                            <Text style={styles.smallUpcomingName} numberOfLines={1}>{sub.name}</Text>
+                            <Text style={styles.smallUpcomingAmount}>€{sub.amount.toFixed(2)}</Text>
+                            <Text style={styles.smallUpcomingDate}>{formattedDate}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* CARD 4: Ultimi flussi */}
+          <View style={[styles.dashboardCard, { marginBottom: 120 }]}>
+            <View style={styles.sectionHeaderCompact}>
+              <Text style={styles.cardLabel}>Ultimi flussi</Text>
+              <Pressable onPress={() => router.push('/history')}>
+                <Text style={styles.seeAllText}>Vedi tutto</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.transactionsPreview}>
+              {transactions.length > 0 ? (
+                transactions.slice(0, 5).map((item) => (
                   <TransactionItem key={item.id} item={item} hideCategory={true} />
-                ))}
-              </View>
+                ))
+              ) : (
+                <Text style={styles.emptyTransactionsText}>Nessuna transazione recente</Text>
+              )}
             </View>
           </View>
         </ScrollView>
@@ -307,63 +386,21 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 120,
   },
-  summaryContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.md,
-    marginTop: SPACING.lg,
-  },
-  summaryCard: {
-    flex: 1,
+  dashboardCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 24,
     padding: SPACING.lg,
-    borderRadius: 20,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
     ...SHADOWS.soft,
   },
-  summaryLabel: {
-    fontSize: TYPOGRAPHY.sizes.xs,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    color: COLORS.secondary,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontFamily: TYPOGRAPHY.fontBold,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.xl,
-    padding: 4,
-  },
-  netWorthHeaderContainer: {
-    paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.xl,
-    alignItems: 'flex-start',
-  },
-  netWorthHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    width: '100%',
-    marginBottom: 4,
-    position: 'relative',
-  },
-  netWorthLabel: {
+  cardLabel: {
     color: COLORS.secondary,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontFamily: TYPOGRAPHY.fontBold,
     textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginBottom: 6,
-  },
-  privacyToggle: {
-    position: 'absolute',
-    right: 0,
-    padding: 5,
+    letterSpacing: 1.5,
+    marginBottom: SPACING.sm,
   },
   netWorthValueContainer: {
     alignItems: 'flex-start',
@@ -383,67 +420,64 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: 32,
   },
-  netWorthEditRow: {
+  expensesCompRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 60,
-    width: '100%',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
-  netWorthCurrencyEdit: {
-    color: COLORS.primary,
-    fontSize: 32,
+  expensesValue: {
+    fontSize: 28,
     fontFamily: TYPOGRAPHY.fontBold,
-    marginRight: 10,
-  },
-  netWorthInput: {
     color: COLORS.primary,
-    fontSize: 36,
-    fontFamily: TYPOGRAPHY.fontBold,
-    padding: 0,
-    margin: 0,
-    textAlign: 'center',
   },
-  filterButton: {
-    flex: 1,
-    paddingVertical: 8,
+  expensesSubText: {
+    fontSize: 12,
+    color: COLORS.secondary,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    lineHeight: 16,
+  },
+  pctBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 2,
   },
-  filterButtonActive: {
-    backgroundColor: COLORS.surface,
-    ...SHADOWS.soft,
+  pctBadgeSuccess: {
+    backgroundColor: '#D1FAE5',
   },
-  filterButtonText: {
-    fontSize: TYPOGRAPHY.sizes.sm,
+  pctBadgeDanger: {
+    backgroundColor: '#FEE2E2',
+  },
+  pctBadgeText: {
+    fontSize: 12,
     fontFamily: TYPOGRAPHY.fontBold,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  subEstimateValue: {
+    fontSize: 24,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+  },
+  subEstimateLabel: {
+    fontSize: 12,
+    fontFamily: TYPOGRAPHY.fontFamily,
     color: COLORS.secondary,
   },
-  filterButtonTextActive: {
-    color: COLORS.primary,
-  },
-  income: {
-    color: COLORS.success,
-  },
-  expense: {
-    color: COLORS.primary,
-  },
-  upcomingCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 24,
-    padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.soft,
-  },
-  upcomingTitle: {
-    fontSize: TYPOGRAPHY.sizes.xs,
+  upcomingSubtitle: {
+    fontSize: 11,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.secondary,
     textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    marginBottom: SPACING.md,
+    letterSpacing: 1,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.sm,
   },
   firstUpcomingContainer: {
     backgroundColor: '#F9FAFB',
@@ -528,5 +562,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: COLORS.secondary,
     fontFamily: TYPOGRAPHY.fontFamily,
+  },
+  sectionHeaderCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  emptyTransactionsText: {
+    color: COLORS.secondary,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    textAlign: 'center',
+    paddingVertical: SPACING.lg,
   },
 });

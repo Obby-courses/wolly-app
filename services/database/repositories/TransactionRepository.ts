@@ -668,6 +668,15 @@ export class TransactionRepository {
     return results.map(r => r.location_name);
   }
 
+  static async getExpensesSumForPeriod(startDate: string, endDate: string): Promise<number> {
+    const db = await getDBConnection();
+    const result = await db.getFirstAsync<{ sum: number }>(`
+      SELECT COALESCE(SUM(amount), 0) as sum FROM transactions
+      WHERE is_deleted = 0 AND direction = 'out' AND date >= ? AND date <= ?
+    `, [startDate, endDate]);
+    return result?.sum ?? 0;
+  }
+
   /**
    * Deletes all transactions and resets the net worth to baseline 1000.0.
    */
