@@ -276,6 +276,37 @@ export default function ManualEntry() {
           {/* SOCIAL TAGS */}
           <View style={styles.section}>
             <Text style={styles.label}>Con Chi (Social)</Text>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {[
+                { key: null, label: 'Nessuno' },
+                { key: 'friends', label: 'Amici' },
+                { key: 'family', label: 'Famiglia' },
+                { key: 'colleagues', label: 'Colleghi' },
+                { key: 'couple', label: 'Coppia' },
+                { key: 'alone', label: 'Da solo' },
+              ].map((opt) => (
+                <Pressable
+                  key={String(opt.key)}
+                  onPress={() => setSocialContext(opt.key as any)}
+                  style={[
+                    styles.chip,
+                    socialContext === opt.key && styles.chipActive,
+                    { marginRight: 8 }
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      socialContext === opt.key && styles.chipTextActive
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
             <View style={styles.tagInputContainer}>
               <TextInput 
                 style={styles.tagInput}
@@ -348,5 +379,25 @@ const styles = StyleSheet.create({
   tagChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, marginBottom: 8 },
   tagText: { fontSize: 13, color: COLORS.primary, fontFamily: TYPOGRAPHY.fontBold },
   saveBtn: { backgroundColor: COLORS.primary, borderRadius: 24, paddingVertical: 20, alignItems: 'center', marginTop: 20, ...SHADOWS.soft },
-  saveBtnText: { color: '#FFF', fontSize: 18, fontFamily: TYPOGRAPHY.fontBold }
+  saveBtnText: { color: '#FFF', fontSize: 18, fontFamily: TYPOGRAPHY.fontBold },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  chipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  chipText: {
+    fontSize: 12,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+  },
+  chipTextActive: {
+    color: '#FFF',
+  }
 });

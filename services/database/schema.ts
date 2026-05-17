@@ -55,6 +55,26 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
     `);
   } catch (e) {}
 
+  // Migrate legacy Italian taxonomy values to English
+  try {
+    await db.execAsync(`
+      UPDATE transactions SET social_context = 'friends' WHERE social_context = 'amici';
+      UPDATE transactions SET social_context = 'family' WHERE social_context = 'famiglia';
+      UPDATE transactions SET social_context = 'colleagues' WHERE social_context = 'colleghi';
+      UPDATE transactions SET social_context = 'couple' WHERE social_context = 'coppia';
+      UPDATE transactions SET social_context = 'alone' WHERE social_context = 'solo';
+      UPDATE transactions SET social_context = 'strangers' WHERE social_context = 'sconosciuti';
+
+      UPDATE transactions SET location_type = 'physical_store' WHERE location_type = 'negozio_fisico';
+      UPDATE transactions SET location_type = 'work' WHERE location_type = 'lavoro';
+      UPDATE transactions SET location_type = 'restaurant' WHERE location_type = 'ristorante';
+      UPDATE transactions SET location_type = 'home' WHERE location_type = 'casa';
+      UPDATE transactions SET location_type = 'transport' WHERE location_type = 'trasporti';
+      UPDATE transactions SET location_type = 'travel' WHERE location_type = 'viaggio';
+      UPDATE transactions SET location_type = 'abroad' WHERE location_type = 'estero';
+    `);
+  } catch (e) {}
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS net_worth (
       id TEXT PRIMARY KEY NOT NULL,

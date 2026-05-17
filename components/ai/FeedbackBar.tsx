@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { QueryIntent } from '../../services/aiQueryParser';
 import { COLORS, TYPOGRAPHY, SPACING } from '../../constants/Theme';
+import { translateSocialContext } from '../../constants/i18n';
 
 interface FeedbackBarProps {
   intent: QueryIntent;
@@ -30,19 +31,62 @@ export default function FeedbackBar({ intent, onUpdate }: FeedbackBarProps) {
     onUpdate({ ...intent, aggregation_type: types[nextIdx] });
   };
 
+  // Build the list of active pills dynamically
+  const pills: { key: string; text: string; isInteractive?: boolean; onPress?: () => void }[] = [];
+
+  // 1. Cosa (Category / Merchant / Domain)
+  pills.push({ key: 'cosa', text: getCosaLabel() });
+
+  // 2. Social Context (Amici, Famiglia, etc.)
+  if (intent.social_context_filter) {
+    pills.push({ 
+      key: 'social', 
+      text: translateSocialContext(intent.social_context_filter) 
+    });
+  }
+
+  // 3. City
+  if (intent.city_filter) {
+    pills.push({ key: 'city', text: intent.city_filter });
+  }
+
+  // 4. Holiday
+  if (intent.holiday_filter) {
+    pills.push({ key: 'holiday', text: intent.holiday_filter });
+  }
+
+  // 5. Tag
+  if (intent.tag_filter) {
+    pills.push({ key: 'tag', text: `#${intent.tag_filter}` });
+  }
+
+  // 6. Period
+  pills.push({ key: 'period', text: intent.period_label || 'Periodo' });
+
+  // 7. Aggregation (Interactive)
+  pills.push({ 
+    key: 'come', 
+    text: getComeLabel(), 
+    isInteractive: true, 
+    onPress: cycleCome 
+  });
+
   return (
     <View style={styles.container}>
-      <View style={styles.pill}>
-        <Text style={styles.label}>{getCosaLabel()}</Text>
-      </View>
-      <Text style={styles.dot}>·</Text>
-      <View style={styles.pill}>
-        <Text style={styles.label}>{intent.period_label || 'Periodo'}</Text>
-      </View>
-      <Text style={styles.dot}>·</Text>
-      <Pressable style={[styles.pill, styles.interactive]} onPress={cycleCome}>
-        <Text style={[styles.label, styles.interactiveText]}>{getComeLabel()}</Text>
-      </Pressable>
+      {pills.map((pill, idx) => (
+        <React.Fragment key={pill.key}>
+          {idx > 0 && <Text style={styles.dot}>·</Text>}
+          {pill.isInteractive ? (
+            <Pressable style={[styles.pill, styles.interactive]} onPress={pill.onPress}>
+              <Text style={[styles.label, styles.interactiveText]}>{pill.text}</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.pill}>
+              <Text style={styles.label}>{pill.text}</Text>
+            </View>
+          )}
+        </React.Fragment>
+      ))}
     </View>
   );
 }
@@ -54,12 +98,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     marginBottom: 4,
+    flexWrap: 'wrap',
+    gap: 4,
   },
   pill: {
     backgroundColor: '#F3F4F6',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    marginVertical: 2,
   },
   interactive: {
     backgroundColor: '#E5E7EB',
@@ -77,7 +124,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   dot: {
-    marginHorizontal: 6,
+    marginHorizontal: 4,
     color: '#9CA3AF',
     fontSize: 12,
     fontWeight: 'bold',
