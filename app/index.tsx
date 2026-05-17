@@ -68,6 +68,19 @@ export default function Home() {
   const [prevMonthExpensesComp, setPrevMonthExpensesComp] = useState<number>(0);
   const [percentageChange, setPercentageChange] = useState<number>(0);
   const [subMonthlyEstimate, setSubMonthlyEstimate] = useState<number>(0);
+  const [isNetWorthHidden, setIsNetWorthHidden] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('wolly_nw_hidden').then(val => {
+      if (val !== null) setIsNetWorthHidden(val === 'true');
+    });
+  }, []);
+
+  const toggleNetWorthVisibility = async () => {
+    const nextVal = !isNetWorthHidden;
+    setIsNetWorthHidden(nextVal);
+    await AsyncStorage.setItem('wolly_nw_hidden', String(nextVal));
+  };
   
   useEffect(() => {
     // Inizializza il DB solo la prima volta
@@ -208,14 +221,29 @@ export default function Home() {
           showsVerticalScrollIndicator={false}
           scrollEnabled={true}
         >
-          {/* CARD 1: Patrimonio totale */}
-          <View style={styles.dashboardCard}>
-            <Text style={styles.cardLabel}>Patrimonio totale</Text>
+          {/* CARD 1: Patrimonio totale (Senza riquadro/card!) */}
+          <View style={styles.netWorthHeaderContainer}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Pressable onPress={toggleNetWorthVisibility} style={styles.privacyButton}>
+                <Ionicons 
+                  name={isNetWorthHidden ? "eye-off-outline" : "eye-outline"} 
+                  size={16} 
+                  color={COLORS.secondary} 
+                />
+              </Pressable>
+              <Text style={styles.netWorthLabel}>Patrimonio totale</Text>
+            </View>
             <View style={styles.netWorthValueContainer}>
               <Text style={styles.netWorthValue}>
-                <Text style={styles.netWorthCurrency}>€ </Text>
-                <Text>{integerPart}</Text>
-                <Text style={styles.netWorthCents}>,{centsPart}</Text>
+                {isNetWorthHidden ? (
+                  <Text style={{ fontSize: 32, letterSpacing: 4 }}>••••••</Text>
+                ) : (
+                  <>
+                    <Text style={styles.netWorthCurrency}>€ </Text>
+                    <Text>{integerPart}</Text>
+                    <Text style={styles.netWorthCents}>,{centsPart}</Text>
+                  </>
+                )}
               </Text>
             </View>
           </View>
@@ -246,9 +274,6 @@ export default function Home() {
                 </View>
               )}
             </View>
-            <Text style={styles.expensesSubText}>
-              rispetto allo stesso periodo del mese scorso (€ {prevMonthExpensesComp.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-            </Text>
           </View>
 
           {/* CARD 3: Spese programmate degli abbonamenti */}
@@ -261,7 +286,7 @@ export default function Home() {
             </View>
 
             {upcomingSubs.length > 0 && (
-              <View style={{ marginTop: SPACING.md }}>
+              <View style={styles.upcomingListContainer}>
                 <Text style={styles.upcomingSubtitle}>Prossime uscite a venire</Text>
                 
                 {/* 1. Il prossimo in grande */}
@@ -394,6 +419,25 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     ...SHADOWS.soft,
   },
+  netWorthHeaderContainer: {
+    paddingHorizontal: SPACING.lg + 4,
+    marginTop: SPACING.xl,
+    marginBottom: SPACING.md,
+    alignItems: 'flex-start',
+  },
+  netWorthLabel: {
+    color: COLORS.secondary,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontFamily: TYPOGRAPHY.fontBold,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  privacyButton: {
+    paddingVertical: 2,
+    paddingRight: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   cardLabel: {
     color: COLORS.secondary,
     fontSize: TYPOGRAPHY.sizes.xs,
@@ -469,6 +513,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: TYPOGRAPHY.fontFamily,
     color: COLORS.secondary,
+  },
+  upcomingListContainer: {
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
   },
   upcomingSubtitle: {
     fontSize: 11,
