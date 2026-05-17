@@ -125,41 +125,123 @@ function buildAnalysisSteps(intent: QueryIntent, extra?: string[]): string[] {
 }
 
 function formatLabelItalian(label: string): string {
-  const labelLower = label.toLowerCase();
-  if (/^\d{4}$/.test(label)) {
-    return `il ${label}`;
+  const labelLower = (label || '').toLowerCase().trim();
+  if (/^\d{4}$/.test(labelLower)) {
+    return `il ${labelLower}`;
+  }
+  if (labelLower === 'tutto' || labelLower === 'tutti' || labelLower === 'sempre') {
+    return 'tutte le transazioni';
   }
   if (labelLower === 'ieri' || labelLower === 'oggi' || labelLower === "l'altro ieri" || labelLower.startsWith('questo') || labelLower.startsWith('quest\'') || labelLower.startsWith('questa')) {
     return labelLower;
   }
+  
+  if (labelLower.startsWith('ultimo ') || labelLower.startsWith('ultimi ') || labelLower.startsWith('ultima ') || labelLower.startsWith('ultime ')) {
+    if (labelLower.startsWith('ultimo ')) {
+      return `l'${labelLower}`;
+    }
+    if (labelLower.startsWith('ultima ')) {
+      return `l'${labelLower}`;
+    }
+    if (labelLower.startsWith('ultimi ')) {
+      return `gli ${labelLower}`;
+    }
+    if (labelLower.startsWith('ultime ')) {
+      return `le ${labelLower}`;
+    }
+  }
+
   return labelLower;
 }
 
 function formatTimeIntroduction(label: string, verb: string): string {
-  const labelLower = label.toLowerCase();
-  if (/^\d{4}$/.test(label)) {
-    return `nel ${label} hai ${verb}`;
+  const labelLower = (label || '').toLowerCase().trim();
+  
+  // Anno preciso, es: 2026
+  if (/^\d{4}$/.test(labelLower)) {
+    return `nel ${labelLower} hai ${verb}`;
   }
+  
+  // Giorni relativi senza preposizioni
   if (labelLower === 'ieri' || labelLower === 'oggi' || labelLower === "l'altro ieri") {
     return `${labelLower} hai ${verb}`;
   }
+  
+  // Periodi relativi con questo/questa
   if (labelLower.startsWith('questo') || labelLower.startsWith('quest\'') || labelLower.startsWith('questa')) {
     return `${labelLower} hai ${verb}`;
   }
-  return `a ${labelLower} hai ${verb}`;
+  
+  // Tutto il tempo / storico completo
+  if (labelLower === 'tutto' || labelLower === 'tutti' || labelLower === 'sempre') {
+    return `in totale hai ${verb}`;
+  }
+  
+  // Ultimo/a/i/e...
+  if (labelLower.startsWith('ultimo ') || labelLower.startsWith('ultimi ') || labelLower.startsWith('ultima ') || labelLower.startsWith('ultime ')) {
+    if (labelLower.startsWith('ultimo ')) {
+      return `nell'${labelLower} hai ${verb}`;
+    }
+    if (labelLower.startsWith('ultima ')) {
+      return `nell'${labelLower} hai ${verb}`;
+    }
+    if (labelLower.startsWith('ultimi ')) {
+      return `negli ${labelLower} hai ${verb}`;
+    }
+    if (labelLower.startsWith('ultime ')) {
+      return `nelle ${labelLower} hai ${verb}`;
+    }
+  }
+  
+  // Mesi specifici (es. "aprile", "maggio 2026")
+  const mesi = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+  const startsWithMonth = mesi.some(m => labelLower.startsWith(m));
+  if (startsWithMonth) {
+    // Fonetica per vocali: aprile, agosto, ottobre
+    if (labelLower.startsWith('aprile') || labelLower.startsWith('agosto') || labelLower.startsWith('ottobre')) {
+      return `ad ${labelLower} hai ${verb}`;
+    }
+    return `a ${labelLower} hai ${verb}`;
+  }
+
+  // Fallback generico
+  return `per quanto riguarda ${labelLower} hai ${verb}`;
 }
 
 function formatTimelineIntroduction(label: string): string {
-  const labelLower = label.toLowerCase();
-  if (/^\d{4}$/.test(label)) {
-    return `del ${label}`;
+  const labelLower = (label || '').toLowerCase().trim();
+  
+  if (/^\d{4}$/.test(labelLower)) {
+    return `del ${labelLower}`;
   }
+  
   if (labelLower === 'ieri' || labelLower === 'oggi' || labelLower === "l'altro ieri") {
     return `di ${labelLower}`;
   }
+  
   if (labelLower.startsWith('questo') || labelLower.startsWith('quest\'') || labelLower.startsWith('questa')) {
     return `di ${labelLower}`;
   }
+  
+  if (labelLower === 'tutto' || labelLower === 'tutti' || labelLower === 'sempre') {
+    return `dell'intero periodo`;
+  }
+  
+  if (labelLower.startsWith('ultimo ') || labelLower.startsWith('ultimi ') || labelLower.startsWith('ultima ') || labelLower.startsWith('ultime ')) {
+    if (labelLower.startsWith('ultimo ')) {
+      return `dell'${labelLower}`;
+    }
+    if (labelLower.startsWith('ultima ')) {
+      return `dell'${labelLower}`;
+    }
+    if (labelLower.startsWith('ultimi ')) {
+      return `degli ${labelLower}`;
+    }
+    if (labelLower.startsWith('ultime ')) {
+      return `delle ${labelLower}`;
+    }
+  }
+
   return `di ${labelLower}`;
 }
 
