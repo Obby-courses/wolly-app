@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
+  View, Text, StyleSheet, KeyboardAvoidingView,
   Platform, Pressable, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
-import ChatBubble from '../components/ai/ChatBubble';
-import JitTotal from '../components/ai/JitTotal';
-import JitDistribution from '../components/ai/JitDistribution';
-import JitList from '../components/ai/JitList';
-import JitTimeline from '../components/ai/JitTimeline';
-import JitSubscriptions from '../components/ai/JitSubscriptions';
-import FeedbackBar from '../components/ai/FeedbackBar';
-import VoiceInputBar from '../components/ai/VoiceInputBar';
+import AiResponseView from '../components/ai/AiResponseView';
 import { askAiChat, AiChatResponse, ChatMessage, aiChatStore } from '../services/aiChat';
 
 // ─── State types ──────────────────────────────────────────────────────────────
@@ -167,12 +160,7 @@ export default function AiChatPage() {
             </View>
           ) : (
             <View style={styles.qaContainer}>
-              {/* Question small at top */}
-              <View style={styles.smallQuestionContainer}>
-                <Text style={styles.smallQuestionText}>{qa?.question}</Text>
-              </View>
-
-              {/* Answer BIG in middle */}
+              {/* Answer area */}
               <View style={styles.mainAnswerArea}>
                 {isLoading ? (
                   <View style={styles.loadingWrapper}>
@@ -180,51 +168,12 @@ export default function AiChatPage() {
                     <Text style={styles.loadingText}>Wolly sta analizzando...</Text>
                   </View>
                 ) : qa?.answer && (
-                  <ScrollView 
-                    style={styles.answerScroll}
-                    contentContainerStyle={styles.answerScrollContent}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    <Text style={qa.answer.intent === 'text' ? styles.bigAnswerText : styles.answerContextText}>
-                      {qa.answer.text_response}
-                    </Text>
-                    
-                    {/* JIT Charts */}
-                    <View style={styles.jitWrapper}>
-                      {qa.answer.intent === 'total' && qa.answer.total_data && (
-                        <JitTotal 
-                          value={qa.answer.total_data.value}
-                          comparison={qa.answer.total_data.comparison}
-                          periodLabel={qa.answer.total_data.period_label}
-                        />
-                      )}
-                      {qa.answer.intent === 'distribution' && qa.answer.distribution_data && (
-                        <JitDistribution {...qa.answer.distribution_data} />
-                      )}
-                      {qa.answer.intent === 'list' && qa.answer.list_data && (
-                        <JitList 
-                          title={qa.answer.list_data.title}
-                          items={qa.answer.list_data.items}
-                          totalCount={qa.answer.list_data.total_count}
-                        />
-                      )}
-                      {qa.answer.intent === 'timeline' && qa.answer.timeline_data && (
-                        <JitTimeline {...qa.answer.timeline_data} />
-                      )}
-                      {qa.answer.intent === 'subscriptions' && qa.answer.subscription_data && (
-                        <JitSubscriptions 
-                          items={qa.answer.subscription_data.items}
-                          totalMonthly={qa.answer.subscription_data.total_monthly}
-                        />
-                      )}
-                    </View>
-
-                    {showDebug && debugData && (
-                      <View style={styles.debugBox}>
-                        <Text style={styles.debugText}>{debugData}</Text>
-                      </View>
-                    )}
-                  </ScrollView>
+                  <AiResponseView
+                    question={qa.question}
+                    answer={qa.answer}
+                    onRerun={reRunQuery}
+                    scrollable={true}
+                  />
                 )}
               </View>
             </View>

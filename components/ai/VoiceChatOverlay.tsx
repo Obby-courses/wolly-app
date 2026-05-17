@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ActivityIndicator,
-  Animated, ScrollView, Dimensions,
+  Animated, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING } from '../../constants/Theme';
-import JitTotal from './JitTotal';
-import JitDistribution from './JitDistribution';
-import JitList from './JitList';
-import JitTimeline from './JitTimeline';
 import { voiceStore } from '../../services/voiceStore';
+import { askAiChat } from '../../services/aiChat';
+import { QueryIntent } from '../../services/aiQueryParser';
+
+// Componente condiviso — identico a quello usato nella chat testuale
+import AiResponseView from './AiResponseView';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -25,7 +26,7 @@ export default function VoiceChatOverlay() {
     const unsub = voiceStore.subscribe(() => {
       setVoiceState(voiceStore.getState());
     });
-    return unsub;
+    return () => { unsub(); };
   }, []);
 
   // Animate in/out based on isOpen
@@ -48,27 +49,36 @@ export default function VoiceChatOverlay() {
     }
   }, [voiceState.isOpen]);
 
-  // Inactivity timeout: auto-close after 7s of no activity
+  // Inactivity timeout: auto-close after 7s if no answer yet
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    
     const { isOpen, isRecording, isLoading, qa } = voiceState;
-    
-    // Solo se aperto e non sta caricando o registrando, e non c'è già una risposta
     if (isOpen && !isRecording && !isLoading && !qa?.answer) {
-      timer = setTimeout(() => {
-        voiceStore.close();
-      }, 7000); // 7 secondi di inattività
+      timer = setTimeout(() => voiceStore.close(), 7000);
     }
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
+    return () => { if (timer) clearTimeout(timer); };
   }, [voiceState]);
 
   const handleClose = async () => {
     await voiceStore.cancelRecording();
     voiceStore.close();
+  };
+
+  /**
+   * Riesegue la query con un intent modificato dall'utente via FeedbackBar.
+   * Identico a reRunQuery in ai-chat.tsx — stessa logica, stessa pipeline.
+   */
+  const handleRerun = async (newIntent: QueryIntent) => {
+    if (!voiceState.qa) return;
+    voiceStore.setIsLoading(true);
+    try {
+      const response = await askAiChat(voiceState.qa.question, [], newIntent);
+      voiceStore.setQa({ question: voiceState.qa.question, answer: response });
+    } catch (e) {
+      console.error('[VoiceChatOverlay] rerun error:', e);
+    } finally {
+      voiceStore.setIsLoading(false);
+    }
   };
 
   const { isRecording, isLoading, qa } = voiceState;
@@ -79,7 +89,6 @@ export default function VoiceChatOverlay() {
         styles.overlay,
         { transform: [{ translateY: slideAnim }] },
       ]}
-      // Leave bottom area for BottomMenu's mic button
       pointerEvents={voiceState.isOpen ? 'auto' : 'none'}
     >
       {/* Header */}
@@ -89,60 +98,32 @@ export default function VoiceChatOverlay() {
         </Pressable>
       </View>
 
-      {/* Content area — leave bottom padding for mic button */}
+      {/* Content area — bottom padding for mic button */}
       <View style={styles.content}>
-        <View style={styles.qaContainer}>
-          {qa ? (
-            <>
-              <View style={styles.smallQuestionContainer}>
-                <Text style={styles.smallQuestionText}>{qa.question}</Text>
+        {qa ? (
+          <>
+            {isLoading ? (
+              <View style={styles.loadingWrapper}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.loadingText}>Wolly sta analizzando...</Text>
               </View>
-              <View style={styles.mainAnswerArea}>
-                {isLoading ? (
-                  <View style={styles.loadingWrapper}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
-                  </View>
-                ) : qa.answer && (
-                  <ScrollView
-                    style={styles.answerScroll}
-                    contentContainerStyle={styles.answerScrollContent}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    <Text style={styles.answerContextText}>{qa.answer.text_response}</Text>
-                    <View style={styles.jitWrapper}>
-                      {qa.answer.intent === 'total' && qa.answer.total_data && (
-                        <JitTotal
-                          value={qa.answer.total_data.value}
-                          comparison={qa.answer.total_data.comparison}
-                          periodLabel={qa.answer.total_data.period_label}
-                        />
-                      )}
-                      {qa.answer.intent === 'distribution' && qa.answer.distribution_data && (
-                        <JitDistribution {...qa.answer.distribution_data} />
-                      )}
-                      {qa.answer.intent === 'list' && qa.answer.list_data && (
-                        <JitList
-                          title={qa.answer.list_data.title}
-                          items={qa.answer.list_data.items}
-                          totalCount={qa.answer.list_data.total_count}
-                        />
-                      )}
-                      {qa.answer.intent === 'timeline' && qa.answer.timeline_data && (
-                        <JitTimeline {...qa.answer.timeline_data} />
-                      )}
-                    </View>
-                  </ScrollView>
-                )}
-              </View>
-            </>
-          ) : (
-            <View style={styles.emptyCenter}>
-              <Text style={styles.emptyTitle}>
-                {isRecording ? 'Ti ascolto...' : 'Tieni premuto per iniziare'}
-              </Text>
-            </View>
-          )}
-        </View>
+            ) : qa.answer && (
+              /* ── STESSO componente usato nella chat testuale ── */
+              <AiResponseView
+                question={qa.question}
+                answer={qa.answer}
+                onRerun={handleRerun}
+                scrollable={true}
+              />
+            )}
+          </>
+        ) : (
+          <View style={styles.emptyCenter}>
+            <Text style={styles.emptyTitle}>
+              {isRecording ? 'Ti ascolto...' : 'Tieni premuto per iniziare'}
+            </Text>
+          </View>
+        )}
       </View>
     </Animated.View>
   );
@@ -166,10 +147,9 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 8 },
   content: {
     flex: 1,
-    // Bottom padding so content doesn't sit under the mic button (60px icon + 34px safe area + 8px top)
+    // Spazio inferiore per il pulsante microfono
     paddingBottom: 110,
   },
-  qaContainer: { flex: 1 },
   emptyCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyTitle: {
     fontFamily: TYPOGRAPHY.fontBold,
@@ -178,27 +158,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: SPACING.xl,
   },
-  smallQuestionContainer: {
-    paddingHorizontal: SPACING.xl,
+  loadingWrapper: {
+    flex: 1,
     alignItems: 'center',
-    paddingBottom: 10,
+    justifyContent: 'center',
+    gap: 16,
   },
-  smallQuestionText: {
+  loadingText: {
     fontFamily: TYPOGRAPHY.fontFamily,
     fontSize: 14,
     color: COLORS.secondary,
-    textAlign: 'center',
   },
-  mainAnswerArea: { flex: 1, paddingHorizontal: SPACING.lg },
-  answerScroll: { flex: 1 },
-  answerScrollContent: { paddingVertical: 20 },
-  answerContextText: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 22,
-    color: COLORS.primary,
-    textAlign: 'center',
-    lineHeight: 30,
-  },
-  jitWrapper: { marginTop: 30, alignItems: 'center' },
-  loadingWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
