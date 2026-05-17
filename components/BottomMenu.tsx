@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, View, Pressable, Platform, Text,
-  KeyboardAvoidingView, Animated, PanResponder,
+  KeyboardAvoidingView, Animated, PanResponder, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -76,11 +76,22 @@ export default function BottomMenu() {
     try {
       setIsProcessing(true);
       const parsed = await parseFromReceipt(true, undefined);
-      if (parsed) {
+      if (parsed && parsed.amount > 0) {
         router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
+      } else {
+        Alert.alert(
+          "Scontrino non riconosciuto",
+          "La foto non sembra contenere uno scontrino valido o leggibile. Riprova.",
+          [{ text: "OK" }]
+        );
       }
     } catch (error) {
       console.error('Error parsing camera/receipt:', error);
+      Alert.alert(
+        "Scontrino non riconosciuto",
+        "La foto non sembra contenere uno scontrino valido o leggibile. Riprova.",
+        [{ text: "OK" }]
+      );
     } finally {
       setIsProcessing(false);
     }
