@@ -111,8 +111,11 @@ function buildWhereClause(
     params.push(filters.is_impulsive ? 1 : 0);
   }
   if (filters.is_recurring !== undefined) {
-    clauses.push(`${tableAlias}.is_recurring_pattern = ?`);
-    params.push(filters.is_recurring ? 1 : 0);
+    if (filters.is_recurring) {
+      clauses.push(`${tableAlias}.subscription_id IS NOT NULL`);
+    } else {
+      clauses.push(`${tableAlias}.subscription_id IS NULL`);
+    }
   }
 
   return { clause: clauses.join(' AND '), params };

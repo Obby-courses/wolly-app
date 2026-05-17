@@ -10,6 +10,7 @@
  */
 
 import { SubscriptionRepository, Subscription } from './database/repositories/SubscriptionRepository';
+import { NetWorthRepository } from './database/repositories/NetWorthRepository';
 import { ALL_CATEGORIES, DOMAINS_CONFIG } from '../constants/categories';
 import { QueryIntent, QueryPeriod } from './aiQueryParser';
 import { MerchantResolver } from './merchantResolver';
@@ -131,6 +132,7 @@ function intentToFilters(intent: QueryIntent, resolvedMerchant: string | null): 
     person: intent.person_filter || undefined,
     holiday: intent.holiday_filter || undefined,
     tag: intent.tag_filter || undefined,
+    is_recurring: intent.is_recurring_filter || undefined,
   };
 }
 
@@ -148,6 +150,55 @@ export async function executeQueryIntent(intent: QueryIntent): Promise<Execution
 
   const filters = intentToFilters(intent, resolvedMerchant);
   console.log(`⚙️ [EXECUTOR] Archetype: ${intent.archetype} | Period: ${periodLabel} | Filters:`, filters);
+
+  // ── SUBJECT: NET_WORTH ──────────────────────────────────────────────────────
+  if (intent.subject === 'net_worth') {
+    if (intent.archetype === 'total') {
+      const { from, to } = periodToDateRange(intent.period);
+      const todayISO = new Date().toISOString().split('T')[0];
+      let finalValue: number;
+      if (to >= todayISO) {
+        finalValue = await NetWorthRepository.getCurrentTotal();
+      } else {
+        finalValue = await NetWorthRepository.getNetWorthAtDate(to);
+      }
+      
+      let comparison: ExecutionResult['comparison'] = undefined;
+      if (intent.comparison_period) {
+        // Il Net Worth a inizio periodo (from) equivale essenzialmente a quello di fine periodo precedente
+        const prevValue = await NetWorthRepository.getNetWorthAtDate(from);
+        const diff = finalValue - prevValue;
+        comparison = {
+          prev_total: prevValue,
+          diff: diff,
+          percentage: prevValue !== 0 ? Math.abs((diff / prevValue) * 100) : 0,
+          is_better: diff >= 0,
+        };
+      }
+      
+      return { archetype: 'total', period_label: periodLabel, total: finalValue, comparison, intent };
+    }
+    
+    if (intent.archetype === 'timeline') {
+      const granularity = intent.period.type === 'year' ? 'month' : 'day';
+      const rows = await getTimeSeries(granularity, filters); 
+      
+      const dataPoints = rows.map(r => ({
+         label: r.period,
+         date: granularity === 'day' ? r.date : undefined,
+         month: granularity === 'month' ? parseInt(r.date.split('-')[1], 10) : undefined,
+      }));
+      
+      const nwHistory = await NetWorthRepository.getNetWorthHistory(dataPoints, granularity === 'day' ? 'daily' : 'monthly');
+      const timelineData = rows.map((r, i) => ({ label: r.period, value: nwHistory[i] }));
+      
+      console.log(`📈 [EXECUTOR] Net Worth Timeline: ${timelineData.length} punti (${granularity})`);
+      return { archetype: 'timeline', period_label: periodLabel, timeline_data: timelineData, intent };
+    }
+    
+    const totalNw = await NetWorthRepository.getCurrentTotal();
+    return { archetype: 'total', period_label: periodLabel, total: totalNw, intent };
+  }
 
   // ── ARCHETYPE: TEXT ─────────────────────────────────────────────────────────
   if (intent.archetype === 'text') {

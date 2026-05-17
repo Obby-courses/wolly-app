@@ -13,6 +13,7 @@ export interface QueryPeriod {
 }
 
 export interface QueryIntent {
+  subject?: 'transactions' | 'net_worth'; // Default: 'transactions'
   archetype: 'total' | 'distribution' | 'list' | 'timeline' | 'text' | 'subscriptions';
   direction: 'out' | 'in' | 'both';
   aggregation_type: 'total' | 'average' | 'count';
@@ -30,6 +31,7 @@ export interface QueryIntent {
   person_filter?: string;         // persona specifica (es: "Marco", "Stefano")
   holiday_filter?: string;        // festività (es: "Natale", "Pasqua")
   tag_filter?: string;            // tag specifico (es: "viaggio", "trasferta")
+  is_recurring_filter?: boolean;  // true se si parla di spese ricorrenti o abbonamenti, altrimenti null
 }
 
 // ─── Prompt Builder (Dinamico) ───────────────────────────────────────────────
@@ -56,20 +58,21 @@ TASSONOMIA DISPONIBILE:
 - FESTIVITÀ CONOSCIUTE (holiday_filter): ${holidayList}
 - TAG REGISTRATI (tag_filter): ${tagList}
 
-L'AI funge da estrattore rigido. Trasforma la frase in un JSON con tre parametri logici:
-1. COSA: category_filter, domain_filter, merchant_filter, holiday_filter o tag_filter.
-2. QUANDO: period (mese, settimana, anno, custom).
-3. COME: aggregation_type (total, average, count).
+L'AI funge da estrattore rigido. Trasforma la frase in un JSON con i seguenti parametri logici:
+1. SOGGETTO (subject): Usa "net_worth" SOLO ED ESCLUSIVAMENTE se la domanda contiene esplicitamente le parole "patrimonio", "ricchezza", o "bilancio totale". In TUTTI gli altri casi (inclusi "stipendio", "guadagnato", "entrate", "spese"), DEVI usare "transactions".
+2. COSA: category_filter, domain_filter, merchant_filter, holiday_filter o tag_filter.
+3. QUANDO: period (mese, settimana, anno, custom).
+4. COME: aggregation_type (total, average, count).
 
 ARCHETIPI:
-- "total": Valore unico calcolato (es: "quanto ho speso?", "media spesa", "quante volte")
+- "total": Valore unico calcolato (es: "quanto ho speso?", "a quanto ammonta il mio patrimonio", "media spesa", "quante volte")
 - "distribution": Proporzioni (es: "dove spendo di più?", "spese per categoria")
 - "list": Transazioni specifiche (es: "mostrami le spese", "cosa ho comprato")
-- "timeline": Andamento nel tempo (es: "trend", "mese per mese")
+- "timeline": Andamento nel tempo (es: "trend delle spese", "andamento patrimonio", "mese per mese")
 - "text": Domanda conversazionale senza dati (es: "cosa è la diversificazione?")
 - "subscriptions": Gestione abbonamenti e proiezioni future
 
-DIRECTION: "out" (spese), "in" (entrate), "both" (entrambi). Default: "out".
+DIRECTION: "out" (spese), "in" (entrate), "both" (entrambi). Default: "out". Se subject="net_worth", usa "both".
 
 AGGREGATION_TYPE: 
 - "total": Somma degli importi (Default).
@@ -78,6 +81,7 @@ AGGREGATION_TYPE:
 
 FORMATO JSON OBBLIGATORIO:
 {
+  "subject": "transactions"|"net_worth",
   "archetype": "total"|"distribution"|"list"|"timeline"|"text"|"subscriptions",
   "direction": "out"|"in"|"both",
   "aggregation_type": "total"|"average"|"count",
@@ -100,7 +104,8 @@ FORMATO JSON OBBLIGATORIO:
   "tag_filter": string|null,
   "sort_by": "date"|"amount_desc"|"amount_asc"|null,
   "limit": number|null,
-  "comparison_period": "prev_month"|"prev_year"|null
+  "comparison_period": "prev_month"|"prev_year"|null,
+  "is_recurring_filter": boolean|null
 }
 
 REGOLE CRITICHE PER DATE E PERIODI:
@@ -135,9 +140,9 @@ ALTRE REGOLE GENERALI:
 - DISTINZIONE CRITICA: 
   a) "Quali sono le spese/acquisti più alti/onerosi?" o "Mostrami i top acquisti" → archetype="list", sort_by="amount_desc" (Vuole vedere le singole transazioni costose).
   b) "Dove spendo di più?", "In quali categorie spendo?" → archetype="distribution", group_by="category" (Vuole vedere le proporzioni per settore).
-- Default automatici se mancano parametri: tutto (null filters) · questo_mese · totale.
-- REGOLA MANDATORIA: Se l'utente nomina "abbonamenti", "costi fissi", "ricorrenze", "Netflix", "Spotify", "Amazon Prime", "palestra", "affitto" o chiede proiezioni future basate su abbonamenti (es. "quanto spenderò tra un anno in abbonamenti?") → archetype="subscriptions" SEMPRE.
-- Esempio: "Quanto spenderò in abbonamenti quest'anno?" → archetype="subscriptions", period.type="year"
+- Default automatici se mancano parametri: tutto (null filters) · se l'archetipo è 'list' imposta il periodo a "all" (tutta la storia) per mostrare lo storico completo ed evitare liste vuote, per altri archetipi usa il mese corrente · totale.
+- GESTIONE ABBONAMENTI E RICORRENTI (is_recurring_filter): Se l'utente chiede una statistica storica o un importo speso (es. "Quanto ho speso di abbonamenti nel 2026?", "elenco spese di abbonamenti") → imposta archetype="total" o "list" (a seconda della domanda), is_recurring_filter=true e subject="transactions".
+- Se invece l'utente chiede l'elenco generale o la proiezione/configurazione degli abbonamenti attivi (es. "quali abbonamenti ho?", "mostrami gli abbonamenti attivi", "quanto mi costano gli abbonamenti al mese?") → imposta archetype="subscriptions", is_recurring_filter=true e subject="transactions".
 - Restituisci SOLO il JSON, nessun testo extra.`;
 }
 

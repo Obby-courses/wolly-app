@@ -314,11 +314,6 @@ export default function SubscriptionsScreen() {
         <View style={styles.cardBody}>
           <View style={styles.cardTop}>
             <Text style={styles.cardName}>{sub.name}</Text>
-            {sub.auto_detected && (
-              <View style={styles.autoPill}>
-                <Text style={styles.autoPillText}>AI</Text>
-              </View>
-            )}
           </View>
           <View style={styles.cardMeta}>
             <Text style={styles.cardAmount}>€{sub.amount.toFixed(2)}</Text>

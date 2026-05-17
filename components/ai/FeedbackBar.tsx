@@ -11,6 +11,7 @@ interface FeedbackBarProps {
 
 export default function FeedbackBar({ intent, onUpdate }: FeedbackBarProps) {
   const getCosaLabel = () => {
+    if (intent.subject === 'net_worth') return 'Patrimonio';
     if (intent.merchant_filter) return intent.merchant_filter;
     if (intent.category_filter) return intent.category_filter.replace(/_/g, ' ');
     if (intent.domain_filter) return intent.domain_filter.replace(/_/g, ' ');

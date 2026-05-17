@@ -42,7 +42,7 @@ const EXPENSE_VERB_PATTERNS = [
 // ─── Pattern per QUERY (analisi AI) ───────────────────────────────────────────
 
 const QUERY_PATTERNS = [
-  /\b(quanto|quante|quanti|quanta)\b/i,
+  /\b(quanto|quante|quanti|quanta|quant'era|quant'è)\b/i,
   /\b(come\s+ho\s+speso|dove\s+spendo|cosa\s+ho\s+speso)\b/i,
   /\b(mostrami|dimmi|analizza|fammi\s+vedere|mostra)\b/i,
   /\b(media|totale|somma|conteggio|confronta|comparazione)\b/i,

@@ -17,17 +17,27 @@ export async function transcribeAudio(uri: string): Promise<string> {
       type: 'audio/m4a',
       name: 'recording.m4a',
     } as any);
-    formData.append('model', 'whisper-large-v3'); // Il modello Whisper più potente su Groq
-    formData.append('language', 'it');           // Forziamo l'italiano per precisione
+    formData.append('model', 'whisper-large-v3-turbo'); // Modello super veloce ed efficiente
+    formData.append('language', 'it');
+
+    console.log("⏳ Sending request to Groq API...");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.warn("⚠️ Groq STT Request timed out!");
+      controller.abort();
+    }, 20000); // 20 seconds timeout
 
     const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        // Note: fetch handles Content-Type for FormData automatically
       },
       body: formData,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
+    console.log("📥 Received response from Groq. Status:", response.status);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -37,8 +47,8 @@ export async function transcribeAudio(uri: string): Promise<string> {
     const data = await response.json();
     console.log("📝 Transcription result:", data.text);
     return data.text;
-  } catch (err) {
-    console.error('Failed to transcribe audio:', err);
+  } catch (err: any) {
+    console.error('❌ Failed to transcribe audio:', err.message || err);
     throw err;
   }
 }

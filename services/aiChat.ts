@@ -327,7 +327,11 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
     }
 
     const timeIntro = formatTimeIntroduction(label, dirLabel);
-    const text_response = `Dunque, ${timeIntro}${filterLabel}${cityLabel}${socialLabel} complessivamente €${value.toFixed(2)}${compText}.`;
+    let text_response = `Dunque, ${timeIntro}${filterLabel}${cityLabel}${socialLabel} complessivamente €${value.toFixed(2)}${compText}.`;
+    
+    if (intent.subject === 'net_worth') {
+      text_response = `Il tuo patrimonio totale (per quanto riguarda il periodo indicato, ${label}) ammonta a €${value.toFixed(2)}${compText}.`;
+    }
 
     return {
       intent: 'total',
@@ -409,18 +413,61 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
     const isMonthly = intent.period.type === 'year';
     const formattedIntro = formatTimelineIntroduction(label);
     
+    let text_response = `Dando un'occhiata all'andamento ${formattedIntro}, ecco come si sono evolute le tue ${intent.direction === 'in' ? 'entrate' : 'spese'}:`;
+    let chartTitle = `Andamento — ${label}`;
+
+    if (intent.subject === 'net_worth') {
+      text_response = `Ecco l'andamento del tuo patrimonio ${formattedIntro}:`;
+      chartTitle = `Andamento Patrimonio — ${label}`;
+    }
+
     return {
       intent: 'timeline',
-      text_response: `Dando un'occhiata all'andamento ${formattedIntro}, ecco come si sono evolute le tue ${intent.direction === 'in' ? 'entrate' : 'spese'}:`,
+      text_response,
       analysis_steps: [
         `Periodo: ${label}`,
         `Granularità: ${isMonthly ? 'mensile' : 'giornaliera'}`,
       ],
       timeline_data: {
         type: 'bar_vertical',
-        title: `Andamento — ${label}`,
+        title: chartTitle,
         data: result.timeline_data,
         granularity: isMonthly ? 'weekday' : 'day',
+      },
+    };
+  }
+
+  // ── SUBSCRIPTIONS ────────────────────────────────────────────────────────────
+  if (result.archetype === 'subscriptions' && result.subscriptions) {
+    const subs = result.subscriptions;
+    const activeCount = subs.filter(s => s.is_active).length;
+    
+    // Normalized monthly total cost
+    let totalMonthly = 0;
+    for (const sub of subs) {
+      if (!sub.is_active) continue;
+      let monthly = sub.amount;
+      switch (sub.frequency) {
+        case 'weekly':    monthly = sub.amount * 4.33; break;
+        case 'biweekly':  monthly = sub.amount * 2.17; break;
+        case 'yearly':    monthly = sub.amount / 12;   break;
+        default:          monthly = sub.amount;        break;
+      }
+      totalMonthly += monthly;
+    }
+
+    return {
+      intent: 'subscriptions',
+      text_response: `Attualmente hai ${activeCount} abbonamenti attivi, per un costo mensile complessivo stimato di circa €${totalMonthly.toFixed(2)}. Ecco l'elenco completo:`,
+      analysis_steps: buildAnalysisSteps(intent, [
+        `Abbonamenti totali nel DB: ${subs.length}`,
+        `Abbonamenti attivi: ${activeCount}`,
+        `Costo mensile stimato: €${totalMonthly.toFixed(2)}`,
+      ]),
+      subscription_data: {
+        total_monthly: totalMonthly,
+        active_count: activeCount,
+        items: subs,
       },
     };
   }
