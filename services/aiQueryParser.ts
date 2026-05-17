@@ -97,7 +97,10 @@ FORMATO JSON OBBLIGATORIO:
   "social_context_filter": string|null,
   "person_filter": string|null,
   "holiday_filter": string|null,
-  "tag_filter": string|null
+  "tag_filter": string|null,
+  "sort_by": "date"|"amount_desc"|"amount_asc"|null,
+  "limit": number|null,
+  "comparison_period": "prev_month"|"prev_year"|null
 }
 
 REGOLE CRITICHE PER DATE E PERIODI:
@@ -111,6 +114,19 @@ REGOLE CRITICHE PER DATE E PERIODI:
 - Se l'utente specifica un anno o mese preciso (es: "nel 2025", "a marzo 2025"):
   * Imposta "type": "year" o "month" con "year" e "month" numerici appropriati, e "from"/"to" a null.
   * Esempio "nel 2025" → "type": "year", "year": 2025, "month": null, "from": null, "to": null.
+
+REGOLE PER ORDINE, LIMITI E CONFRONTI:
+- Se l'utente chiede ordinamento o valori estremi (es: "le spese più alte", "i più economici", "i più recenti"):
+  * Per "più alti", "più costosi", "top acquisti" → sort_by="amount_desc"
+  * Per "più bassi", "più economici" → sort_by="amount_asc"
+  * Per "più recenti", "ultimi acquisti" → sort_by="date" (o null, default)
+- Se l'utente specifica una quantità numerica di elementi (es: "le ultime 5 spese", "mostrami 10 transazioni"):
+  * Imposta "limit" al numero richiesto (es: 5 o 10). Se non specificato, lascia null o ometti.
+- Se l'utente chiede un confronto rispetto a un altro periodo (es: "rispetto al mese scorso", "in confronto all'anno scorso"):
+  * Per "mese scorso", "mese precedente" → comparison_period="prev_month"
+  * Per "anno scorso", "anno precedente" → comparison_period="prev_year"
+
+ALTRE REGOLE GENERALI:
 - Se l'utente nomina una festività (es: "Natale", "Pasqua", "Ferragosto") → holiday_filter="nome festività"
 - Se l'utente nomina un tag o una tipologia (es: "viaggio", "trasferta") → tag_filter="tag"
 - Se l'utente nomina un negozio specifico (es: "Coca Cola", "Esselunga", "Amazon") → merchant_filter="nome negozio"
