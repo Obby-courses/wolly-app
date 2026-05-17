@@ -14,7 +14,7 @@ import { networkStore } from '../services/networkStore';
 
 const CANCEL_THRESHOLD_Y = -60;
 const MIN_RECORDING_DURATION = 500;
-const MIC_SIZE = 64;
+const MIC_SIZE = 56;
 
 const RANDOM_QUESTIONS = [
   "Cosa ho speso nell'ultimo periodo?",
@@ -76,6 +76,12 @@ export default function BottomMenu() {
     try {
       setIsProcessing(true);
       const parsed = await parseFromReceipt(true, undefined);
+      
+      if (parsed === null) {
+        // L'utente ha annullato la fotocamera
+        return;
+      }
+
       if (parsed && parsed.amount > 0) {
         router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
       } else {
@@ -163,7 +169,39 @@ export default function BottomMenu() {
   // This keeps the PanResponder gesture alive through the state change.
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
+    <View style={styles.wrapper}>
+      {/* RACCORDO VISIVO A DUE LAYER (Effetto "Corna") */}
+      <View style={styles.hornsContainer} pointerEvents="none">
+        {/* Corno Sinistro */}
+        <View style={{ position: 'absolute', bottom: 0, left: 0, width: 40, height: 40, overflow: 'hidden' }}>
+          <View style={{
+            position: 'absolute',
+            width: 160,
+            height: 160,
+            borderRadius: 80,
+            borderWidth: 40,
+            borderColor: COLORS.surface,
+            left: -40,
+            top: -80,
+          }} />
+        </View>
+
+        {/* Corno Destro */}
+        <View style={{ position: 'absolute', bottom: 0, right: 0, width: 40, height: 40, overflow: 'hidden' }}>
+          <View style={{
+            position: 'absolute',
+            width: 160,
+            height: 160,
+            borderRadius: 80,
+            borderWidth: 40,
+            borderColor: COLORS.surface,
+            left: -80,
+            top: -80,
+          }} />
+        </View>
+      </View>
+
+      <View style={styles.container}>
 
       {/* Cancel hint — ABSOLUTE so it doesn't move the mic button below */}
       {isOpen && isRecording && (
@@ -243,25 +281,36 @@ export default function BottomMenu() {
         </View>
       )}
     </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 0,
     left: 0,
     right: 0,
-    alignItems: 'center',
     zIndex: 101,
-    height: 120, // Altezza fissa per evitare salti di layout
-    justifyContent: 'flex-end',
+  },
+  hornsContainer: {
+    height: 40,
+    width: '100%',
+    backgroundColor: 'transparent',
+  },
+  container: {
+    backgroundColor: COLORS.surface,
+    paddingTop: 4,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cancelHintContainer: {
     position: 'absolute',
-    top: 0, // In cima al container da 120px
+    top: -45,
     alignItems: 'center',
     gap: 4,
+    zIndex: 110,
   },
   cancelHintText: {
     fontFamily: TYPOGRAPHY.fontBold,
@@ -273,15 +322,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.lg,
+    zIndex: 102,
   },
   sideIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.medium,
+    ...SHADOWS.soft,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -310,7 +360,7 @@ const styles = StyleSheet.create({
   },
   toast: {
     position: 'absolute',
-    bottom: 90,
+    bottom: 95,
     left: SPACING.lg,
     right: SPACING.lg,
     backgroundColor: '#1E293B',

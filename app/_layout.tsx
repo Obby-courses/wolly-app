@@ -42,13 +42,14 @@ export default function RootLayout() {
     return null;
   }
 
-  // Pagine su cui il menu deve apparire (Root tabs)
+  // Pagine su cui il menu superiore deve apparire (Root tabs)
   const rootPaths = ['/', '/stats', '/subscriptions', '/history', '/settings'];
-  const showMenu = rootPaths.includes(pathname);
+  const showTopNav = rootPaths.includes(pathname);
+  const showBottomMenu = pathname !== '/ai-chat' && pathname !== '/voice-chat';
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
-      {showMenu && <TopNavigation />}
+      {showTopNav && <TopNavigation />}
       <SwipeNavigator>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
@@ -63,8 +64,8 @@ export default function RootLayout() {
       {/* Voice overlay — always mounted, animates in/out */}
       <VoiceChatOverlay />
 
-      {/* Bottom menu: show on root tabs OR when voice overlay is open (so the mic stays visible) */}
-      {(showMenu || voiceOpen) && <BottomMenu />}
+      {/* Bottom menu: show on all screens except AI chat/voice chat OR when voice overlay is open */}
+      {(showBottomMenu || voiceOpen) && <BottomMenu />}
     </View>
   );
 }

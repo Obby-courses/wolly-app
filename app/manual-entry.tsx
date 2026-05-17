@@ -99,7 +99,8 @@ export default function ManualEntry() {
   };
 
   const handleSave = () => {
-    if (!amount || isNaN(parseFloat(amount))) {
+    const parsedVal = parseFloat(amount.replace(',', '.'));
+    if (!amount || isNaN(parsedVal) || parsedVal <= 0) {
       Alert.alert('Errore', 'Inserisci un importo valido.');
       return;
     }
@@ -107,8 +108,8 @@ export default function ManualEntry() {
     const expense: ParsedExpense = {
       id: uuid.v4() as string,
       created_at: new Date().toISOString(),
-      amount: parseFloat(amount),
-      net_amount: parseFloat(amount),
+      amount: parsedVal,
+      net_amount: parsedVal,
       currency: 'EUR',
       payment_method: paymentMethod,
       direction: direction,
@@ -192,9 +193,12 @@ export default function ManualEntry() {
               <TextInput 
                 style={[styles.amountInput, { color: direction === 'in' ? COLORS.success : COLORS.primary }]}
                 placeholder="0.00"
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
                 value={amount}
-                onChangeText={setAmount}
+                onChangeText={(val) => {
+                  const cleaned = val.replace(/[^0-9,.]/g, '');
+                  setAmount(cleaned);
+                }}
                 autoFocus
               />
             </View>

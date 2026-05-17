@@ -80,6 +80,7 @@ export default function ExpenseDetail() {
 
   // City Search State
   const [citySearch, setCitySearch] = useState('');
+  const [amountInputText, setAmountInputText] = useState('');
 
   // Custom Tag Creation State
   const [newTagInput, setNewTagInput] = useState('');
@@ -223,6 +224,15 @@ export default function ExpenseDetail() {
       }
     }
   }, [data, id]);
+
+  useEffect(() => {
+    if (editableExpense && editableExpense.amount !== undefined) {
+      const parsedCurrentLocal = parseFloat(amountInputText.replace(',', '.')) || 0;
+      if (parsedCurrentLocal !== editableExpense.amount) {
+        setAmountInputText(editableExpense.amount > 0 ? String(editableExpense.amount) : '');
+      }
+    }
+  }, [editableExpense?.amount]);
   
   if (!editableExpense) {
     return (
@@ -511,9 +521,14 @@ export default function ExpenseDetail() {
              <Text style={[styles.currency, { color: isIncome ? COLORS.success : COLORS.primary }]}>€</Text>
              <TextInput 
                 style={[styles.amountInput, { color: isIncome ? COLORS.success : COLORS.primary }]}
-                value={String(editableExpense.amount || '')}
-                onChangeText={(val) => updateField('amount', parseFloat(val) || 0)}
-                keyboardType="numeric"
+                value={amountInputText}
+                onChangeText={(val) => {
+                  const cleaned = val.replace(/[^0-9,.]/g, '');
+                  setAmountInputText(cleaned);
+                  const numericVal = parseFloat(cleaned.replace(',', '.')) || 0;
+                  updateField('amount', numericVal);
+                }}
+                keyboardType="decimal-pad"
              />
           </View>
 
@@ -1333,7 +1348,7 @@ const styles = StyleSheet.create({
   backIcon: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
   container: { flex: 1 },
-  content: { padding: 20 },
+  content: { padding: 20, paddingBottom: 130 },
   sectionTitle: { 
     fontSize: 10, 
     fontWeight: '900', 
