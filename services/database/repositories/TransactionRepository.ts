@@ -13,6 +13,11 @@ export class TransactionRepository {
 
     const domainKey = getDomainForCategory(expense.category_key)?.key || null;
 
+    let finalTags = expense.tags ? [...expense.tags] : [];
+    if (expense.is_weekend && !finalTags.includes('weekend')) {
+      finalTags.push('weekend');
+    }
+
     await db.runAsync(`
       INSERT INTO transactions (
         id, created_at, date, time, amount, net_amount, currency, direction,
@@ -54,7 +59,7 @@ export class TransactionRepository {
       expense.people_mentioned ? expense.people_mentioned.join(',') : null,
       subscription_id || null,
       expense.holiday || null,
-      expense.tags ? expense.tags.join(',') : null,
+      finalTags.length > 0 ? finalTags.join(',') : null,
     ]);
 
     // Sincronizzazione Patrimonio: Incrementa o Decrementa
@@ -586,8 +591,25 @@ export class TransactionRepository {
     const newImpact = newDirection === 'in' ? newAmount : -newAmount;
     const adjustment = newImpact - oldImpact;
 
-    // Build the query dynamically based on ParsedExpense keys if needed, 
-    // but here we can just update all standard fields for simplicity as in insert.
+    let finalTags: string[] = [];
+    if (updates.tags !== undefined) {
+      finalTags = Array.isArray(updates.tags) ? [...updates.tags] : (updates.tags ? updates.tags.split(',') : []);
+    } else {
+      finalTags = oldTx.tags ? oldTx.tags.split(',') : [];
+    }
+
+    const isWeekendVal = updates.is_weekend !== undefined 
+      ? updates.is_weekend 
+      : (updates.date 
+          ? (new Date(updates.date).getDay() === 0 || new Date(updates.date).getDay() === 6) 
+          : (oldTx.date ? (new Date(oldTx.date).getDay() === 0 || new Date(oldTx.date).getDay() === 6) : false));
+
+    if (isWeekendVal) {
+      if (!finalTags.includes('weekend')) finalTags.push('weekend');
+    } else {
+      finalTags = finalTags.filter((t: string) => t !== 'weekend');
+    }
+
     await db.runAsync(`
       UPDATE transactions SET
         date = ?, time = ?, amount = ?, net_amount = ?, currency = ?, direction = ?,
@@ -616,7 +638,7 @@ export class TransactionRepository {
       updates.split_people !== undefined ? updates.split_people : oldTx.split_people,
       updates.subscription_id !== undefined ? updates.subscription_id : oldTx.subscription_id,
       updates.holiday !== undefined ? updates.holiday : oldTx.holiday,
-      updates.tags !== undefined ? (Array.isArray(updates.tags) ? updates.tags.join(',') : updates.tags) : oldTx.tags,
+      finalTags.length > 0 ? finalTags.join(',') : null,
       id
     ]);
 

@@ -17,6 +17,42 @@ import { COMUNI_ITALIANI, ComuneItem } from '../constants/comuni';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
 
+const DEFAULT_EXPENSE = {
+  amount: 0,
+  net_amount: 0,
+  currency: 'EUR',
+  payment_method: null,
+  direction: 'out',
+  category_key: 'altro_altro',
+  subcategory_key: 'altro_altro',
+  category_confidence: 1.0,
+  date: new Date().toISOString().split('T')[0],
+  time: null,
+  time_of_day: 'afternoon',
+  is_weekend: false,
+  day_of_week: null,
+  social_context: null,
+  people_mentioned: [],
+  group_size: null,
+  is_social: false,
+  location_type: null,
+  location_name: '',
+  city: '',
+  address: '',
+  is_travel: false,
+  is_online: false,
+  refund: null,
+  split: null,
+  reason: '',
+  description: '',
+  input_method: 'manual',
+  raw_input: '',
+  holiday: null,
+  tags: [],
+  is_deleted: false,
+  synced_at: null,
+} as unknown as ParsedExpense;
+
 export default function ExpenseDetail() {
   const router = useRouter();
   const { data, id } = useLocalSearchParams<{ data?: string; id?: string }>();
@@ -52,19 +88,31 @@ export default function ExpenseDetail() {
   // Dynamic Tags List State
   const [availableTags, setAvailableTags] = useState<string[]>(['lavoro', 'trasferta']);
 
-  // Fetch distinct tags on mount
+  // Custom Person Creation State
+  const [newPersonInput, setNewPersonInput] = useState('');
+  const [showNewPersonInput, setShowNewPersonInput] = useState(false);
+
+  // Dynamic People List State
+  const [availablePeople, setAvailablePeople] = useState<string[]>(['mamma', 'papà']);
+
+  // Fetch distinct tags and people on mount
   useEffect(() => {
-    const loadTags = async () => {
+    const loadTagsAndPeople = async () => {
       try {
         const dbTags = await TransactionRepository.getDistinctTags();
-        const combined = Array.from(new Set(['lavoro', 'trasferta', ...dbTags]))
+        const combinedTags = Array.from(new Set(['lavoro', 'trasferta', ...dbTags]))
           .filter(t => t !== 'viaggio' && t.trim() !== '');
-        setAvailableTags(combined);
+        setAvailableTags(combinedTags);
+
+        const dbPeople = await TransactionRepository.getDistinctPeople();
+        const combinedPeople = Array.from(new Set(['mamma', 'papà', ...dbPeople]))
+          .filter(p => p.trim() !== '');
+        setAvailablePeople(combinedPeople);
       } catch (e) {
-        console.error('Errore nel caricamento dei tag:', e);
+        console.error('Errore nel caricamento di tag/persone:', e);
       }
     };
-    loadTags();
+    loadTagsAndPeople();
   }, []);
 
   // Reset calendar to current month when collapsed
@@ -148,10 +196,14 @@ export default function ExpenseDetail() {
       try {
         const parsed = JSON.parse(data);
         
-        // Inizializza array tags
-        if (!parsed.tags) parsed.tags = [];
+        const merged: ParsedExpense = {
+          ...DEFAULT_EXPENSE,
+          ...parsed,
+          tags: parsed.tags || [],
+          people_mentioned: parsed.people_mentioned || [],
+        };
 
-        setEditableExpense(parsed);
+        setEditableExpense(merged);
         
         // Imposta stato calendario in base alla data del parser
         if (parsed.date) {
@@ -205,24 +257,38 @@ export default function ExpenseDetail() {
 
   const handleConfirm = async () => {
     try {
+      if (!editableExpense.amount || editableExpense.amount <= 0) {
+        Alert.alert('Attenzione', 'L\'importo della transazione è obbligatorio.');
+        return;
+      }
+
       setIsSaving(true);
       
+      const todayStr = new Date().toISOString().split('T')[0];
+      const expenseToSave: ParsedExpense = {
+        ...editableExpense,
+        date: editableExpense.date || todayStr,
+      };
+
       if (isEditingExisting) {
         // Aggiorna record esistente
-        await TransactionRepository.update(id!, editableExpense);
+        await TransactionRepository.update(id!, expenseToSave);
       } else {
         // Inserisce nuovo record transazione
-        const txId = await TransactionRepository.insert(editableExpense);
+        expenseToSave.id = editableExpense.id || (require('react-native-uuid').default.v4().toString());
+        expenseToSave.created_at = editableExpense.created_at || new Date().toISOString();
+
+        const txId = await TransactionRepository.insert(expenseToSave);
 
         // Se il toggle abbonamento è attivo, salva anche l'abbonamento e collegalo
         if (isSubscriptionActive && subscription) {
           const today = new Date().toISOString().split('T')[0];
           const subId = await SubscriptionRepository.insert({
-            name: subscription.subscription_name || editableExpense.description || 'Subscription',
-            amount: subscription.subscription_amount || editableExpense.amount,
-            currency: editableExpense.currency,
-            direction: editableExpense.direction as 'in' | 'out',
-            category_key: editableExpense.category_key,
+            name: subscription.subscription_name || expenseToSave.description || 'Subscription',
+            amount: subscription.subscription_amount || expenseToSave.amount,
+            currency: expenseToSave.currency,
+            direction: expenseToSave.direction as 'in' | 'out',
+            category_key: expenseToSave.category_key,
             frequency: subscription.subscription_frequency || 'monthly',
             recurrence_day: subscription.subscription_day ?? new Date().getDate(),
             start_date: today,
@@ -355,6 +421,34 @@ export default function ExpenseDetail() {
     }
   };
 
+  const togglePersonChip = (personStr: string) => {
+    const currentPeople = editableExpense.people_mentioned || [];
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (currentPeople.includes(personStr)) {
+      updateField('people_mentioned', currentPeople.filter(p => p !== personStr));
+    } else {
+      updateField('people_mentioned', [...currentPeople, personStr]);
+    }
+  };
+
+  const handleAddCustomPerson = () => {
+    if (!newPersonInput.trim()) return;
+    const cleanPerson = newPersonInput.trim().toLowerCase();
+    const currentPeople = editableExpense.people_mentioned || [];
+    
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!currentPeople.includes(cleanPerson)) {
+      updateField('people_mentioned', [...currentPeople, cleanPerson]);
+    }
+    
+    if (!availablePeople.includes(cleanPerson)) {
+      setAvailablePeople([...availablePeople, cleanPerson]);
+    }
+    
+    setNewPersonInput('');
+    setShowNewPersonInput(false);
+  };
+
   const MONTHS_IT = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
@@ -369,9 +463,7 @@ export default function ExpenseDetail() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backIcon}>
-          <Ionicons name="chevron-back" size={28} color={COLORS.primary} />
-        </Pressable>
+        <View style={{ width: 28 }} />
         <Text style={styles.headerTitle}>
           {isEditingExisting ? 'Modifica Transazione' : 'Verifica Dati'}
         </Text>
@@ -459,10 +551,28 @@ export default function ExpenseDetail() {
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Data</Text>
               <Text style={styles.detailValue}>
-                {new Date(editableExpense.date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {editableExpense.date 
+                  ? new Date(editableExpense.date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
+                  : '---'}
               </Text>
             </View>
-            <Ionicons name={activeField === 'date' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {!!editableExpense.date && (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    updateField('date', null);
+                    updateField('day_of_week', null);
+                    updateField('is_weekend', false);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
+                </Pressable>
+              )}
+              <Ionicons name={activeField === 'date' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            </View>
           </Pressable>
 
           {activeField === 'date' && (
@@ -524,7 +634,22 @@ export default function ExpenseDetail() {
                 {editableExpense.time || '--:--'}
               </Text>
             </View>
-            <Ionicons name={activeField === 'time' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {!!editableExpense.time && (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    updateField('time', null);
+                    updateField('time_of_day', null);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
+                </Pressable>
+              )}
+              <Ionicons name={activeField === 'time' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            </View>
           </Pressable>
 
           {activeField === 'time' && (
@@ -592,10 +717,26 @@ export default function ExpenseDetail() {
               <Text style={styles.detailValue}>
                 {editableExpense.city 
                   ? `${editableExpense.city}${editableExpense.address ? `, ${editableExpense.address}` : ''}` 
-                  : 'Non rilevata'}
+                  : '---'}
               </Text>
             </View>
-            <Ionicons name={activeField === 'city' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {(!!editableExpense.city || !!editableExpense.address) && (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    updateField('city', '');
+                    updateField('address', '');
+                    setCitySearch('');
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
+                </Pressable>
+              )}
+              <Ionicons name={activeField === 'city' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            </View>
           </Pressable>
 
           {activeField === 'city' && (
@@ -706,7 +847,21 @@ export default function ExpenseDetail() {
                 {editableExpense.payment_method || 'Non specificato'}
               </Text>
             </View>
-            <Ionicons name={activeField === 'payment_method' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {!!editableExpense.payment_method && (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    updateField('payment_method', null);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
+                </Pressable>
+              )}
+              <Ionicons name={activeField === 'payment_method' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            </View>
           </Pressable>
 
           {activeField === 'payment_method' && (
@@ -740,10 +895,27 @@ export default function ExpenseDetail() {
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Livello Sociale</Text>
               <Text style={styles.detailValue}>
-                {translateSocialContext(editableExpense.social_context) || 'Privato'}
+                {translateSocialContext(editableExpense.social_context) || '---'}
               </Text>
             </View>
-            <Ionicons name={activeField === 'social_context' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {!!editableExpense.social_context && (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    updateField('social_context', null);
+                    updateField('is_social', false);
+                    updateField('people_mentioned', []);
+                    updateField('split', null);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
+                </Pressable>
+              )}
+              <Ionicons name={activeField === 'social_context' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            </View>
           </Pressable>
 
           {activeField === 'social_context' && (
@@ -775,11 +947,119 @@ export default function ExpenseDetail() {
             </View>
           )}
 
-          {editableExpense.is_social && (
-            <DetailItem 
-              label="Persone" 
-              value={editableExpense.people_mentioned.join(', ')} 
-            />
+          {/* PERSONE ACCORDION - ATTIVO E VISIBILE SOLO SE IL CONTESTO SOCIALE E DIVERSO DA SOLO E NULLO */}
+          {editableExpense.social_context && editableExpense.social_context !== 'alone' && (
+            <>
+              <Pressable 
+                style={[styles.detailItemVertical, styles.detailItemBorder]}
+                onPress={() => toggleField('people_mentioned', 480)}
+              >
+                <View style={styles.detailTextContainer}>
+                  <Text style={styles.detailLabel}>Persone con cui viene fatto</Text>
+                  <Text style={styles.detailValue}>
+                    {editableExpense.people_mentioned.length > 0 
+                      ? editableExpense.people_mentioned.join(', ') 
+                      : '---'}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  {editableExpense.people_mentioned.length > 0 && (
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        updateField('people_mentioned', []);
+                      }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
+                    </Pressable>
+                  )}
+                  <Ionicons name={activeField === 'people_mentioned' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+                </View>
+              </Pressable>
+
+              {activeField === 'people_mentioned' && (
+                <View style={styles.editorExpandContainer}>
+                  <Text style={styles.editorLabel}>Seleziona o aggiungi persone</Text>
+                  <View style={styles.quickChipsRow}>
+                    {/* Render dynamic unique people loaded from DB or default */}
+                    {availablePeople.map((personStr) => {
+                      const isSel = (editableExpense.people_mentioned || []).includes(personStr);
+                      return (
+                        <Pressable
+                          key={personStr}
+                          onPress={() => togglePersonChip(personStr)}
+                          style={[styles.quickChip, isSel && styles.quickChipActive]}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={[styles.quickChipText, isSel && styles.quickChipTextActive]}>
+                              {personStr.charAt(0).toUpperCase() + personStr.slice(1)}
+                            </Text>
+                            {isSel && (
+                              <Ionicons name="close-circle" size={14} color="#FFF" style={{ marginLeft: 6 }} />
+                            )}
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+
+                    {/* Render any other custom people in the array that are not in availablePeople yet */}
+                    {(editableExpense.people_mentioned || []).map((customPerson) => {
+                      if (availablePeople.includes(customPerson)) return null;
+                      return (
+                        <Pressable
+                          key={customPerson}
+                          onPress={() => togglePersonChip(customPerson)}
+                          style={[styles.quickChip, styles.quickChipActive]}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={[styles.quickChipText, styles.quickChipTextActive]}>
+                              {customPerson.charAt(0).toUpperCase() + customPerson.slice(1)}
+                            </Text>
+                            <Ionicons name="close-circle" size={14} color="#FFF" style={{ marginLeft: 6 }} />
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+
+                    {/* "+ Nuova Persona" Chip button */}
+                    <Pressable
+                      onPress={() => {
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        setShowNewPersonInput(!showNewPersonInput);
+                      }}
+                      style={[styles.quickChip, { borderStyle: 'dashed', borderColor: COLORS.primary }]}
+                    >
+                      <Text style={[styles.quickChipText, { color: COLORS.primary }]}>
+                        + Nuova Persona
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  {/* Inline person creator input */}
+                  {showNewPersonInput && (
+                    <View style={styles.inlineTagInputContainer}>
+                      <TextInput
+                        style={styles.inlineTagInput}
+                        placeholder="Nome (es. Mario, Elena...)"
+                        placeholderTextColor={COLORS.secondary}
+                        value={newPersonInput}
+                        onChangeText={setNewPersonInput}
+                        autoFocus
+                        onSubmitEditing={handleAddCustomPerson}
+                      />
+                      <Pressable 
+                        onPress={handleAddCustomPerson}
+                        style={styles.addTagButton}
+                      >
+                        <Ionicons name="checkmark" size={20} color="#FFF" />
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
           )}
 
           {editableExpense.split && (
@@ -800,7 +1080,22 @@ export default function ExpenseDetail() {
                 {translateLocationType(editableExpense.location_type) || 'Non specificato'}
               </Text>
             </View>
-            <Ionicons name={activeField === 'location_type' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {!!editableExpense.location_type && (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    updateField('location_type', null);
+                    updateField('is_online', false);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
+                </Pressable>
+              )}
+              <Ionicons name={activeField === 'location_type' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+            </View>
           </Pressable>
 
           {activeField === 'location_type' && (
@@ -954,9 +1249,16 @@ export default function ExpenseDetail() {
             </Pressable>
           )}
           {editableExpense.is_weekend && (
-            <View style={styles.tag}>
+            <Pressable 
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                updateField('is_weekend', false);
+              }}
+              style={[styles.tag, { flexDirection: 'row', alignItems: 'center' }]}
+            >
               <Text style={styles.tagText}>Weekend</Text>
-            </View>
+              <Ionicons name="close" size={12} color={COLORS.secondary} style={{ marginLeft: 4 }} />
+            </Pressable>
           )}
           {(editableExpense.tags || []).map(t => (
             <Pressable 

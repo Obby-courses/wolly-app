@@ -10,6 +10,7 @@ import { parseFromReceipt } from '../modules/registration/receiptParser';
 import { voiceStore } from '../services/voiceStore';
 import { askAiChat } from '../services/aiChat';
 import { Audio } from 'expo-av';
+import { networkStore } from '../services/networkStore';
 
 const CANCEL_THRESHOLD_Y = -60;
 const MIN_RECORDING_DURATION = 500;
@@ -31,12 +32,16 @@ export default function BottomMenu() {
 
   // Mirror voiceStore state
   const [voiceState, setVoiceState] = useState(voiceStore.getState());
+  const [isOffline, setIsOffline] = useState(networkStore.getState().isOffline);
+  
   useEffect(() => {
-    const unsub = voiceStore.subscribe(() => setVoiceState(voiceStore.getState()));
+    const unsubVoice = voiceStore.subscribe(() => setVoiceState(voiceStore.getState()));
+    const unsubNet = networkStore.subscribe(() => setIsOffline(networkStore.getState().isOffline));
     // Chiediamo i permessi subito all'avvio per non interrompere il gesto dopo
     Audio.requestPermissionsAsync().catch(() => {});
     return () => {
-      unsub();
+      unsubVoice();
+      unsubNet();
     };
   }, []);
 
@@ -163,49 +168,63 @@ export default function BottomMenu() {
         </View>
       )}
 
-      <View style={styles.row}>
-        {/* Left: Chat icon — hidden when overlay is open */}
-        <Pressable
-          onPress={() => router.push('/ai-chat')}
-          style={[styles.sideIcon, isOpen && styles.hidden]}
-          pointerEvents={isOpen ? 'none' : 'auto'}
-        >
-          <Ionicons name="chatbubble-ellipses-outline" size={26} color={COLORS.secondary} />
-        </Pressable>
+      {isOffline ? (
+        <View style={styles.row}>
+          <Pressable
+            onPress={() => router.push({ 
+              pathname: '/expense-detail', 
+              params: { data: JSON.stringify({ amount: 0, date: new Date().toISOString(), category_key: 'altro_altro', direction: 'out', tags: [], input_method: 'manual' }) } 
+            })}
+            style={[styles.micBtn, { backgroundColor: COLORS.primary }]}
+          >
+            <Ionicons name="add" size={36} color="#FFF" />
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.row}>
+          {/* Left: Chat icon — hidden when overlay is open */}
+          <Pressable
+            onPress={() => router.push('/ai-chat')}
+            style={[styles.sideIcon, isOpen && styles.hidden]}
+            pointerEvents={isOpen ? 'none' : 'auto'}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={26} color={COLORS.secondary} />
+          </Pressable>
 
-        {/* Center: Mic — ALWAYS rendered, same element, same position */}
-        <Animated.View
-          {...micPanResponder.panHandlers}
-          style={[
-            styles.micBtn,
-            isOpen && styles.micBtnActive,
-            isSlidingToCancel && styles.micBtnCancel,
-            isRecording && !isSlidingToCancel && { transform: [{ scale: pulseScale }] },
-          ]}
-        >
-          <Ionicons
-            name={isRecording ? 'mic' : 'mic-outline'}
-            size={32}
-            color={
-              isSlidingToCancel
-                ? COLORS.danger
-                : isOpen
-                ? '#FFF'
-                : COLORS.primary
-            }
-          />
-        </Animated.View>
+          {/* Center: Mic — ALWAYS rendered, same element, same position */}
+          <Animated.View
+            {...micPanResponder.panHandlers}
+            style={[
+              styles.micBtn,
+              isOpen && styles.micBtnActive,
+              isSlidingToCancel && styles.micBtnCancel,
+              isRecording && !isSlidingToCancel && { transform: [{ scale: pulseScale }] },
+            ]}
+          >
+            <Ionicons
+              name={isRecording ? 'mic' : 'mic-outline'}
+              size={32}
+              color={
+                isSlidingToCancel
+                  ? COLORS.danger
+                  : isOpen
+                  ? '#FFF'
+                  : COLORS.primary
+              }
+            />
+          </Animated.View>
 
-        {/* Right: Camera icon — hidden when overlay is open */}
-        <Pressable
-          onPress={handleCamera}
-          disabled={isProcessing || isOpen}
-          style={[styles.sideIcon, (isOpen || isProcessing) && styles.hidden]}
-          pointerEvents={isOpen ? 'none' : 'auto'}
-        >
-          <Ionicons name="camera-outline" size={26} color={COLORS.secondary} />
-        </Pressable>
-      </View>
+          {/* Right: Camera icon — hidden when overlay is open */}
+          <Pressable
+            onPress={handleCamera}
+            disabled={isProcessing || isOpen}
+            style={[styles.sideIcon, (isOpen || isProcessing) && styles.hidden]}
+            pointerEvents={isOpen ? 'none' : 'auto'}
+          >
+            <Ionicons name="camera-outline" size={26} color={COLORS.secondary} />
+          </Pressable>
+        </View>
+      )}
 
       {toastMsg && (
         <View style={styles.toast}>

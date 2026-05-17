@@ -9,6 +9,7 @@ import VoiceChatOverlay from '../components/ai/VoiceChatOverlay';
 import { View } from 'react-native';
 import { usePathname } from 'expo-router';
 import { voiceStore } from '../services/voiceStore';
+import { networkStore } from '../services/networkStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -22,6 +23,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    networkStore.loadInitialState();
     const unsub = voiceStore.subscribe(() => {
       setVoiceOpen(voiceStore.getState().isOpen);
     });

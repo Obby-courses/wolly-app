@@ -1,13 +1,21 @@
-import React from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, Pressable, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS, TYPOGRAPHY, SPACING } from '../constants/Theme';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
+import { networkStore } from '../services/networkStore';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  
+  const [networkState, setNetworkState] = useState(networkStore.getState());
+  useEffect(() => {
+    const unsub = networkStore.subscribe(() => setNetworkState(networkStore.getState()));
+    return () => { unsub(); };
+  }, []);
+
 
   const handleDeleteAll = () => {
     Alert.alert(
@@ -57,6 +65,27 @@ export default function SettingsScreen() {
             <Text style={styles.itemText}>Abbonamenti & Ricorrenti</Text>
             <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
           </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Dev Settings</Text>
+          <View style={styles.item}>
+            <Ionicons name="cloud-offline-outline" size={22} color={COLORS.primary} />
+            <View style={{ flex: 1, marginLeft: SPACING.md }}>
+              <Text style={{ fontSize: TYPOGRAPHY.sizes.base, fontFamily: TYPOGRAPHY.fontFamily, color: COLORS.primary }}>
+                Modalità Demo Offline
+              </Text>
+              <Text style={{ fontSize: 12, color: COLORS.secondary, marginTop: 2 }}>
+                Forza l'app in modalità senza rete (disabilita AI)
+              </Text>
+            </View>
+            <Switch
+              value={networkState.isDemoOffline}
+              onValueChange={(val) => networkStore.setDemoOffline(val)}
+              trackColor={{ false: '#D1D5DB', true: COLORS.primary }}
+              thumbColor={'#FFF'}
+            />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
