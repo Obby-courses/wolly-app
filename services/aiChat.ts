@@ -124,6 +124,45 @@ function buildAnalysisSteps(intent: QueryIntent, extra?: string[]): string[] {
   return steps;
 }
 
+function formatLabelItalian(label: string): string {
+  const labelLower = label.toLowerCase();
+  if (/^\d{4}$/.test(label)) {
+    return `il ${label}`;
+  }
+  if (labelLower === 'ieri' || labelLower === 'oggi' || labelLower === "l'altro ieri" || labelLower.startsWith('questo') || labelLower.startsWith('quest\'') || labelLower.startsWith('questa')) {
+    return labelLower;
+  }
+  return labelLower;
+}
+
+function formatTimeIntroduction(label: string, verb: string): string {
+  const labelLower = label.toLowerCase();
+  if (/^\d{4}$/.test(label)) {
+    return `nel ${label} hai ${verb}`;
+  }
+  if (labelLower === 'ieri' || labelLower === 'oggi' || labelLower === "l'altro ieri") {
+    return `${labelLower} hai ${verb}`;
+  }
+  if (labelLower.startsWith('questo') || labelLower.startsWith('quest\'') || labelLower.startsWith('questa')) {
+    return `${labelLower} hai ${verb}`;
+  }
+  return `a ${labelLower} hai ${verb}`;
+}
+
+function formatTimelineIntroduction(label: string): string {
+  const labelLower = label.toLowerCase();
+  if (/^\d{4}$/.test(label)) {
+    return `del ${label}`;
+  }
+  if (labelLower === 'ieri' || labelLower === 'oggi' || labelLower === "l'altro ieri") {
+    return `di ${labelLower}`;
+  }
+  if (labelLower.startsWith('questo') || labelLower.startsWith('quest\'') || labelLower.startsWith('questa')) {
+    return `di ${labelLower}`;
+  }
+  return `di ${labelLower}`;
+}
+
 function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): AiChatResponse {
   const label = result.period_label;
 
@@ -183,13 +222,21 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
     let compText = '';
     if (result.comparison) {
       const c = result.comparison;
-      const sign = c.diff > 0 ? '+' : '';
-      compText = ` (${sign}€${Math.abs(c.diff).toFixed(0)}, ${c.percentage.toFixed(0)}% vs periodo precedente)`;
+      const pct = Math.abs(c.percentage).toFixed(0);
+      const diffVal = Math.abs(c.diff).toFixed(2);
+      if (c.diff > 0) {
+        compText = `, ovvero €${diffVal} (+${pct}%) in più rispetto al periodo precedente`;
+      } else if (c.diff < 0) {
+        compText = `, ovvero €${diffVal} (-${pct}%) in meno rispetto al periodo precedente`;
+      }
     }
+
+    const timeIntro = formatTimeIntroduction(label, dirLabel);
+    const text_response = `Dunque, ${timeIntro}${filterLabel}${cityLabel} complessivamente €${value.toFixed(2)}${compText}.`;
 
     return {
       intent: 'total',
-      text_response: `Dunque, ${label.toLowerCase()} hai ${dirLabel}${filterLabel}${cityLabel} complessivamente:`,
+      text_response,
       analysis_steps: buildAnalysisSteps(intent, [
         `Totale calcolato dal DB: €${value.toFixed(2)}`,
       ]),
@@ -211,10 +258,11 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
     const top = items[0];
     const unitLabel = intent.group_by === 'city' ? 'La città' : 'La categoria';
     const topText = top ? ` ${unitLabel} principale è "${top.label}" con €${top.value.toFixed(2)} (${top.percentage}%).` : '';
+    const formattedLabel = formatLabelItalian(label);
 
     return {
       intent: 'distribution',
-      text_response: `Ecco come sono state distribuite le tue ${intent.direction === 'in' ? 'entrate' : 'spese'} per quanto riguarda ${label.toLowerCase()}.${topText}`,
+      text_response: `Ecco come sono state distribuite le tue ${intent.direction === 'in' ? 'entrate' : 'spese'} per quanto riguarda ${formattedLabel}.${topText}`,
       analysis_steps: buildAnalysisSteps(intent, [
         `Raggruppato per ${intent.group_by || 'categoria'}`,
         `${items.length} voci trovate`,
@@ -236,11 +284,11 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
   if (result.archetype === 'list' && result.transactions) {
     const tx = result.transactions;
     const count = result.transaction_count ?? tx.length;
-    const shown = tx.length;
+    const formattedLabel = formatLabelItalian(label);
 
     return {
       intent: 'list',
-      text_response: `Per quanto riguarda ${label.toLowerCase()}, ho trovato ${count} transazioni in totale. Ecco le più rilevanti:`,
+      text_response: `Per quanto riguarda ${formattedLabel}, ho trovato ${count} transazioni in totale. Ecco le più rilevanti:`,
       analysis_steps: buildAnalysisSteps(intent, [
         `${count} transazioni trovate`,
       ]),
@@ -264,9 +312,11 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
   // ── TIMELINE ─────────────────────────────────────────────────────────────────
   if (result.archetype === 'timeline' && result.timeline_data) {
     const isMonthly = intent.period.type === 'year';
+    const formattedIntro = formatTimelineIntroduction(label);
+    
     return {
       intent: 'timeline',
-      text_response: `Dando un'occhiata all'andamento ${label.toLowerCase()}, ecco come si sono evolute le tue ${intent.direction === 'in' ? 'entrate' : 'spese'}:`,
+      text_response: `Dando un'occhiata all'andamento ${formattedIntro}, ecco come si sono evolute le tue ${intent.direction === 'in' ? 'entrate' : 'spese'}:`,
       analysis_steps: [
         `Periodo: ${label}`,
         `Granularità: ${isMonthly ? 'mensile' : 'giornaliera'}`,

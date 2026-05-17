@@ -81,11 +81,17 @@ FORMATO JSON OBBLIGATORIO:
   "archetype": "total"|"distribution"|"list"|"timeline"|"text"|"subscriptions",
   "direction": "out"|"in"|"both",
   "aggregation_type": "total"|"average"|"count",
-  "period": { "type": "week"|"month"|"year"|"custom"|"all", "year": number|null, "month": number|null },
+  "period": {
+    "type": "week"|"month"|"year"|"custom"|"all",
+    "year": number|null,
+    "month": number|null,
+    "from": "YYYY-MM-DD"|null,
+    "to": "YYYY-MM-DD"|null
+  },
   "category_filter": string|null,
   "domain_filter": string|null,
   "merchant_filter": string|null,
-  "period_label": "stringa leggibile (es: 'Aprile 2026')",
+  "period_label": "stringa leggibile (es: 'Aprile 2026' o 'Ieri' o 'Ultimi 12 mesi')",
   "city_filter": string|null,
   "group_by": "category"|"city"|null,
   "social_context_filter": string|null,
@@ -94,7 +100,17 @@ FORMATO JSON OBBLIGATORIO:
   "tag_filter": string|null
 }
 
-REGOLE:
+REGOLE CRITICHE PER DATE E PERIODI:
+- Se l'utente si riferisce a un intervallo personalizzato o relativo (es: "ieri", "l'altro ieri", "ultimi 5 giorni", "ultimi 12 mesi", "ultimo anno"):
+  * Imposta "type": "custom".
+  * Calcola rigorosamente le date "from" e "to" basandoti su oggi (${currentDateISO}).
+  * Esempio "ieri" (se oggi è 2026-05-17) → "from": "2026-05-16", "to": "2026-05-16", "period_label": "Ieri".
+  * Esempio "l'altro ieri" (se oggi è 2026-05-17) → "from": "2026-05-15", "to": "2026-05-15", "period_label": "L'altro ieri".
+  * Esempio "nell'ultimo anno" o "negli ultimi 12 mesi" (se oggi è 2026-05-17) → "from": "2025-05-17", "to": "2026-05-17", "period_label": "Ultimi 12 mesi".
+  * NOTA: "nell'ultimo anno" NON significa anno solare concluso 2025! Significa ultimi 365 giorni (type: "custom", from: 1 anno fa, to: oggi).
+- Se l'utente specifica un anno o mese preciso (es: "nel 2025", "a marzo 2025"):
+  * Imposta "type": "year" o "month" con "year" e "month" numerici appropriati, e "from"/"to" a null.
+  * Esempio "nel 2025" → "type": "year", "year": 2025, "month": null, "from": null, "to": null.
 - Se l'utente nomina una festività (es: "Natale", "Pasqua", "Ferragosto") → holiday_filter="nome festività"
 - Se l'utente nomina un tag o una tipologia (es: "viaggio", "trasferta") → tag_filter="tag"
 - Se l'utente nomina un negozio specifico (es: "Coca Cola", "Esselunga", "Amazon") → merchant_filter="nome negozio"

@@ -8,7 +8,17 @@
  *  - 'unknown'  → nessun segnale finanziario → mostra toast
  */
 
-export type RouteResult = 'expense' | 'query' | 'unknown';
+export type RouteResult = 'expense' | 'query' | 'advice' | 'unknown';
+
+// ─── Pattern per ADVICE (consigli finanziari bloccati) ─────────────────────────
+const ADVICE_PATTERNS = [
+  /\b(consigli[oi]|suggeriment[oi]|raccomandazion[ei])\s+finanziari[oi]?\b/i,
+  /\bcome\s+(investire|comprare\s+azioni|fare\s+trading|investo)\b/i,
+  /\b(dove|in\s+cosa)\s+(conviene\s+investire|metto\s+i\s+miei\s+soldi|investo)\b/i,
+  /\bconsigliami\s+(un\s+investimento|come\s+risparmiare|su\s+cosa\s+comprare)\b/i,
+  /\b(azioni|criptovalute|bitcoin|borsa)\s+da\s+comprare\b/i,
+  /\bconsigli[o]?\s+(di|su)\s+risparmio\b/i,
+];
 
 // ─── Pattern per EXPENSE (registrazione) ─────────────────────────────────────
 
@@ -47,6 +57,9 @@ const QUERY_PATTERNS = [
 export function routeInput(text: string): RouteResult {
   const t = text.trim();
   if (!t || t.length < 2) return 'unknown';
+
+  const isAdvice = ADVICE_PATTERNS.some(p => p.test(t));
+  if (isAdvice) return 'advice';
 
   const hasAmount = AMOUNT_PATTERNS.some(p => p.test(t));
   const hasExpenseVerb = EXPENSE_VERB_PATTERNS.some(p => p.test(t));
