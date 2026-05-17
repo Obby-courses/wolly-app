@@ -26,7 +26,7 @@ export interface QueryIntent {
   period_label?: string;       // label leggibile generata dall'IA (es: "Questo mese")
   city_filter?: string;        // città specifica (es: "Torino", "Milano")
   group_by?: 'category' | 'city'; // come raggruppare i dati (default: category)
-  social_context_filter?: string; // contesto sociale (es: "Amici", "Famiglia")
+  social_context_filter?: string; // contesto sociale (es: "friends", "family", "colleagues", "couple", "strangers", "alone")
   person_filter?: string;         // persona specifica (es: "Marco", "Stefano")
   holiday_filter?: string;        // festività (es: "Natale", "Pasqua")
   tag_filter?: string;            // tag specifico (es: "viaggio", "trasferta")
@@ -40,7 +40,7 @@ function buildParserPrompt(currentDateISO: string, cities: string[], socialConte
     d.categories.map(c => `${c.key}→${d.key}`)
   ).join(', ');
   const cityList = cities.length > 0 ? cities.join(', ') : 'nessuna città ancora registrata';
-  const socialList = socialContexts.length > 0 ? socialContexts.join(', ') : 'nessun contesto ancora registrato (es: Amici, Famiglia)';
+  const socialList = socialContexts.length > 0 ? socialContexts.join(', ') : 'friends, family, colleagues, couple, strangers, alone';
   const peopleList = people.length > 0 ? people.join(', ') : 'nessuna persona ancora registrata';
   const holidayList = holidays.length > 0 ? holidays.join(', ') : 'nessuna festività ancora registrata (es: Natale, Pasqua)';
   const tagList = tags.length > 0 ? tags.join(', ') : 'nessun tag ancora registrato (es: viaggio, trasferta)';
@@ -51,7 +51,7 @@ Oggi è ${currentDateISO}.
 TASSONOMIA DISPONIBILE:
 - CATEGORIE (category_filter): ${categoryList}
 - CITTÀ CONOSCIUTE (city_filter): ${cityList}
-- CONTESTI SOCIALI (social_context_filter): ${socialList}
+- CONTESTI SOCIALI (social_context_filter): ${socialList} (Usa rigorosamente uno di questi valori in inglese se menzionato: friends, family, colleagues, couple, strangers, alone)
 - PERSONE CONOSCIUTE (person_filter): ${peopleList}
 - FESTIVITÀ CONOSCIUTE (holiday_filter): ${holidayList}
 - TAG REGISTRATI (tag_filter): ${tagList}

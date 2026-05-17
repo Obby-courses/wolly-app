@@ -1,6 +1,7 @@
-export type TimeOfDay = 'mattina' | 'pomeriggio' | 'sera' | 'notte' | null;
-export type SocialContext = 'solo' | 'coppia' | 'amici' | 'famiglia' | 'colleghi' | 'sconosciuti' | null;
-export type LocationType = 'casa' | 'ristorante' | 'negozio_fisico' | 'online' | 'trasporti' | 'lavoro' | 'viaggio' | 'estero' | null;
+// Values are stored in English in the DB. For display labels, use constants/i18n.ts.
+export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night' | null;
+export type SocialContext = 'friends' | 'couple' | 'family' | 'colleagues' | 'strangers' | 'alone' | null;
+export type LocationType = 'home' | 'restaurant' | 'physical_store' | 'online' | 'transport' | 'work' | 'travel' | 'abroad' | null;
 export type EmotionalCategory = 'necessità' | 'cura_di_sé' | 'amicizie' | 'passioni' | 'impulso' | 'ansia' | 'obiettivi';
 export type InputMethod = 'voice' | 'receipt' | 'manual' | 'text' | 'ocr';
 
@@ -37,7 +38,7 @@ export interface ParsedExpense {
   time: string | null; // HH:mm format
   time_of_day: TimeOfDay;
   is_weekend: boolean;
-  day_of_week: string; // lunedì ... domenica
+  day_of_week: string; // monday ... sunday (English)
 
   // Layer 4 — Sociale
   social_context: SocialContext;

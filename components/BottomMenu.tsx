@@ -35,7 +35,9 @@ export default function BottomMenu() {
     const unsub = voiceStore.subscribe(() => setVoiceState(voiceStore.getState()));
     // Chiediamo i permessi subito all'avvio per non interrompere il gesto dopo
     Audio.requestPermissionsAsync().catch(() => {});
-    return unsub;
+    return () => {
+      unsub();
+    };
   }, []);
 
   // Pulse animation for recording state
@@ -68,7 +70,7 @@ export default function BottomMenu() {
   const handleCamera = async () => {
     try {
       setIsProcessing(true);
-      const parsed = await parseFromReceipt(true, null);
+      const parsed = await parseFromReceipt(true, undefined);
       if (parsed) {
         router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
       }

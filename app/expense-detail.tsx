@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ParsedExpense } from '../modules/registration/types';
 import { getDomainForCategory, getCategory } from '../constants/categories';
+import { translateSocialContext, translateLocationType } from '../constants/i18n';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 import { SubscriptionRepository } from '../services/database/repositories/SubscriptionRepository';
 import { SubscriptionSuggestion } from '../services/groqParser';
@@ -220,7 +221,7 @@ export default function ExpenseDetail() {
           />
           <DetailItem 
             label="Livello Sociale" 
-            value={editableExpense.social_context || 'Privato'} 
+            value={translateSocialContext(editableExpense.social_context) || 'Privato'} 
           />
           {editableExpense.is_social && (
             <DetailItem 
@@ -236,7 +237,7 @@ export default function ExpenseDetail() {
           )}
           <DetailItem 
             label="Tipo Location" 
-            value={editableExpense.location_type} 
+            value={translateLocationType(editableExpense.location_type)} 
             isLast
           />
         </View>

@@ -1,6 +1,7 @@
 import { parseQueryIntent, QueryIntent } from './aiQueryParser';
 import { executeQueryIntent, ExecutionResult, DistributionItem } from './queryExecutor';
 import { SubscriptionRepository, Subscription } from './database/repositories/SubscriptionRepository';
+import { translateSocialContext, translateLocationType, translateTimeOfDay } from '../constants/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -245,6 +246,17 @@ function formatTimelineIntroduction(label: string): string {
   return `di ${labelLower}`;
 }
 
+function getSocialContextItalianLabel(context: string): string {
+  const ctx = context.toLowerCase();
+  if (ctx === 'friends') return ' con amici';
+  if (ctx === 'family') return ' con la famiglia';
+  if (ctx === 'colleagues') return ' con i colleghi';
+  if (ctx === 'couple') return ' in coppia';
+  if (ctx === 'strangers') return ' con sconosciuti';
+  if (ctx === 'alone') return ' da solo';
+  return ` con contesto ${context}`;
+}
+
 function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): AiChatResponse {
   const label = result.period_label;
 
@@ -300,6 +312,7 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
       : '';
     
     const cityLabel = intent.city_filter ? ` a ${intent.city_filter}` : '';
+    const socialLabel = intent.social_context_filter ? getSocialContextItalianLabel(intent.social_context_filter) : '';
 
     let compText = '';
     if (result.comparison) {
@@ -314,7 +327,7 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
     }
 
     const timeIntro = formatTimeIntroduction(label, dirLabel);
-    const text_response = `Dunque, ${timeIntro}${filterLabel}${cityLabel} complessivamente €${value.toFixed(2)}${compText}.`;
+    const text_response = `Dunque, ${timeIntro}${filterLabel}${cityLabel}${socialLabel} complessivamente €${value.toFixed(2)}${compText}.`;
 
     return {
       intent: 'total',

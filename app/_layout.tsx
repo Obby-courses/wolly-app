@@ -25,7 +25,9 @@ export default function RootLayout() {
     const unsub = voiceStore.subscribe(() => {
       setVoiceOpen(voiceStore.getState().isOpen);
     });
-    return unsub;
+    return () => {
+      unsub();
+    };
   }, []);
 
   useEffect(() => {

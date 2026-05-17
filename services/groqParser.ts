@@ -23,7 +23,7 @@ export async function parseExpenseWithAI(
 
   const now = new Date();
   const currentTimestamp = now.toISOString();
-  const currentDayNames = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
+  const currentDayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
   const currentDayName = currentDayNames[now.getDay()];
 
   const currentDateISO = now.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -67,8 +67,8 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
    - location_name: Estrai il nome del brand o negozio (es: "Esselunga", "Amazon", "McDonald's"). Se è un acquisto online, metti is_online = true e location_type = "online".
    - city e address: Estrai città e indirizzo se menzionati esplicitamente (es: "a Milano", "in via Torino"). 
    - FALLBACK GEOGRAFICO: Se la città/indirizzo NON sono detti esplicitamente, usa questi dati del telefono dell'utente: Città: ${locationContext?.city || 'non disponibile'}, Indirizzo: ${locationContext?.address || 'non disponibile'}.
-10. PERSONE: Estrai nomi propri menzionati in people_mentioned. Deduci social_context: "amici", "famiglia", "colleghi", "coppia". Se non specificato o se è "da solo", metti null. DIVIETO: NON usare mai la stringa "solo".
-11. LOCATION TYPE: Deduci location_type tra: "casa", "ristorante", "negozio_fisico", "online", "trasporti", "lavoro", "viaggio", "estero".
+10. PERSONE: Estrai nomi propri menzionati in people_mentioned. Deduci social_context: "friends", "family", "colleagues", "couple", "strangers", "alone". Se non specificato, usa null.
+11. LOCATION TYPE: Deduci location_type tra: "home", "restaurant", "physical_store", "online", "transport", "work", "travel", "abroad".
   "amount": number,
   "net_amount": number,
   "currency": "EUR",
@@ -79,14 +79,14 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
   "category_confidence": number,
   "date": "YYYY-MM-DD"|null,
   "time": "HH:mm"|null,
-  "time_of_day": "mattina"|"pomeriggio"|"sera"|"notte"|null,
+  "time_of_day": "morning"|"afternoon"|"evening"|"night"|null,
   "is_weekend": boolean,
   "day_of_week": string|null,
-  "social_context": string|null,
+  "social_context": "friends"|"couple"|"family"|"colleagues"|"strangers"|"alone"|null,
   "people_mentioned": string[],
   "group_size": number|null,
   "is_social": boolean,
-  "location_type": string|null,
+  "location_type": "home"|"restaurant"|"physical_store"|"online"|"transport"|"work"|"travel"|"abroad"|null,
   "location_name": string|null,
   "city": string|null,
   "address": string|null,
@@ -188,7 +188,7 @@ REGOLA ABBONAMENTO: Imposta "suggest_subscription": true SOLO se l'importo ha pa
           try {
             const parsedDate = new Date(result.date);
             if (!isNaN(parsedDate.getTime())) {
-              const days = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
+              const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
               finalDayOfWeek = days[parsedDate.getDay()];
             }
           } catch (e) {
@@ -290,14 +290,14 @@ REGOLA ABBONAMENTO: Imposta "suggest_subscription": true SOLO se l'importo ha pa
       category_confidence: 0.5,
       date: currentTimestamp.split('T')[0],
       time: null,
-      time_of_day: 'pomeriggio',
+      time_of_day: 'afternoon',
       is_weekend: false,
       day_of_week: currentDayName,
       social_context: null,
       people_mentioned: [],
       group_size: null,
       is_social: false,
-      location_type: 'negozio_fisico',
+      location_type: 'physical_store',
       location_name: null,
       city: null,
       address: null,

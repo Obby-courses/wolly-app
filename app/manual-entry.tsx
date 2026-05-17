@@ -72,7 +72,7 @@ export default function ManualEntry() {
     if (currentTag.trim() && !peopleTags.includes(currentTag.trim())) {
       setPeopleTags([...peopleTags, currentTag.trim()]);
       setCurrentTag('');
-      if (!socialContext) setSocialContext('amici');
+      if (!socialContext) setSocialContext('friends');
     }
   };
 
@@ -124,7 +124,7 @@ export default function ManualEntry() {
       people_mentioned: peopleTags,
       group_size: peopleTags.length > 0 ? peopleTags.length + 1 : 1,
       is_social: socialContext !== null,
-      location_type: direction === 'in' ? 'lavoro' : 'negozio_fisico',
+      location_type: direction === 'in' ? 'work' : 'physical_store',
       location_name: vendor || null,
       city: city,
       address: address,
@@ -137,6 +137,8 @@ export default function ManualEntry() {
       description: description || vendor || 'Inserimento manuale',
       input_method: 'manual',
       raw_input: `Manuale avanzato: ${amount} ${direction} ${description}`,
+      holiday: null,
+      tags: [],
       is_deleted: false,
       synced_at: null
     };
@@ -145,14 +147,14 @@ export default function ManualEntry() {
   };
 
   const getTimeOfDay = (hour: number): TimeOfDay => {
-    if (hour >= 5 && hour < 12) return 'mattina';
-    if (hour >= 12 && hour < 18) return 'pomeriggio';
-    if (hour >= 18 && hour < 22) return 'sera';
-    return 'notte';
+    if (hour >= 5 && hour < 12) return 'morning';
+    if (hour >= 12 && hour < 18) return 'afternoon';
+    if (hour >= 18 && hour < 22) return 'evening';
+    return 'night';
   };
 
   const getDayOfWeek = (day: number): string => {
-    const days = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     return days[day];
   };
 

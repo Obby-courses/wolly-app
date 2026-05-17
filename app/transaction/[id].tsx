@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionRepository } from '../../services/database/repositories/TransactionRepository';
 import { getDomainForCategory, getCategory } from '../../constants/categories';
+import { translateSocialContext, translateLocationType } from '../../constants/i18n';
 import { COLORS } from '../../constants/Theme';
 import CategoryPickerModal from '../../components/CategoryPickerModal';
 
@@ -191,8 +192,8 @@ export default function TransactionDetail() {
           <View style={{ marginTop: 20 }}>
             <DetailItem label="Località" value={transaction.city ? `${transaction.city}${transaction.address ? `, ${transaction.address}` : ''}` : 'Non rilevata'} />
             <DetailItem label="Metodo Pagamento" value={transaction.payment_method} />
-            <DetailItem label="Contesto Sociale" value={transaction.social_context || 'Privato'} />
-            <DetailItem label="Tipo Location" value={transaction.location_type} isLast />
+            <DetailItem label="Contesto Sociale" value={translateSocialContext(transaction.social_context) || 'Privato'} />
+            <DetailItem label="Tipo Location" value={translateLocationType(transaction.location_type)} isLast />
           </View>
         </View>
 
