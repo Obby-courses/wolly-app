@@ -68,8 +68,6 @@ const navItems = [
 const styles = StyleSheet.create({
   outerContainer: {
     backgroundColor: COLORS.background,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
     zIndex: 100,
   },
   safeArea: {

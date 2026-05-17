@@ -96,6 +96,11 @@ export default function Home() {
     <TransactionItem item={item} />
   );
 
+  const formattedNetWorth = netWorth.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const commaIndex = formattedNetWorth.lastIndexOf(',');
+  const integerPart = commaIndex !== -1 ? formattedNetWorth.substring(0, commaIndex) : formattedNetWorth;
+  const centsPart = commaIndex !== -1 ? formattedNetWorth.substring(commaIndex + 1) : '00';
+
   return (
     <SafeAreaView style={styles.container}>
       {!isDbReady ? (
@@ -112,9 +117,12 @@ export default function Home() {
           <View style={{ flex: 1, justifyContent: 'space-between' }}>
             <View>
               <View style={styles.netWorthHeaderContainer}>
+                <Text style={styles.netWorthLabel}>Patrimonio totale</Text>
                 <View style={styles.netWorthValueContainer}>
                   <Text style={styles.netWorthValue}>
-                    € {netWorth.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <Text style={styles.netWorthCurrency}>€ </Text>
+                    <Text>{integerPart}</Text>
+                    <Text style={styles.netWorthCents}>,{centsPart}</Text>
                   </Text>
                 </View>
               </View>
@@ -236,12 +244,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     marginTop: SPACING.lg,
     marginBottom: SPACING.xl,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   netWorthHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     width: '100%',
     marginBottom: 4,
     position: 'relative',
@@ -252,6 +260,7 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontBold,
     textTransform: 'uppercase',
     letterSpacing: 2,
+    marginBottom: 6,
   },
   privacyToggle: {
     position: 'absolute',
@@ -259,14 +268,22 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   netWorthValueContainer: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
   },
   netWorthValue: {
     color: COLORS.primary,
     fontSize: 44,
     fontFamily: TYPOGRAPHY.fontBold,
-    textAlign: 'center',
+    textAlign: 'left',
+  },
+  netWorthCurrency: {
+    fontSize: 24,
+    color: COLORS.primary,
+  },
+  netWorthCents: {
+    color: '#9CA3AF',
+    fontSize: 32,
   },
   netWorthEditRow: {
     flexDirection: 'row',
