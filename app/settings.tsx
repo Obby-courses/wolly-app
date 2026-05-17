@@ -1,12 +1,37 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS, TYPOGRAPHY, SPACING } from '../constants/Theme';
 import { Ionicons } from '@expo/vector-icons';
+import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 
 export default function SettingsScreen() {
   const router = useRouter();
+
+  const handleDeleteAll = () => {
+    Alert.alert(
+      "Elimina tutte le transazioni",
+      "Sei sicuro di voler eliminare DEFINITIVAMENTE tutte le transazioni dal database? Questa azione non è reversibile e resetterà anche il tuo patrimonio.",
+      [
+        { text: "Annulla", style: "cancel" },
+        { 
+          text: "Sì, elimina tutto", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await TransactionRepository.deleteAll();
+              Alert.alert("Completato", "Tutte le transazioni sono state eliminate e il patrimonio è stato resettato.");
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Errore", "Impossibile eliminare le transazioni.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -16,6 +41,12 @@ export default function SettingsScreen() {
             <Ionicons name="server-outline" size={22} color={COLORS.primary} />
             <Text style={styles.itemText}>Gestione Dati & Seed</Text>
             <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
+          </Pressable>
+
+          <Pressable style={[styles.item, styles.dangerItem]} onPress={handleDeleteAll}>
+            <Ionicons name="trash-outline" size={22} color="#EF4444" />
+            <Text style={[styles.itemText, styles.dangerText]}>Elimina tutte le transazioni</Text>
+            <Ionicons name="chevron-forward" size={18} color="#EF4444" />
           </Pressable>
         </View>
 
@@ -78,5 +109,13 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.base,
     fontFamily: TYPOGRAPHY.fontFamily,
     color: COLORS.primary,
+  },
+  dangerItem: {
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+  },
+  dangerText: {
+    color: '#EF4444',
   }
 });

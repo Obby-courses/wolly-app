@@ -645,5 +645,14 @@ export class TransactionRepository {
     const results = await db.getAllAsync<{ location_name: string }>(query);
     return results.map(r => r.location_name);
   }
+
+  /**
+   * Deletes all transactions and resets the net worth to baseline 1000.0.
+   */
+  static async deleteAll(): Promise<void> {
+    const db = await getDBConnection();
+    await db.runAsync('DELETE FROM transactions');
+    await db.runAsync('UPDATE net_worth SET amount = 1000.0');
+  }
 }
 
