@@ -209,7 +209,7 @@ export default function Home() {
   const centsPart = commaIndex !== -1 ? formattedNetWorth.substring(commaIndex + 1) : '00';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {!isDbReady ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#111827" />
@@ -354,7 +354,7 @@ export default function Home() {
           </View>
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -416,13 +416,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: SPACING.lg,
     marginHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
+    marginTop: SPACING.sm,
     ...SHADOWS.soft,
   },
   netWorthHeaderContainer: {
     paddingHorizontal: SPACING.lg + 4,
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.md,
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.xs,
     alignItems: 'flex-start',
   },
   netWorthLabel: {
