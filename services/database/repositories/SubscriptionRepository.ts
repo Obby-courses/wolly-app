@@ -82,8 +82,8 @@ export class SubscriptionRepository {
   }
 
   static async delete(id: string): Promise<void> {
-    // Soft delete
-    await this.setIsActive(id, false);
+    const db = await getDBConnection();
+    await db.runAsync(`DELETE FROM subscriptions WHERE id = ?`, [id]);
   }
 
   // ─── Read ─────────────────────────────────────────────────────────────────

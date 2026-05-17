@@ -87,6 +87,7 @@ interface SubFormState {
   frequency: Frequency;
   recurrence_day: string;
   start_date: string;
+  is_active?: boolean;
 }
 
 const EMPTY_FORM: SubFormState = {
@@ -96,14 +97,16 @@ const EMPTY_FORM: SubFormState = {
   frequency: 'monthly',
   recurrence_day: String(new Date().getDate()),
   start_date: new Date().toISOString().split('T')[0],
+  is_active: true,
 };
 
 function SubModal({
-  visible, onClose, onSave, initial
+  visible, onClose, onSave, onDelete, initial
 }: {
   visible: boolean;
   onClose: () => void;
   onSave: (form: SubFormState) => Promise<void>;
+  onDelete?: () => void;
   initial?: SubFormState;
 }) {
   const [form, setForm] = useState<SubFormState>(initial || EMPTY_FORM);
@@ -114,7 +117,7 @@ function SubModal({
     setForm(initial || EMPTY_FORM);
   }, [initial, visible]);
 
-  const set = (k: keyof SubFormState, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: keyof SubFormState, v: any) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.amount) return Alert.alert('', 'Nome e importo sono obbligatori.');
@@ -126,6 +129,12 @@ function SubModal({
     }
   };
 
+  const handleDeleteClick = () => {
+    if (onDelete) {
+      onDelete();
+    }
+  };
+
   const category = getCategory(form.category_key);
 
   return (
@@ -133,7 +142,7 @@ function SubModal({
       <SafeAreaView style={modal.container}>
         <View style={modal.header}>
           <Pressable onPress={onClose}><Ionicons name="close" size={26} color={COLORS.primary} /></Pressable>
-          <Text style={modal.title}>{initial ? 'Modifica' : 'Nuovo Abbonamento'}</Text>
+          <Text style={modal.title}>{initial ? 'Gestisci Abbonamento' : 'Nuovo Abbonamento'}</Text>
           <Pressable onPress={handleSave} disabled={saving}>
             <Text style={[modal.save, saving && { opacity: 0.5 }]}>{saving ? '...' : 'Salva'}</Text>
           </Pressable>
@@ -158,6 +167,43 @@ function SubModal({
             value={form.amount}
             onChangeText={v => set('amount', v)}
           />
+
+          {/* STATO ABBONAMENTO */}
+          {!!initial && (
+            <>
+              <Text style={modal.label}>Stato Abbonamento</Text>
+              <View style={modal.chipRow}>
+                <Pressable
+                  style={[
+                    modal.chip,
+                    form.is_active !== false && { backgroundColor: '#D1FAE5', borderColor: '#34D399', borderWidth: 1 }
+                  ]}
+                  onPress={() => set('is_active', true)}
+                >
+                  <Text style={[
+                    modal.chipText,
+                    form.is_active !== false && { color: '#065F46', fontWeight: '900' }
+                  ]}>
+                    Attivo
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    modal.chip,
+                    form.is_active === false && { backgroundColor: '#FEE2E2', borderColor: '#F87171', borderWidth: 1 }
+                  ]}
+                  onPress={() => set('is_active', false)}
+                >
+                  <Text style={[
+                    modal.chipText,
+                    form.is_active === false && { color: '#991B1B', fontWeight: '900' }
+                  ]}>
+                    Disattivato (In pausa)
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
 
           <Text style={modal.label}>Classificazione</Text>
           <Pressable style={modal.pickerTrigger} onPress={() => setShowPicker(true)}>
@@ -210,6 +256,17 @@ function SubModal({
             value={form.start_date}
             onChangeText={v => set('start_date', v)}
           />
+
+          {/* PULSANTE ELIMINA ABBONAMENTO */}
+          {!!initial && onDelete && (
+            <Pressable 
+              style={modal.deleteButton} 
+              onPress={handleDeleteClick}
+            >
+              <Ionicons name="trash-outline" size={18} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={modal.deleteButtonText}>Elimina Abbonamento</Text>
+            </Pressable>
+          )}
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -263,6 +320,7 @@ export default function SubscriptionsScreen() {
       frequency: form.frequency,
       recurrence_day: parseInt(form.recurrence_day) || null,
       start_date: form.start_date,
+      is_active: form.is_active !== false,
     });
     setEditTarget(null);
     load();
@@ -302,44 +360,43 @@ export default function SubscriptionsScreen() {
     frequency: editTarget.frequency,
     recurrence_day: String(editTarget.recurrence_day ?? ''),
     start_date: editTarget.start_date,
+    is_active: editTarget.is_active !== false,
   } : undefined;
 
   const renderCard = (sub: Subscription) => {
     const color = getCategoryColor(sub.category_key);
     const freqLabel = FREQUENCIES.find(f => f.key === sub.frequency)?.label || sub.frequency;
+    const isActive = sub.is_active !== false;
 
     return (
-      <View key={sub.id} style={styles.card}>
-        <View style={[styles.cardAccent, { backgroundColor: color }]} />
+      <Pressable 
+        key={sub.id} 
+        style={[styles.card, !isActive && { opacity: 0.55 }]}
+        onPress={() => openEdit(sub)}
+      >
+        <View style={[styles.cardAccent, { backgroundColor: isActive ? color : '#9CA3AF' }]} />
         <View style={styles.cardBody}>
           <View style={styles.cardTop}>
-            <Text style={styles.cardName}>{sub.name}</Text>
+            <Text style={[styles.cardName, !isActive && { color: COLORS.secondary }]}>{sub.name}</Text>
+            {!isActive && (
+              <View style={[styles.autoPill, { backgroundColor: '#E5E7EB', marginLeft: 8 }]}>
+                <Text style={[styles.autoPillText, { color: COLORS.secondary }]}>Inattivo</Text>
+              </View>
+            )}
           </View>
           <View style={styles.cardMeta}>
-            <Text style={styles.cardAmount}>€{sub.amount.toFixed(2)}</Text>
+            <Text style={[styles.cardAmount, !isActive && { color: COLORS.secondary }]}>€{sub.amount.toFixed(2)}</Text>
             <Text style={styles.cardSep}>·</Text>
             <Text style={styles.cardFrequency}>{freqLabel}</Text>
           </View>
-          {sub.is_active && (
+          {isActive && (
             <Text style={styles.cardNextOccurrence}>Prossimo: {nextOccurrenceLabel(sub)}</Text>
           )}
         </View>
-        <View style={styles.cardActions}>
-          <Pressable onPress={() => openEdit(sub)} style={styles.cardButton}>
-            <Ionicons name="pencil-outline" size={18} color={COLORS.secondary} />
-          </Pressable>
-          <Pressable onPress={() => handleToggle(sub)} style={styles.cardButton}>
-            <Ionicons
-              name={sub.is_active ? 'pause-circle-outline' : 'play-circle-outline'}
-              size={18}
-              color={sub.is_active ? COLORS.secondary : COLORS.success}
-            />
-          </Pressable>
-          <Pressable onPress={() => handleDelete(sub)} style={styles.cardButton}>
-            <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
-          </Pressable>
+        <View style={{ justifyContent: 'center', paddingRight: SPACING.lg }}>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.secondary} />
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -357,35 +414,28 @@ export default function SubscriptionsScreen() {
             <Text style={styles.summaryCount}>{active.length} active subscription/s</Text>
           </View>
 
-          {/* Active */}
+          {/* Active List */}
           {active.length > 0 && (
             <>
-              <Text style={styles.sectionLabel}>ACTIVE</Text>
+              <Text style={styles.sectionLabel}>ATTIVI</Text>
               {active.map(renderCard)}
             </>
           )}
 
-          {active.length === 0 && (
-            <View style={styles.emptyState}>
-              <Ionicons name="repeat-outline" size={48} color={COLORS.secondary} />
-              <Text style={styles.emptyText}>No active subscriptions</Text>
-              <Text style={styles.emptySubText}>Tap + to add one</Text>
-            </View>
-          )}
-
-          {/* Inactive (collapsible) */}
+          {/* Inactive List */}
           {inactive.length > 0 && (
             <>
-              <Pressable
-                style={styles.inactiveToggle}
-                onPress={() => setShowInactive(v => !v)}
-              >
-                <Text style={styles.inactiveToggleText}>
-                  {showInactive ? '▾' : '▸'} INACTIVE ({inactive.length})
-                </Text>
-              </Pressable>
-              {showInactive && inactive.map(renderCard)}
+              <Text style={[styles.sectionLabel, { marginTop: SPACING.lg }]}>DISATTIVATI</Text>
+              {inactive.map(renderCard)}
             </>
+          )}
+
+          {subs.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="repeat-outline" size={48} color={COLORS.secondary} />
+              <Text style={styles.emptyText}>Nessun abbonamento registrato</Text>
+              <Text style={styles.emptySubText}>Tocca + per aggiungerne uno</Text>
+            </View>
           )}
         </ScrollView>
       )}
@@ -402,6 +452,11 @@ export default function SubscriptionsScreen() {
         visible={!!editTarget}
         onClose={() => setEditTarget(null)}
         onSave={handleEdit}
+        onDelete={editTarget ? () => {
+          const target = editTarget;
+          setEditTarget(null);
+          handleDelete(target);
+        } : undefined}
         initial={editForm}
       />
     </SafeAreaView>
@@ -573,5 +628,21 @@ const modal = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.base,
     fontFamily: TYPOGRAPHY.fontFamily,
     color: COLORS.primary,
+  },
+  deleteButton: {
+    backgroundColor: '#EF4444',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginTop: 40,
+    ...SHADOWS.medium,
+  },
+  deleteButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontWeight: '700',
   },
 });
