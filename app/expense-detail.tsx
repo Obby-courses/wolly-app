@@ -479,17 +479,24 @@ export default function ExpenseDetail() {
         <Text style={styles.headerTitle}>
           {isEditingExisting ? 'Modifica Transazione' : 'Verifica Dati'}
         </Text>
-        {isEditingExisting ? (
-          <Pressable onPress={handleDelete} disabled={isDeleting} style={styles.deleteHeaderBtn}>
-            {isDeleting ? (
-              <ActivityIndicator size="small" color="#EF4444" />
+        <View style={styles.headerRightContainer}>
+          {isEditingExisting && (
+            <Pressable onPress={handleDelete} disabled={isDeleting || isSaving} style={styles.headerActionBtn}>
+              {isDeleting ? (
+                <ActivityIndicator size="small" color="#EF4444" />
+              ) : (
+                <Ionicons name="trash-outline" size={22} color="#EF4444" />
+              )}
+            </Pressable>
+          )}
+          <Pressable onPress={handleConfirm} disabled={isSaving || isDeleting} style={styles.headerSaveBtn}>
+            {isSaving ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
             ) : (
-              <Ionicons name="trash-outline" size={24} color="#EF4444" />
+              <Text style={styles.headerSaveText}>Salva</Text>
             )}
           </Pressable>
-        ) : (
-          <View style={{ width: 36 }} />
-        )}
+        </View>
       </View>
 
       <ScrollView 
@@ -1297,28 +1304,6 @@ export default function ExpenseDetail() {
         )}
         
       </ScrollView>
-
-      {/* STICKY FOOTER BUTTONS BAR */}
-      <View style={styles.footerContainer}>
-        <Pressable 
-          style={styles.footerBackButton} 
-          onPress={() => router.back()}
-        >
-          <Text style={styles.footerBackButtonText}>Indietro</Text>
-        </Pressable>
-
-        <Pressable 
-          style={[styles.footerSaveButton, isSaving && { opacity: 0.7 }]} 
-          onPress={handleConfirm}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color="#FFF" />
-          ) : (
-            <Text style={styles.footerSaveButtonText}>Salva</Text>
-          )}
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
@@ -1350,7 +1335,7 @@ const styles = StyleSheet.create({
   backIcon: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
   container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 130 },
+  content: { padding: 20, paddingBottom: 40 },
   sectionTitle: { 
     fontSize: 10, 
     fontWeight: '900', 
@@ -1766,5 +1751,28 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '800',
     fontSize: 16,
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerActionBtn: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerSaveBtn: {
+    backgroundColor: COLORS.primary + '15',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerSaveText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
 });
