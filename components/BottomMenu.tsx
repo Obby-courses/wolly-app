@@ -160,29 +160,66 @@ export default function BottomMenu() {
     voiceStore.close();
   };
 
-  // ── Mic PanResponder ──────────────────────────────────────────────────────────
+  // ── primaryPanResponder (Gestisce sia TAP che HOLD per la registrazione immediata) ──
+  const holdTimeoutRef = useRef<any>(null);
+  const hasStartedRecordingRef = useRef(false);
   const isReleasingRef = useRef(false);
 
-  const micPanResponder = useRef(
+  const primaryPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
 
       onPanResponderGrant: () => {
         isReleasingRef.current = false;
-        voiceStore.startRecording();
+        hasStartedRecordingRef.current = false;
+
+        if (isTextChat) return;
+
+        // Rileviamo se l'utente tiene premuto: avvia la registrazione dopo 150ms
+        holdTimeoutRef.current = setTimeout(() => {
+          hasStartedRecordingRef.current = true;
+          voiceStore.startRecording();
+        }, 150);
       },
 
       onPanResponderTerminationRequest: () => false,
 
       onPanResponderMove: (_, { dx }) => {
-        voiceStore.setIsSlidingToCancel(dx < CANCEL_THRESHOLD_X);
+        if (hasStartedRecordingRef.current) {
+          voiceStore.setIsSlidingToCancel(dx < CANCEL_THRESHOLD_X);
+        } else if (dx < -15) {
+          // Se l'utente trascina subito a sinistra di oltre 15px, forziamo l'avvio della registrazione
+          if (holdTimeoutRef.current) {
+            clearTimeout(holdTimeoutRef.current);
+            holdTimeoutRef.current = null;
+          }
+          hasStartedRecordingRef.current = true;
+          voiceStore.startRecording();
+          voiceStore.setIsSlidingToCancel(true);
+        }
       },
 
       onPanResponderRelease: async () => {
         if (isReleasingRef.current) return;
         isReleasingRef.current = true;
 
+        if (holdTimeoutRef.current) {
+          clearTimeout(holdTimeoutRef.current);
+          holdTimeoutRef.current = null;
+        }
+
+        // Caso 1: Semplice TAP rapido (minore di 150ms)
+        if (!hasStartedRecordingRef.current) {
+          if (!isExpanded && !isVoiceChat) {
+            setIsExpanded(true);
+          } else if (isExpanded) {
+            setIsExpanded(false);
+          }
+          return;
+        }
+
+        // Caso 2: HOLD (registrazione avviata)
         const state = voiceStore.getState();
         const duration = Date.now() - state.recordingStartTime;
 
@@ -190,11 +227,11 @@ export default function BottomMenu() {
         if (state.isSlidingToCancel) {
           voiceStore.cancelRecording();
           voiceStore.close();
-          setIsExpanded(false); // Collapsa anche il menu
+          setIsExpanded(false);
           return;
         }
 
-        // Tap veloce: annulla e chiude
+        // Tap veloce (sicurezza sulla durata minima)
         if (duration < MIN_RECORDING_DURATION) {
           voiceStore.cancelRecording();
           voiceStore.close();
@@ -202,7 +239,7 @@ export default function BottomMenu() {
           return;
         }
 
-        // Ottiene il file
+        // Ottiene il file audio
         const result = await voiceStore.stopAndGetUri();
         if (!result || !result.uri) {
           voiceStore.close();
@@ -210,15 +247,21 @@ export default function BottomMenu() {
           return;
         }
 
-        // Delega l'elaborazione vocale allo store
+        // Elabora l'input vocale
         voiceStore.processVoiceInput(result.uri);
-        setIsExpanded(false); // Chiude menu dopo invio
+        setIsExpanded(false);
       },
 
       onPanResponderTerminate: async () => {
-        await voiceStore.cancelRecording();
-        voiceStore.close();
-        setIsExpanded(false);
+        if (holdTimeoutRef.current) {
+          clearTimeout(holdTimeoutRef.current);
+          holdTimeoutRef.current = null;
+        }
+        if (hasStartedRecordingRef.current) {
+          await voiceStore.cancelRecording();
+          voiceStore.close();
+          setIsExpanded(false);
+        }
       },
     })
   ).current;
@@ -317,13 +360,14 @@ export default function BottomMenu() {
           {/* RIGHT SIDE: Dynamic Actions */}
           <View style={styles.rightContainer}>
             {isVoiceChat ? (
-              // 1. Voice Chat active state: [X] and [Rec]
+              // 1. Voice Chat active state: [X] and the persistent primary button
               <View style={styles.voiceActionsRow}>
                 <Pressable onPress={handleVoiceClose} style={styles.closeBtn}>
                   <Ionicons name="close" size={24} color="#1C1C1E" />
                 </Pressable>
                 <Animated.View
-                  {...micPanResponder.panHandlers}
+                  key="persistent-primary-btn"
+                  {...primaryPanResponder.panHandlers}
                   style={[
                     styles.toolBtn,
                     isSlidingToCancel && styles.micBtnCancel,
@@ -345,7 +389,7 @@ export default function BottomMenu() {
                 <Text style={styles.offlineBtnText}>Nuova spesa</Text>
               </Pressable>
             ) : (
-              // 4. Online Idle state: Animated Expandable tools [Back] [Foto] [Chat] [Audio]
+              // 4. Online Idle state: Animated Expandable tools and persistent primary button
               <View style={styles.expandedWrapper}>
                 
                 {/* Back tool button */}
@@ -403,27 +447,23 @@ export default function BottomMenu() {
                   </Pressable>
                 </Animated.View>
 
-                {/* Audio button (or Collapsed '+' button) */}
-                {isExpanded ? (
-                  <Animated.View
-                    {...micPanResponder.panHandlers}
-                    style={[
-                      styles.toolBtn,
-                      isRecording && styles.micBtnActive,
-                      isSlidingToCancel && styles.micBtnCancel,
-                      isRecording && !isSlidingToCancel && { transform: [{ scale: pulseScale }] },
-                    ]}
-                  >
-                    <Ionicons name="mic" size={20} color="#FFF" />
-                  </Animated.View>
-                ) : (
-                  <Pressable
-                    style={styles.toolBtn}
-                    onPress={() => setIsExpanded(true)}
-                  >
-                    <Ionicons name="add" size={24} color="#FFF" />
-                  </Pressable>
-                )}
+                {/* Persistent primary button inside expandedWrapper */}
+                <Animated.View
+                  key="persistent-primary-btn"
+                  {...primaryPanResponder.panHandlers}
+                  style={[
+                    styles.toolBtn,
+                    isExpanded && styles.micBtnActive,
+                    isSlidingToCancel && styles.micBtnCancel,
+                    isRecording && !isSlidingToCancel && { transform: [{ scale: pulseScale }] },
+                  ]}
+                >
+                  <Ionicons
+                    name={isExpanded ? "mic" : "add"}
+                    size={isExpanded ? 20 : 24}
+                    color="#FFF"
+                  />
+                </Animated.View>
 
               </View>
             )}
