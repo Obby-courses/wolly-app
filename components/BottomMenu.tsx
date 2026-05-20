@@ -16,10 +16,10 @@ const MIN_RECORDING_DURATION = 500;
 const MIC_SIZE = 40;
 
 const NAV_ITEMS = [
-  { path: '/', icon: 'home', label: 'Home' },
-  { path: '/stats', icon: 'pie-chart', label: 'Stats' },
-  { path: '/subscriptions', icon: 'card', label: 'Abbonamenti' },
-  { path: '/settings', icon: 'settings', label: 'Impostazioni' }
+  { path: '/', icon: 'home-sharp', label: 'Home' },
+  { path: '/stats', icon: 'pie-chart-sharp', label: 'Stats' },
+  { path: '/subscriptions', icon: 'card-sharp', label: 'Abbonamenti' },
+  { path: '/settings', icon: 'settings-sharp', label: 'Impostazioni' }
 ];
 
 export default function BottomMenu() {
@@ -302,18 +302,18 @@ export default function BottomMenu() {
   };
 
   // Interpolations for horizontal slide menu [Back] [Foto] [Chat] [Audio]
-  // Spacing: width 40, gap 8 -> step is 48
+  // Spacing: width 80, gap 8 -> step is 88
   const backTranslateX = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -144],
+    outputRange: [0, -264],
   });
   const fotoTranslateX = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -96],
+    outputRange: [0, -176],
   });
   const chatTranslateX = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -48],
+    outputRange: [0, -88],
   });
   const toolOpacity = expandAnim.interpolate({
     inputRange: [0, 0.4, 1],
@@ -328,22 +328,21 @@ export default function BottomMenu() {
       <View style={styles.container}>
         <View style={styles.row}>
           
-          {/* LEFT SIDE: Navigation Icons OR Dynamic Cancel text */}
+          {/* LEFT SIDE: Navigation Icons OR Close button in voice chat / Plus button in text chat */}
           <View style={styles.leftContainer}>
-            {isVoiceChat && isRecording ? (
-              // Pulse/Slide arrow with "Wipe per annullare" text when recording
-              <View style={styles.cancelContainer}>
-                <Animated.View style={{ transform: [{ translateX: chevronTranslateX }] }}>
-                  <Ionicons
-                    name="chevron-back"
-                    size={16}
-                    color={isSlidingToCancel ? COLORS.danger : COLORS.secondary}
-                  />
-                </Animated.View>
-                <Text style={[styles.cancelText, isSlidingToCancel && { color: COLORS.danger }]}>
-                  {isSlidingToCancel ? 'Rilascia per annullare' : 'Wipe per annullare'}
-                </Text>
-              </View>
+            {isVoiceChat ? (
+              // In voice chat, close button X is moved to the far left corner
+              <Pressable onPress={handleVoiceClose} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color="#1C1C1E" />
+              </Pressable>
+            ) : isTextChat && !isExpanded ? (
+              // In text chat active and not expanded, show the plus (+) button in the bottom-left corner
+              <Pressable
+                onPress={() => setIsExpanded(true)}
+                style={styles.toolBtn}
+              >
+                <Ionicons name="add" size={24} color="#FFF" />
+              </Pressable>
             ) : (
               // Standard Navigation Tabs (mostra solo la pagina corrente se espanso per pulizia visiva)
               <View style={styles.leftNav}>
@@ -360,11 +359,23 @@ export default function BottomMenu() {
           {/* RIGHT SIDE: Dynamic Actions */}
           <View style={styles.rightContainer}>
             {isVoiceChat ? (
-              // 1. Voice Chat active state: [X] and the persistent primary button
+              // 1. Voice Chat active state: persistent primary button and cancel text next to it
               <View style={styles.voiceActionsRow}>
-                <Pressable onPress={handleVoiceClose} style={styles.closeBtn}>
-                  <Ionicons name="close" size={24} color="#1C1C1E" />
-                </Pressable>
+                {isRecording && (
+                  // Pulse/Slide arrow with "Wipe per annullare" text when recording (brought close to Rec button)
+                  <View style={styles.cancelContainer}>
+                    <Animated.View style={{ transform: [{ translateX: chevronTranslateX }] }}>
+                      <Ionicons
+                        name="chevron-back"
+                        size={16}
+                        color={isSlidingToCancel ? COLORS.danger : COLORS.secondary}
+                      />
+                    </Animated.View>
+                    <Text style={[styles.cancelText, isSlidingToCancel && { color: COLORS.danger }]}>
+                      {isSlidingToCancel ? 'Rilascia per annullare' : 'Wipe per annullare'}
+                    </Text>
+                  </View>
+                )}
                 <Animated.View
                   key="persistent-primary-btn"
                   {...primaryPanResponder.panHandlers}
@@ -377,7 +388,7 @@ export default function BottomMenu() {
                   <Ionicons name="mic" size={20} color="#FFF" />
                 </Animated.View>
               </View>
-            ) : isTextChat ? (
+            ) : isTextChat && !isExpanded ? (
               // 2. Text AI Chat active state: just [X]
               <Pressable onPress={() => router.back()} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color="#1C1C1E" />
@@ -516,7 +527,7 @@ const styles = StyleSheet.create({
   rightContainer: {
     alignItems: 'flex-end',
     justifyContent: 'center',
-    minWidth: 48,
+    minWidth: 80,
   },
   leftNav: {
     flexDirection: 'row',
@@ -556,7 +567,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
-    width: 40,
+    width: 80,
     height: 40,
   },
   pressable: {
@@ -566,9 +577,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   toolBtn: {
-    width: MIC_SIZE,
-    height: MIC_SIZE,
-    borderRadius: MIC_SIZE / 2,
+    width: 80,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.brandBlue,
     alignItems: 'center',
     justifyContent: 'center',
@@ -597,7 +608,7 @@ const styles = StyleSheet.create({
   voiceActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   toast: {
     position: 'absolute',
