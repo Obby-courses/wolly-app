@@ -14,37 +14,7 @@ interface CustomKeyboardProps {
   onSubmit: () => void;
 }
 
-// Dizionario di termini finanziari e parole comuni in Italiano/Inglese per l'autocorrezione
-const DICTIONARY = [
-  'spesa', 'spese', 'entrate', 'entrata', 'abbonamento', 'abbonamenti', 'impostazioni', 'statistiche', 'grafico',
-  'soldi', 'conto', 'carta', 'bancomat', 'credito', 'debito', 'categoria', 'transazione', 'transazioni',
-  'casa', 'cibo', 'viaggi', 'lavoro', 'bollette', 'bolletta', 'investimento', 'investimenti', 'risparmio',
-  'risparmi', 'budget', 'finanze', 'mensile', 'settimanale', 'annuale', 'wolly', 'ciao', 'aiuto', 'grazie',
-  'quanto', 'come', 'perché', 'quando', 'dove', 'chi', 'che', 'cosa', 'salva', 'elimina', 'modifica',
-  'nuovo', 'nuova', 'aggiungi', 'inserisci', 'visualizza'
-];
-
-// Algoritmo di calcolo distanza di Levenshtein per correzione di refusi
-function getLevenshteinDistance(a: string, b: string): number {
-  const matrix = [];
-  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1, // sostituzione
-          matrix[i][j - 1] + 1,     // inserimento
-          matrix[i - 1][j] + 1      // cancellazione
-        );
-      }
-    }
-  }
-  return matrix[b.length][a.length];
-}
-
+// Funzione principale della tastiera personalizzata
 export default function CustomKeyboard({
   value,
   onChangeText,
@@ -55,65 +25,6 @@ export default function CustomKeyboard({
   const { width: screenWidth } = useWindowDimensions();
   const [mode, setMode] = useState<'letters' | 'numbers'>('letters');
   const [isShiftActive, setIsShiftActive] = useState(false);
-
-  // Tiene traccia dell'ultima correzione per permettere il Revert su Backspace
-  const [lastCorrection, setLastCorrection] = useState<{
-    original: string;
-    corrected: string;
-    index: number;
-  } | null>(null);
-
-  // Estrae le informazioni sulla parola correntemente digitata dal cursore
-  const getCurrentWordInfo = () => {
-    const { start } = selection;
-    if (start === 0) return { word: '', start: 0, end: 0 };
-
-    // Trova l'ultimo spazio prima del cursore
-    const lastSpaceIndex = value.lastIndexOf(' ', start - 1);
-    const wordStart = lastSpaceIndex === -1 ? 0 : lastSpaceIndex + 1;
-    const word = value.slice(wordStart, start);
-    return { word, start: wordStart, end: start };
-  };
-
-  const wordInfo = getCurrentWordInfo();
-
-  // Genera suggerimenti basati sulla parola corrente
-  const getSuggestions = (word: string): string[] => {
-    if (!word || word.length < 2) return [];
-    const w = word.toLowerCase();
-
-    // 1. Corrispondenza per prefisso (es. "spe" -> "spesa")
-    const prefixMatches = DICTIONARY.filter(dictWord => dictWord.startsWith(w));
-
-    // 2. Corrispondenza per distanza di Levenshtein (es. "spsa" -> "spesa")
-    const distanceMatches = DICTIONARY.filter(dictWord => {
-      if (dictWord.startsWith(w)) return false; // già catturata
-      const dist = getLevenshteinDistance(w, dictWord);
-      return dist <= 2; // tolleranza massima di 2 errori di battitura
-    });
-
-    return [...prefixMatches, ...distanceMatches].slice(0, 3);
-  };
-
-  const activeSuggestions = getSuggestions(wordInfo.word);
-
-  const applySuggestion = (suggestion: string) => {
-    const { start, end, word } = getCurrentWordInfo();
-    
-    // Sostituisce la parola digitata con il suggerimento + uno spazio
-    const newValue = value.slice(0, start) + suggestion + ' ' + value.slice(end);
-    const newCursorPos = start + suggestion.length + 1;
-
-    onChangeText(newValue);
-    onSelectionChange({ start: newCursorPos, end: newCursorPos });
-    
-    // Memorizza per un eventuale ripristino con Backspace
-    setLastCorrection({
-      original: word,
-      corrected: suggestion,
-      index: start,
-    });
-  };
 
   const handleKeyPress = (char: string) => {
     const { start, end } = selection;
@@ -133,24 +44,10 @@ export default function CustomKeyboard({
 
     onChangeText(newValue);
     onSelectionChange({ start: newCursorPos, end: newCursorPos });
-    setLastCorrection(null);
   };
 
   const handleBackspace = () => {
     const { start, end } = selection;
-    
-    // REVERT DELL'AUTOCORREZIONE: Se l'utente preme backspace subito dopo aver inserito lo spazio autocorretto
-    if (lastCorrection && start === lastCorrection.index + lastCorrection.corrected.length + 1) {
-      const { original, corrected, index } = lastCorrection;
-      const newValue = value.slice(0, index) + original + value.slice(start);
-      const newCursorPos = index + original.length;
-      
-      onChangeText(newValue);
-      onSelectionChange({ start: newCursorPos, end: newCursorPos });
-      setLastCorrection(null);
-      return;
-    }
-
     let newValue = '';
     let newCursorPos = 0;
 
@@ -166,31 +63,23 @@ export default function CustomKeyboard({
 
     onChangeText(newValue);
     onSelectionChange({ start: newCursorPos, end: newCursorPos });
-    setLastCorrection(null);
   };
 
   const handleSpace = () => {
-    // Se c'è un suggerimento di autocorrezione valido, premendo spazio viene applicato automaticamente
-    if (activeSuggestions.length > 0) {
-      applySuggestion(activeSuggestions[0]);
+    const { start, end } = selection;
+    let newValue = '';
+    let newCursorPos = 0;
+
+    if (start === end) {
+      newValue = value.slice(0, start) + ' ' + value.slice(start);
+      newCursorPos = start + 1;
     } else {
-      // Spazio normale
-      const { start, end } = selection;
-      let newValue = '';
-      let newCursorPos = 0;
-
-      if (start === end) {
-        newValue = value.slice(0, start) + ' ' + value.slice(start);
-        newCursorPos = start + 1;
-      } else {
-        newValue = value.slice(0, start) + ' ' + value.slice(end);
-        newCursorPos = start + 1;
-      }
-
-      onChangeText(newValue);
-      onSelectionChange({ start: newCursorPos, end: newCursorPos });
-      setLastCorrection(null);
+      newValue = value.slice(0, start) + ' ' + value.slice(end);
+      newCursorPos = start + 1;
     }
+
+    onChangeText(newValue);
+    onSelectionChange({ start: newCursorPos, end: newCursorPos });
   };
 
   // Riga 1, 2, 3 per Lettere
@@ -225,83 +114,8 @@ export default function CustomKeyboard({
     );
   };
 
-  // Renderizza la barra delle parole suggerite (autocorrezione stile Apple)
-  const renderSuggestionBar = () => {
-    let left = '';
-    let center = '';
-    let right = '';
-    let hasSuggestions = false;
-
-    if (activeSuggestions.length === 1) {
-      center = activeSuggestions[0];
-      left = '?';
-      right = '.';
-      hasSuggestions = true;
-    } else if (activeSuggestions.length === 2) {
-      center = activeSuggestions[0];
-      left = activeSuggestions[1];
-      right = '.';
-      hasSuggestions = true;
-    } else if (activeSuggestions.length >= 3) {
-      center = activeSuggestions[0];
-      left = activeSuggestions[1];
-      right = activeSuggestions[2];
-      hasSuggestions = true;
-    } else {
-      // Default scorciatoie se non ci sono parole da correggere
-      left = '?';
-      center = '.';
-      right = ',';
-    }
-
-    return (
-      <View style={styles.suggestionBar}>
-        {/* Suggestion 1 */}
-        <Pressable
-          style={styles.suggestionSlot}
-          onPress={() => hasSuggestions ? applySuggestion(left) : handleKeyPress(left)}
-        >
-          <Text style={[styles.suggestionText, hasSuggestions && styles.suggestedWordText]}>
-            {hasSuggestions ? `"${left}"` : left}
-          </Text>
-        </Pressable>
-
-        <View style={styles.suggestionDivider} />
-
-        {/* Suggestion 2 (Centrale: l'autocorrezione principale) */}
-        <Pressable
-          style={styles.suggestionSlot}
-          onPress={() => hasSuggestions ? applySuggestion(center) : handleKeyPress(center)}
-        >
-          <Text style={[
-            styles.suggestionText,
-            styles.bestSuggestionText,
-            hasSuggestions && { color: '#007AFF', fontFamily: TYPOGRAPHY.fontBold }
-          ]}>
-            {hasSuggestions ? `"${center}"` : center}
-          </Text>
-        </Pressable>
-
-        <View style={styles.suggestionDivider} />
-
-        {/* Suggestion 3 */}
-        <Pressable
-          style={styles.suggestionSlot}
-          onPress={() => hasSuggestions ? applySuggestion(right) : handleKeyPress(right)}
-        >
-          <Text style={[styles.suggestionText, hasSuggestions && styles.suggestedWordText]}>
-            {hasSuggestions ? `"${right}"` : right}
-          </Text>
-        </Pressable>
-      </View>
-    );
-  };
-
   return (
     <View style={styles.keyboardContainer}>
-      {/* ─── SUGGESTION BAR (AUTOCORRECT) ────────────────────────────────────── */}
-      {renderSuggestionBar()}
-
       {mode === 'letters' ? (
         // ─── LAYOUT LETTERE ──────────────────────────────────────────────────
         <View style={styles.rowsWrapper}>
@@ -391,13 +205,7 @@ export default function CustomKeyboard({
                 { flex: 5 }
               ]}
             >
-              {activeSuggestions.length > 0 ? (
-                <Text style={[styles.keyText, { fontSize: 13, color: '#8E8E93', fontFamily: TYPOGRAPHY.fontBold }]}>
-                  {activeSuggestions[0]}
-                </Text>
-              ) : (
-                <Text style={styles.keyText}>spazio</Text>
-              )}
+              <Text style={styles.keyText}>spazio</Text>
             </Pressable>
 
             {/* Tasto Invia */}
@@ -511,7 +319,7 @@ const styles = StyleSheet.create({
   rowsWrapper: {
     width: '100%',
     gap: 8, // Ridotto gap verticale tra le righe di tasti (era 12)
-    marginTop: 6,
+    marginTop: 2,
   },
   row: {
     flexDirection: 'row',
@@ -565,40 +373,5 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 13,
     color: '#1C1C1E',
-  },
-
-  // ─── SUGGESTION BAR (AUTOCORRECT) STYLES ─────────────────────────────────
-  suggestionBar: {
-    flexDirection: 'row',
-    height: 38,
-    backgroundColor: '#E5E5EA',
-    borderRadius: 6,
-    marginHorizontal: 3,
-    alignItems: 'center',
-  },
-  suggestionSlot: {
-    flex: 1,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  suggestionDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: '#D1D1D6',
-  },
-  suggestionText: {
-    fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: 14,
-    color: '#8E8E93',
-  },
-  bestSuggestionText: {
-    color: '#1C1C1E',
-    fontFamily: TYPOGRAPHY.fontFamily,
-  },
-  suggestedWordText: {
-    color: '#1C1C1E',
-    fontFamily: TYPOGRAPHY.fontFamily,
   },
 });
