@@ -1,7 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, ActivityIndicator, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionRepository } from '../../services/database/repositories/TransactionRepository';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
@@ -10,6 +11,7 @@ import AnnualChart from '../../components/AnnualChart';
 
 export default function CashflowScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('Mese');
   const [baseDate, setBaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -17,11 +19,18 @@ export default function CashflowScreen() {
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpense, setTotalExpense] = useState(0);
 
+  // Automatic reset when entering the screen
   useFocusEffect(
     useCallback(() => {
-      loadStats();
-    }, [timeRange, baseDate])
+      setTimeRange('Mese');
+      setBaseDate(new Date().toISOString().split('T')[0]);
+    }, [])
   );
+
+  // Load stats when filters change
+  useEffect(() => {
+    loadStats();
+  }, [timeRange, baseDate]);
 
   const loadStats = async () => {
     setLoading(true);
@@ -46,76 +55,174 @@ export default function CashflowScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
-        </Pressable>
-        <Text style={styles.title}>Flusso di Cassa</Text>
-        <View style={{ width: 24 }} />
+    <View style={styles.container}>
+      {/* Header Sfumato Blu Premium */}
+      <LinearGradient
+        colors={['#0A74FF', '#0857C3']}
+        style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
+      >
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={{ marginRight: 12, marginLeft: -4, marginTop: 2 }}>
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          </Pressable>
+          <Text style={styles.title}>Flusso di Cassa</Text>
+        </View>
+        <Text style={styles.subtitle}>Confronto diretto tra entrate e uscite</Text>
+      </LinearGradient>
+
+      {/* Overlapping Bottom Sheet - NO border radius */}
+      <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 64 }]}>
+        
+        {/* TimeFilter in premium white card container */}
+        <View style={styles.filterCard}>
+          <TimeFilter 
+            timeRange={timeRange} 
+            setTimeRange={setTimeRange} 
+            baseDate={baseDate}
+            onDateChange={setBaseDate}
+          />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} scrollEnabled={false}>
+          {loading ? <ActivityIndicator size="large" color="#0A74FF" style={{ marginTop: 50 }} /> : (
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>Entrate vs Uscite</Text>
+                <Ionicons name="swap-vertical" size={20} color="#0A74FF" />
+              </View>
+              <Text style={styles.cardSubtitle}>Confronto diretto dei flussi di cassa nel periodo.</Text>
+              
+              <AnnualChart 
+                data={trendData} 
+                title=""
+                height={130}
+                labels={
+                  timeRange === 'Settimana' 
+                    ? trendData.map(s => s.label || '') 
+                    : timeRange === 'Mese' 
+                    ? trendData.map(s => s.day?.toString() || '') 
+                    : timeRange === 'Anno'
+                    ? ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D']
+                    : trendData.map(s => s.label || '')
+                }
+              />
+              
+              <View style={styles.summaryContainer}>
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>Totale Entrate</Text>
+                    <Text style={[styles.summaryValue, { color: COLORS.success }]}>+ €{totalIncome.toLocaleString('it-IT', { maximumFractionDigits: 0 })}</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>Totale Uscite</Text>
+                    <Text style={[styles.summaryValue, { color: COLORS.danger }]}>- €{totalExpense.toLocaleString('it-IT', { maximumFractionDigits: 0 })}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </ScrollView>
       </View>
-
-      <TimeFilter 
-        timeRange={timeRange} 
-        setTimeRange={setTimeRange} 
-        baseDate={baseDate}
-        onDateChange={setBaseDate}
-      />
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {loading ? <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} /> : (
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle}>Entrate vs Uscite</Text>
-              <Ionicons name="swap-vertical" size={20} color={COLORS.secondary} />
-            </View>
-            <Text style={styles.cardSubtitle}>Confronto diretto dei flussi di cassa nel periodo.</Text>
-            
-            <AnnualChart 
-              data={trendData} 
-              title=""
-              labels={
-                timeRange === 'Settimana' 
-                  ? trendData.map(s => s.label || '') 
-                  : timeRange === 'Mese' 
-                  ? trendData.map(s => s.day?.toString() || '') 
-                  : timeRange === 'Anno'
-                  ? ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D']
-                  : trendData.map(s => s.label || '')
-              }
-            />
-            
-            <View style={styles.summaryContainer}>
-              <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Totale Entrate</Text>
-                  <Text style={[styles.summaryValue, { color: COLORS.success }]}>+ €{totalIncome.toFixed(0)}</Text>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Totale Uscite</Text>
-                  <Text style={[styles.summaryValue, { color: COLORS.danger }]}>- €{totalExpense.toFixed(0)}</Text>
-              </View>
-            </View>
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { padding: SPACING.lg, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  backBtn: { padding: 4 },
-  title: { fontSize: TYPOGRAPHY.sizes.xl, fontFamily: TYPOGRAPHY.fontBold, color: COLORS.primary },
-  scrollContent: { paddingBottom: 120 },
-  card: { backgroundColor: COLORS.surface, marginHorizontal: SPACING.lg, marginTop: SPACING.lg, borderRadius: 24, padding: SPACING.xl, ...SHADOWS.soft },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: TYPOGRAPHY.sizes.lg, fontFamily: TYPOGRAPHY.fontBold, color: COLORS.primary },
-  cardSubtitle: { fontSize: TYPOGRAPHY.sizes.sm, fontFamily: TYPOGRAPHY.fontFamily, color: COLORS.secondary, marginTop: 4, marginBottom: SPACING.md },
-  summaryContainer: { flexDirection: 'row', marginTop: SPACING.xl, paddingTop: SPACING.lg, borderTopWidth: 1, borderTopColor: COLORS.border, justifyContent: 'space-around' },
-  summaryItem: { alignItems: 'center' },
-  summaryLabel: { fontSize: TYPOGRAPHY.sizes.xs, fontFamily: TYPOGRAPHY.fontFamily, color: COLORS.secondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
-  summaryValue: { fontSize: TYPOGRAPHY.sizes.lg, fontFamily: TYPOGRAPHY.fontBold },
-  divider: { width: 1, height: '100%', backgroundColor: COLORS.border }
+  container: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+  },
+  headerGradient: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  title: {
+    fontSize: 24,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: '#FFFFFF',
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    marginTop: 6,
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: -20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  filterCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    marginBottom: 12,
+    ...SHADOWS.soft,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    ...SHADOWS.soft,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+  },
+  cardSubtitle: {
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    marginTop: 2,
+    marginBottom: SPACING.sm,
+  },
+  summaryContainer: {
+    flexDirection: 'row',
+    marginTop: SPACING.md,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    justifyContent: 'space-around',
+  },
+  summaryItem: {
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: 9,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontFamily: TYPOGRAPHY.fontBold,
+  },
+  divider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: COLORS.border,
+  },
 });

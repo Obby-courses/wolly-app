@@ -473,7 +473,9 @@ export default function ExpenseDetail() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <View style={{ width: 28 }} />
+        <Pressable onPress={() => router.back()} style={styles.backIcon}>
+          <Ionicons name="chevron-back" size={28} color={COLORS.primary} />
+        </Pressable>
         <Text style={styles.headerTitle}>
           {isEditingExisting ? 'Modifica Transazione' : 'Verifica Dati'}
         </Text>
@@ -486,7 +488,7 @@ export default function ExpenseDetail() {
             )}
           </Pressable>
         ) : (
-          <View style={{ width: 28 }} />
+          <View style={{ width: 36 }} />
         )}
       </View>
 

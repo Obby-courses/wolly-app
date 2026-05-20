@@ -233,6 +233,21 @@ export class TransactionRepository {
   }
 
   /**
+   * Retrieves the date of the very first transaction in the database.
+   * Returns a YYYY-MM-DD string or null if no transactions exist.
+   */
+  static async getFirstTransactionDate(): Promise<string | null> {
+    const db = await getDBConnection();
+    const result = await db.getFirstAsync(`
+      SELECT MIN(date) as first_date
+      FROM transactions 
+      WHERE is_deleted = 0 AND direction != 'adj'
+    `);
+    if (!result || !(result as any).first_date) return null;
+    return (result as any).first_date;
+  }
+
+  /**
    * Retrieves stats for the entire history, grouping by month or year.
    */
   static async getStatsForAllTime(): Promise<{ label: string, income: number, expense: number }[]> {
@@ -252,7 +267,7 @@ export class TransactionRepository {
 
     const monthsSpan = (spanResult as any).months_span || 0;
 
-    if (monthsSpan < 24) {
+    if (monthsSpan < 60) {
       // Group by Month
       const results = await db.getAllAsync(`
         SELECT 
@@ -532,7 +547,18 @@ export class TransactionRepository {
       timeExpr = "strftime('%Y-%m', date)";
       periodFilter = `AND strftime('%Y', date) = strftime('%Y', '${baseDate}')`;
     } else {
-      timeExpr = "strftime('%Y', date)";
+      // 'Tutto' view: determine if we should group by month or year based on total span (limit 5 years)
+      const spanResult = await db.getFirstAsync<{ months_span: number }>(`
+        SELECT (julianday(MAX(date)) - julianday(MIN(date))) / 30 as months_span
+        FROM transactions 
+        WHERE is_deleted = 0 AND direction = '${direction}'
+      `);
+      const monthsSpan = spanResult?.months_span || 0;
+      if (monthsSpan < 60) {
+        timeExpr = "strftime('%Y-%m', date)";
+      } else {
+        timeExpr = "strftime('%Y', date)";
+      }
     }
 
     let filterExpr = `AND direction = '${direction}'`;
@@ -561,6 +587,14 @@ export class TransactionRepository {
           const m = parseInt(r.period.split('-')[1]);
           const months = ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'];
           label = months[m-1] || r.period;
+      } else {
+          // 'Tutto'
+          if (r.period.includes('-')) {
+              const parts = r.period.split('-');
+              label = parts[1] + '/' + parts[0].slice(2);
+          } else {
+              label = r.period;
+          }
       }
       return { label, value: r.total };
     });

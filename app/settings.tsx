@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, Alert, Switch } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { COLORS, TYPOGRAPHY, SPACING } from '../constants/Theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 import { networkStore } from '../services/networkStore';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   
   const [networkState, setNetworkState] = useState(networkStore.getState());
   useEffect(() => {
     const unsub = networkStore.subscribe(() => setNetworkState(networkStore.getState()));
     return () => { unsub(); };
   }, []);
-
 
   const handleDeleteAll = () => {
     Alert.alert(
@@ -41,108 +42,155 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dati & Database</Text>
-          <Pressable style={styles.item} onPress={() => router.push('/seed-data')}>
-            <Ionicons name="server-outline" size={22} color={COLORS.primary} />
-            <Text style={styles.itemText}>Gestione Dati & Seed</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
-          </Pressable>
-
-          <Pressable style={[styles.item, styles.dangerItem]} onPress={handleDeleteAll}>
-            <Ionicons name="trash-outline" size={22} color="#EF4444" />
-            <Text style={[styles.itemText, styles.dangerText]}>Elimina tutte le transazioni</Text>
-            <Ionicons name="chevron-forward" size={18} color="#EF4444" />
-          </Pressable>
+    <View style={styles.container}>
+      {/* Header Sfumato Blu Premium */}
+      <LinearGradient
+        colors={['#0A74FF', '#0857C3']}
+        style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Impostazioni</Text>
         </View>
+        <Text style={styles.subtitle}>Gestisci l'applicazione e le tue preferenze</Text>
+      </LinearGradient>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Finanze</Text>
-          <Pressable style={styles.item} onPress={() => router.push('/subscriptions')}>
-            <Ionicons name="repeat-outline" size={22} color={COLORS.primary} />
-            <Text style={styles.itemText}>Abbonamenti & Ricorrenti</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
-          </Pressable>
-        </View>
+      {/* Overlapping Bottom Sheet */}
+      <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 48 }]}>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dev Settings</Text>
-          <View style={styles.item}>
-            <Ionicons name="cloud-offline-outline" size={22} color={COLORS.primary} />
-            <View style={{ flex: 1, marginLeft: SPACING.md }}>
-              <Text style={{ fontSize: TYPOGRAPHY.sizes.base, fontFamily: TYPOGRAPHY.fontFamily, color: COLORS.primary }}>
-                Modalità Demo Offline
-              </Text>
-              <Text style={{ fontSize: 12, color: COLORS.secondary, marginTop: 2 }}>
-                Forza l'app in modalità senza rete (disabilita AI)
-              </Text>
-            </View>
-            <Switch
-              value={networkState.isDemoOffline}
-              onValueChange={(val) => networkStore.setDemoOffline(val)}
-              trackColor={{ false: '#D1D5DB', true: COLORS.primary }}
-              thumbColor={'#FFF'}
-            />
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Dati & Database</Text>
+            
+            <Pressable style={styles.item} onPress={() => router.push('/seed-data')}>
+              <View style={[styles.iconContainer, { backgroundColor: '#E6F0FF' }]}>
+                <Ionicons name="server" size={20} color="#0A74FF" />
+              </View>
+              <Text style={styles.itemText}>Gestione Dati & Seed</Text>
+              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+            </Pressable>
+
+            <Pressable style={[styles.item, styles.dangerItem]} onPress={handleDeleteAll}>
+              <View style={[styles.iconContainer, { backgroundColor: '#FCE8E6' }]}>
+                <Ionicons name="trash" size={20} color="#EF4444" />
+              </View>
+              <Text style={[styles.itemText, styles.dangerText]}>Elimina tutte le transazioni</Text>
+              <Ionicons name="chevron-forward" size={18} color="#EF4444" />
+            </Pressable>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Dev Settings</Text>
+            
+            <View style={styles.item}>
+              <View style={[styles.iconContainer, { backgroundColor: '#E6F4EA' }]}>
+                <Ionicons name="cloud-offline" size={20} color="#34C759" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.itemTitleText}>Modalità Demo Offline</Text>
+                <Text style={styles.itemSubtitleText}>Forza l'app in modalità senza rete (disabilita AI)</Text>
+              </View>
+              <Switch
+                value={networkState.isDemoOffline}
+                onValueChange={(val) => networkStore.setDemoOffline(val)}
+                trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
+                thumbColor={'#FFF'}
+              />
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F2F2F7',
+  },
+  headerGradient: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   header: {
-    padding: SPACING.xl,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
   },
   title: {
-    fontSize: TYPOGRAPHY.sizes.xxl,
+    fontSize: 24,
     fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
+    color: '#FFFFFF',
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    marginTop: 6,
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: -20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   scrollContent: {
-    padding: SPACING.lg,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   section: {
     marginBottom: SPACING.xl,
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: 12,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.secondary,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     marginBottom: SPACING.md,
     marginLeft: 4,
   },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 20,
     marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    ...SHADOWS.soft,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   itemText: {
     flex: 1,
-    marginLeft: SPACING.md,
-    fontSize: TYPOGRAPHY.sizes.base,
+    marginLeft: 12,
+    fontSize: 15,
     fontFamily: TYPOGRAPHY.fontFamily,
     color: COLORS.primary,
+  },
+  itemTitleText: {
+    fontSize: 15,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.primary,
+  },
+  itemSubtitleText: {
+    fontSize: 11,
+    color: COLORS.secondary,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    marginTop: 2,
   },
   dangerItem: {
     borderWidth: 1,
     borderColor: '#FEE2E2',
-    backgroundColor: '#FEF2F2',
   },
   dangerText: {
     color: '#EF4444',

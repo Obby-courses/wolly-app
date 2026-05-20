@@ -1,7 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, Dimensions, ActivityIndicator, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { TransactionRepository } from '../../services/database/repositories/TransactionRepository';
@@ -14,7 +15,7 @@ const { width } = Dimensions.get('window');
 const WealthChart = ({ data, labels }: { data: any[], labels: string[] }) => {
   if (data.length === 0) return null;
   const chartWidth = width - (SPACING.lg * 4);
-  const chartHeight = 200;
+  const chartHeight = 130;
   const safeMargin = 10;
   const maxVal = Math.max(...data.map(d => d.wealth), 1) * 1.1;
   const minVal = Math.min(...data.map(d => d.wealth), 0) * 0.9;
@@ -27,10 +28,10 @@ const WealthChart = ({ data, labels }: { data: any[], labels: string[] }) => {
   return (
     <View style={styles.wealthChartContainer}>
       <Svg width={chartWidth} height={chartHeight}>
-        <Path d={areaData} fill={COLORS.primary + '15'} />
-        <Path d={pathData} fill="none" stroke={COLORS.primary} strokeWidth="3" />
+        <Path d={areaData} fill="#0A74FF15" />
+        <Path d={pathData} fill="none" stroke="#0A74FF" strokeWidth="3" />
         {data.length < 40 && data.map((d, i) => (
-          <Circle key={i} cx={getX(i)} cy={getY(d.wealth)} r="4" fill={COLORS.primary} />
+          <Circle key={i} cx={getX(i)} cy={getY(d.wealth)} r="4" fill="#0A74FF" />
         ))}
       </Svg>
       <View style={styles.chartLabelsRow}>
@@ -44,17 +45,25 @@ const WealthChart = ({ data, labels }: { data: any[], labels: string[] }) => {
 
 export default function NetWorthScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('Mese');
   const [baseDate, setBaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [netWorthTrend, setNetWorthTrend] = useState<any[]>([]);
   const [selectedTotalValue, setSelectedTotalValue] = useState(0);
 
+  // Automatic reset when entering the screen
   useFocusEffect(
     useCallback(() => {
-      loadStats();
-    }, [timeRange, baseDate])
+      setTimeRange('Mese');
+      setBaseDate(new Date().toISOString().split('T')[0]);
+    }, [])
   );
+
+  // Load stats when filters change
+  useEffect(() => {
+    loadStats();
+  }, [timeRange, baseDate]);
 
   const loadStats = async () => {
     setLoading(true);
@@ -66,7 +75,6 @@ export default function NetWorthScreen() {
       else if (timeRange === 'Anno') rawTrend = await TransactionRepository.getMonthlyStatsForYear(d.getFullYear());
       else rawTrend = await TransactionRepository.getStatsForAllTime();
 
-      // Net worth at the END of the period (baseDate)
       const nwAtEnd = await NetWorthRepository.getNetWorthAtDate(baseDate);
       setSelectedTotalValue(nwAtEnd);
       
@@ -85,62 +93,165 @@ export default function NetWorthScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
-        </Pressable>
-        <Text style={styles.title}>Saldo</Text>
-        <View style={{ width: 24 }} />
+    <View style={styles.container}>
+      {/* Header Sfumato Blu Premium */}
+      <LinearGradient
+        colors={['#0A74FF', '#0857C3']}
+        style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
+      >
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={{ marginRight: 12, marginLeft: -4, marginTop: 2 }}>
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          </Pressable>
+          <Text style={styles.title}>Saldo</Text>
+        </View>
+        <Text style={styles.subtitle}>Andamento del patrimonio totale nel tempo</Text>
+      </LinearGradient>
+
+      {/* Overlapping Bottom Sheet - NO border radius */}
+      <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 64 }]}>
+        
+        {/* TimeFilter in premium white card container */}
+        <View style={styles.filterCard}>
+          <TimeFilter 
+            timeRange={timeRange} 
+            setTimeRange={setTimeRange} 
+            baseDate={baseDate}
+            onDateChange={setBaseDate}
+          />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} scrollEnabled={false}>
+          {loading ? <ActivityIndicator size="large" color="#0A74FF" style={{ marginTop: 30 }} /> : (
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                 <Text style={styles.cardTitle}>Andamento Cumulativo</Text>
+                 <Ionicons name="wallet-outline" size={20} color="#0A74FF" />
+              </View>
+              <Text style={styles.cardSubtitle}>Crescita del patrimonio basata sulle tue transazioni.</Text>
+              
+              <WealthChart data={netWorthTrend} labels={
+                timeRange === 'Settimana' ? netWorthTrend.map(s => s.label || '') : 
+                timeRange === 'Mese' ? netWorthTrend.map(s => s.day?.toString() || '') : 
+                ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D']
+              }/>
+              
+              <View style={styles.currentWealthRow}>
+                <Text style={styles.currentWealthValue}>€ {selectedTotalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</Text>
+                <Text style={styles.currentWealthLabel}>Saldo a fine periodo</Text>
+              </View>
+            </View>
+          )}
+        </ScrollView>
       </View>
-
-      <TimeFilter 
-        timeRange={timeRange} 
-        setTimeRange={setTimeRange} 
-        baseDate={baseDate}
-        onDateChange={setBaseDate}
-      />
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {loading ? <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} /> : (
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-               <Text style={styles.cardTitle}>Andamento Cumulativo</Text>
-               <Ionicons name="wallet" size={20} color={COLORS.secondary} />
-            </View>
-            <Text style={styles.cardSubtitle}>Crescita del patrimonio basata sulle tue transazioni.</Text>
-            
-            <WealthChart data={netWorthTrend} labels={
-              timeRange === 'Settimana' ? netWorthTrend.map(s => s.label || '') : 
-              timeRange === 'Mese' ? netWorthTrend.map(s => s.day?.toString() || '') : 
-              ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D']
-            }/>
-            
-            <View style={styles.currentWealthRow}>
-              <Text style={styles.currentWealthValue}>€ {selectedTotalValue.toFixed(2)}</Text>
-              <Text style={styles.currentWealthLabel}>Saldo al termine del periodo</Text>
-            </View>
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { padding: SPACING.lg, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  backBtn: { padding: 4 },
-  title: { fontSize: TYPOGRAPHY.sizes.xl, fontFamily: TYPOGRAPHY.fontBold, color: COLORS.primary },
-  scrollContent: { paddingBottom: 120 },
-  card: { backgroundColor: COLORS.surface, marginHorizontal: SPACING.lg, marginTop: SPACING.lg, borderRadius: 24, padding: SPACING.xl, ...SHADOWS.soft },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: TYPOGRAPHY.sizes.lg, fontFamily: TYPOGRAPHY.fontBold, color: COLORS.primary },
-  cardSubtitle: { fontSize: TYPOGRAPHY.sizes.sm, fontFamily: TYPOGRAPHY.fontFamily, color: COLORS.secondary, marginTop: 4, marginBottom: SPACING.md },
-  wealthChartContainer: { marginTop: SPACING.sm, alignItems: 'center' },
-  chartLabelsRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 10, marginTop: 8 },
-  chartLabelText: { fontSize: 9, fontFamily: TYPOGRAPHY.fontFamily, color: COLORS.secondary },
-  currentWealthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACING.xl, paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.border },
-  currentWealthLabel: { fontSize: TYPOGRAPHY.sizes.sm, fontFamily: TYPOGRAPHY.fontFamily, color: COLORS.secondary },
-  currentWealthValue: { fontSize: 24, fontFamily: TYPOGRAPHY.fontBold, color: COLORS.primary }
+  container: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+  },
+  headerGradient: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  title: {
+    fontSize: 24,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: '#FFFFFF',
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    marginTop: 6,
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: -20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  filterCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    marginBottom: 12,
+    ...SHADOWS.soft,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    ...SHADOWS.soft,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+  },
+  cardSubtitle: {
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    marginTop: 2,
+    marginBottom: SPACING.sm,
+  },
+  wealthChartContainer: {
+    marginTop: SPACING.xs,
+    alignItems: 'center',
+  },
+  chartLabelsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 10,
+    marginTop: 6,
+  },
+  chartLabelText: {
+    fontSize: 9,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+  },
+  currentWealthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: SPACING.md,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  currentWealthLabel: {
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+  },
+  currentWealthValue: {
+    fontSize: 20,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+  },
 });

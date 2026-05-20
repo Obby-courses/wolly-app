@@ -44,14 +44,13 @@ export default function RootLayout() {
 
   // Pagine principali (Root tabs) su cui il menu inferiore è visibile
   const tabPaths = ['/', '/stats', '/subscriptions', '/settings'];
-  const showBottomMenu = [...tabPaths, '/ai-chat', '/voice-chat'].includes(pathname);
+  const showBottomMenu = [...tabPaths, '/ai-chat', '/voice-chat'].includes(pathname) || pathname.startsWith('/stats/');
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
       <SwipeNavigator>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
-          <Stack.Screen name="history" />
           <Stack.Screen name="manual-entry" />
           <Stack.Screen name="expense-detail" />
           <Stack.Screen name="seed-data" />

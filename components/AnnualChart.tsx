@@ -21,9 +21,10 @@ interface AnnualChartProps {
   title: string;
   labels?: string[];
   showNetWorth?: boolean;
+  height?: number;
 }
 
-export default function AnnualChart({ data, previousData, title, labels, showNetWorth }: AnnualChartProps) {
+export default function AnnualChart({ data, previousData, title, labels, showNetWorth, height = 280 }: AnnualChartProps) {
   if (data.length === 0) return null;
 
   // Trova il valore massimo considerando anche il periodo precedente e il tipo di dato
@@ -54,12 +55,12 @@ export default function AnnualChart({ data, previousData, title, labels, showNet
   const VERTICAL_PADDING = 4; // Padding per evitare che lo stroke venga tagliato
   
   const getY = (value: number) => {
-    const usableHeight = CHART_HEIGHT - (VERTICAL_PADDING * 2);
+    const usableHeight = height - (VERTICAL_PADDING * 2);
     const effectiveMax = maxVal - minVal;
     const effectiveValue = value - minVal;
     
-    if (effectiveMax === 0) return CHART_HEIGHT / 2;
-    return (CHART_HEIGHT - VERTICAL_PADDING) - (effectiveValue / effectiveMax) * usableHeight;
+    if (effectiveMax === 0) return height / 2;
+    return (height - VERTICAL_PADDING) - (effectiveValue / effectiveMax) * usableHeight;
   };
 
   // Costruisci il path per le linee
@@ -85,12 +86,12 @@ export default function AnnualChart({ data, previousData, title, labels, showNet
 
   return (
     <View style={styles.container}>
-      <View style={styles.chartArea}>
-        <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
+      <View style={[styles.chartArea, { height: height }]}>
+        <Svg width={CHART_WIDTH} height={height}>
           {/* Griglie */}
           <Line x1={SAFE_MARGIN} y1={VERTICAL_PADDING} x2={CHART_WIDTH - SAFE_MARGIN} y2={VERTICAL_PADDING} stroke={COLORS.border} strokeWidth="1" strokeDasharray="4, 4" />
-          <Line x1={SAFE_MARGIN} y1={CHART_HEIGHT / 2} x2={CHART_WIDTH - SAFE_MARGIN} y2={CHART_HEIGHT / 2} stroke={COLORS.border} strokeWidth="1" strokeDasharray="4, 4" />
-          <Line x1={SAFE_MARGIN} y1={CHART_HEIGHT - VERTICAL_PADDING} x2={CHART_WIDTH - SAFE_MARGIN} y2={CHART_HEIGHT - VERTICAL_PADDING} stroke={COLORS.border} strokeWidth="1" strokeDasharray="4, 4" />
+          <Line x1={SAFE_MARGIN} y1={height / 2} x2={CHART_WIDTH - SAFE_MARGIN} y2={height / 2} stroke={COLORS.border} strokeWidth="1" strokeDasharray="4, 4" />
+          <Line x1={SAFE_MARGIN} y1={height - VERTICAL_PADDING} x2={CHART_WIDTH - SAFE_MARGIN} y2={height - VERTICAL_PADDING} stroke={COLORS.border} strokeWidth="1" strokeDasharray="4, 4" />
 
           {/* Linee periodo precedente (Sottili) */}
           {prevExpensePath && <Path d={prevExpensePath} fill="none" stroke={COLORS.danger} strokeWidth="1" strokeOpacity={0.3} strokeLinejoin="round" strokeLinecap="round" />}

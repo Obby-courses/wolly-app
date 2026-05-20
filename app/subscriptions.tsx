@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, Pressable,
-  TextInput, Modal, Alert, ActivityIndicator
+  TextInput, Modal, Alert, ActivityIndicator, SafeAreaView
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import { SubscriptionRepository, Subscription, Frequency } from '../services/database/repositories/SubscriptionRepository';
@@ -277,6 +278,7 @@ function SubModal({
 
 export default function SubscriptionsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalMonthly, setTotalMonthly] = useState(0);
@@ -393,51 +395,71 @@ export default function SubscriptionsScreen() {
             <Text style={styles.cardNextOccurrence}>Prossimo: {nextOccurrenceLabel(sub)}</Text>
           )}
         </View>
-        <View style={{ justifyContent: 'center', paddingRight: SPACING.lg }}>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.secondary} />
-        </View>
       </Pressable>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#0A74FF" /></View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
-
-          {/* Summary card */}
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>TOTAL MONTHLY ESTIMATE</Text>
-            <Text style={styles.summaryValue}>€{totalMonthly.toFixed(2)}</Text>
-            <Text style={styles.summaryCount}>{active.length} active subscription/s</Text>
-          </View>
-
-          {/* Active List */}
-          {active.length > 0 && (
-            <>
-              <Text style={styles.sectionLabel}>ATTIVI</Text>
-              {active.map(renderCard)}
-            </>
-          )}
-
-          {/* Inactive List */}
-          {inactive.length > 0 && (
-            <>
-              <Text style={[styles.sectionLabel, { marginTop: SPACING.lg }]}>DISATTIVATI</Text>
-              {inactive.map(renderCard)}
-            </>
-          )}
-
-          {subs.length === 0 && (
-            <View style={styles.emptyState}>
-              <Ionicons name="repeat-outline" size={48} color={COLORS.secondary} />
-              <Text style={styles.emptyText}>Nessun abbonamento registrato</Text>
-              <Text style={styles.emptySubText}>Tocca + per aggiungerne uno</Text>
+        <View style={{ flex: 1 }}>
+          {/* Header Sfumato Blu Premium */}
+          <LinearGradient
+            colors={['#0A74FF', '#0857C3']}
+            style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
+          >
+            <View style={styles.header}>
+              <View style={{ width: 32 }} />
+              <Text style={styles.title}>Abbonamenti</Text>
+              <Pressable onPress={() => setShowModal(true)} style={styles.addButton}>
+                <Ionicons name="add" size={22} color="#FFFFFF" />
+              </Pressable>
             </View>
-          )}
-        </ScrollView>
+
+            {/* Summary card inside blue header */}
+            <View style={styles.netWorthHeaderContainer}>
+              <Text style={styles.netWorthLabel}>STIMA MENSILE TOTALE</Text>
+              <View style={styles.netWorthValueContainer}>
+                <Text style={styles.netWorthValue}>
+                  € {totalMonthly.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              <Text style={styles.netWorthSub}>{active.length} abbonamenti attivi</Text>
+            </View>
+          </LinearGradient>
+
+          {/* Overlapping Bottom Sheet */}
+          <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 48 }]}>
+
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+              {/* Active List */}
+              {active.length > 0 && (
+                <>
+                  <Text style={styles.sectionLabel}>ATTIVI</Text>
+                  {active.map(renderCard)}
+                </>
+              )}
+
+              {/* Inactive List */}
+              {inactive.length > 0 && (
+                <>
+                  <Text style={[styles.sectionLabel, { marginTop: SPACING.lg }]}>DISATTIVATI</Text>
+                  {inactive.map(renderCard)}
+                </>
+              )}
+
+              {subs.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Ionicons name="repeat-outline" size={48} color={COLORS.secondary} />
+                  <Text style={styles.emptyText}>Nessun abbonamento registrato</Text>
+                  <Text style={styles.emptySubtext}>Tocca + per aggiungerne uno</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
       )}
 
       {/* Add Modal */}
@@ -459,43 +481,86 @@ export default function SubscriptionsScreen() {
         } : undefined}
         initial={editForm}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: SPACING.lg, paddingBottom: 120 },
-  summaryCard: {
-    backgroundColor: '#111827',
-    borderRadius: 24,
-    padding: SPACING.xl,
-    marginBottom: SPACING.xl,
-    alignItems: 'center',
-    ...SHADOWS.medium,
+  container: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
   },
-  summaryLabel: {
-    color: '#9CA3AF',
-    fontSize: TYPOGRAPHY.sizes.xs,
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerGradient: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  addButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 20,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: '#FFFFFF',
+  },
+  netWorthHeaderContainer: {
+    marginTop: 20,
+    paddingHorizontal: 4,
+    alignItems: 'flex-start',
+  },
+  netWorthLabel: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 11,
     fontFamily: TYPOGRAPHY.fontBold,
     textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginBottom: 8,
+    letterSpacing: 1.2,
   },
-  summaryValue: {
-    color: '#FFF',
-    fontSize: 44,
+  netWorthValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  netWorthValue: {
+    color: '#FFFFFF',
+    fontSize: 34,
     fontFamily: TYPOGRAPHY.fontBold,
-    marginBottom: 4,
+    letterSpacing: -0.5,
   },
-  summaryCount: {
-    color: '#6B7280',
-    fontSize: TYPOGRAPHY.sizes.sm,
+  netWorthSub: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
     fontFamily: TYPOGRAPHY.fontFamily,
+    marginTop: 4,
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: -20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  scrollContent: {
+    paddingBottom: 120,
   },
   sectionLabel: {
-    fontSize: TYPOGRAPHY.sizes.xs,
+    fontSize: 11,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.secondary,
     textTransform: 'uppercase',
@@ -504,16 +569,27 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   card: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     marginBottom: SPACING.md,
     flexDirection: 'row',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
     ...SHADOWS.soft,
   },
-  cardAccent: { width: 5 },
-  cardBody: { flex: 1, padding: SPACING.lg },
-  cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  cardAccent: {
+    width: 6,
+  },
+  cardBody: {
+    flex: 1,
+    padding: SPACING.lg,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   cardName: {
     fontSize: TYPOGRAPHY.sizes.base,
     fontFamily: TYPOGRAPHY.fontBold,
@@ -521,29 +597,43 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   autoPill: {
-    backgroundColor: '#DDD6FE',
+    backgroundColor: '#E5E7EB',
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 2,
     marginLeft: 6,
   },
-  autoPillText: { fontSize: 10, fontFamily: TYPOGRAPHY.fontBold, color: '#7C3AED' },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  autoPillText: {
+    fontSize: 10,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+  },
+  cardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
   cardAmount: {
-    fontSize: TYPOGRAPHY.sizes.lg,
+    fontSize: 18,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.primary,
   },
-  cardSep: { color: COLORS.secondary, fontSize: TYPOGRAPHY.sizes.base },
-  cardFrequency: { fontSize: TYPOGRAPHY.sizes.sm, color: COLORS.secondary, fontFamily: TYPOGRAPHY.fontFamily },
-  cardNextOccurrence: { fontSize: TYPOGRAPHY.sizes.xs, color: COLORS.secondary, fontFamily: TYPOGRAPHY.fontFamily, marginTop: 4 },
-  cardActions: {
-    flexDirection: 'column',
-    justifyContent: 'center',
-    paddingRight: SPACING.md,
-    gap: SPACING.sm,
+  cardSep: {
+    color: COLORS.secondary,
+    fontSize: TYPOGRAPHY.sizes.base,
   },
-  cardButton: { padding: 6 },
+  cardFrequency: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.secondary,
+    fontFamily: TYPOGRAPHY.fontFamily,
+  },
+  cardNextOccurrence: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.secondary,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    marginTop: 4,
+  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -554,7 +644,11 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.secondary,
   },
-  emptySubText: { fontSize: TYPOGRAPHY.sizes.sm, color: COLORS.secondary, fontFamily: TYPOGRAPHY.fontFamily },
+  emptySubtext: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.secondary,
+    fontFamily: TYPOGRAPHY.fontFamily,
+  },
   inactiveToggle: {
     paddingVertical: SPACING.md,
     marginBottom: SPACING.sm,

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ... (rest of imports)
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -70,6 +71,7 @@ export default function Home() {
   const [percentageChange, setPercentageChange] = useState<number>(0);
   const [subMonthlyEstimate, setSubMonthlyEstimate] = useState<number>(0);
   const [isNetWorthHidden, setIsNetWorthHidden] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     AsyncStorage.getItem('wolly_nw_hidden').then(val => {
@@ -139,7 +141,7 @@ export default function Home() {
         'date',
         now.toISOString().split('T')[0]
       );
-      setTransactions(filteredTrans.slice(0, 15));
+      setTransactions(filteredTrans.slice(0, 4));
 
       // Load Net Worth
       const currentNw = await NetWorthRepository.getCurrentTotal();
@@ -204,97 +206,112 @@ export default function Home() {
     <TransactionItem item={item} />
   );
 
+  const filteredTransactions = transactions.filter((t) => {
+    if (!searchQuery) return true;
+    const desc = t.description?.toLowerCase() || '';
+    const cat = t.category_key?.toLowerCase() || '';
+    const subcat = t.subcategory_key?.toLowerCase() || '';
+    const q = searchQuery.toLowerCase();
+    return desc.includes(q) || cat.includes(q) || subcat.includes(q);
+  });
+
   const formattedNetWorth = netWorth.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const commaIndex = formattedNetWorth.lastIndexOf(',');
   const integerPart = commaIndex !== -1 ? formattedNetWorth.substring(0, commaIndex) : formattedNetWorth;
   const centsPart = commaIndex !== -1 ? formattedNetWorth.substring(commaIndex + 1) : '00';
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: 0 }]}>
+    <View style={styles.container}>
       {!isDbReady ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#111827" />
         </View>
       ) : (
         <View style={{ flex: 1 }}>
-          {/* CARD 1: Patrimonio totale (Senza riquadro/card!) */}
-          <View style={styles.netWorthHeaderContainer}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Pressable onPress={toggleNetWorthVisibility} style={styles.privacyButton}>
-                <Ionicons 
-                  name={isNetWorthHidden ? "eye-off-outline" : "eye-outline"} 
-                  size={16} 
-                  color={COLORS.secondary} 
-                />
-              </Pressable>
+          {/* PARTE SUPERIORE: Sfumatura blu elettrico premium */}
+          <LinearGradient
+            colors={['#0A74FF', '#0857C3']}
+            style={[styles.topSection, { paddingTop: insets.top + 16 }]}
+          >
+            {/* Patrimonio totale (Sinistra allineato, stile premium) */}
+            <View style={styles.netWorthHeaderContainer}>
               <Text style={styles.netWorthLabel}>Patrimonio totale</Text>
+              <View style={styles.netWorthValueContainer}>
+                <Text style={styles.netWorthValue}>
+                  {isNetWorthHidden ? (
+                    <Text style={{ fontSize: 36, letterSpacing: 4 }}>••••••</Text>
+                  ) : (
+                    <>
+                      <Text style={styles.netWorthCurrency}>€ </Text>
+                      <Text>{integerPart}</Text>
+                      <Text style={styles.netWorthCents}>,{centsPart}</Text>
+                    </>
+                  )}
+                </Text>
+                <Pressable onPress={toggleNetWorthVisibility} style={styles.eyeButton}>
+                  <Ionicons 
+                    name={isNetWorthHidden ? "eye-off-sharp" : "eye-sharp"} 
+                    size={18} 
+                    color="#FFFFFF" 
+                  />
+                </Pressable>
+              </View>
             </View>
-            <View style={styles.netWorthValueContainer}>
-              <Text style={styles.netWorthValue}>
-                {isNetWorthHidden ? (
-                  <Text style={{ fontSize: 32, letterSpacing: 4 }}>••••••</Text>
-                ) : (
-                  <>
-                    <Text style={styles.netWorthCurrency}>€ </Text>
-                    <Text>{integerPart}</Text>
-                    <Text style={styles.netWorthCents}>,{centsPart}</Text>
-                  </>
-                )}
-              </Text>
-            </View>
-          </View>
 
-          {/* RIGA DELLE METRICHE: Spese questo mese + programmate */}
-          <View style={styles.metricsRow}>
-            {/* Card Spese del Mese */}
-            <View style={styles.metricCard}>
-              <Text style={styles.cardLabel} numberOfLines={1}>QUESTO MESE</Text>
-              <View style={styles.expensesCompRow}>
-                <Text style={styles.expensesValue} numberOfLines={1}>
+            {/* CARD METRICHE ESISTENTI: Affiancate in stile debit/credit card sfumate traslucide */}
+            <View style={styles.cardsRow}>
+              {/* Card Spese del Mese (Debit Card Style) */}
+              <View style={styles.glassCard}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardHeaderText}>SPESE IN MAG 26</Text>
+                </View>
+                <Text style={styles.cardValueText} numberOfLines={1}>
                   €{thisMonthExpenses.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </Text>
-              </View>
-              
-              {/* Percentuale di confronto */}
-              {percentageChange !== 0 ? (
-                <View style={[
-                  styles.pctBadge, 
-                  percentageChange > 0 ? styles.pctBadgeDanger : styles.pctBadgeSuccess
-                ]}>
-                  <Ionicons 
-                    name={percentageChange > 0 ? "arrow-up" : "arrow-down"} 
-                    size={11} 
-                    color={percentageChange > 0 ? '#991B1B' : '#065F46'} 
-                  />
-                  <Text style={[
-                    styles.pctBadgeText, 
-                    percentageChange > 0 ? { color: '#991B1B' } : { color: '#065F46' }
-                  ]}>
-                    {Math.abs(percentageChange).toFixed(0)}%
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.emptyTrendText}>Stabile</Text>
-              )}
-            </View>
-
-            {/* Card Spese Programmate */}
-            <View style={styles.metricCard}>
-              <Text style={styles.cardLabel} numberOfLines={1}>PROGRAMMATE</Text>
-              <View style={styles.expensesCompRow}>
-                <Text style={styles.expensesValue} numberOfLines={1}>
-                  €{subMonthlyEstimate.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                <Text style={styles.cardFooterText} numberOfLines={1}>
+                  {percentageChange !== 0 ? (
+                    `${percentageChange > 0 ? '+' : '-'}${Math.abs(percentageChange).toFixed(0)}% vs mese prec.`
+                  ) : (
+                    'Trend stabile'
+                  )}
                 </Text>
               </View>
-              <Text style={styles.subEstimateLabel}>/ mese stimato</Text>
-            </View>
-          </View>
 
-          {/* LISTA ULTIME SPESE */}
-          <View style={styles.listSectionContainer}>
+              {/* Card Spese Programmate (Credit Card Style) */}
+              <View style={[styles.glassCard, { justifyContent: 'flex-start', gap: 6 }]}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardHeaderText}>PROSSIME SPESE</Text>
+                </View>
+                <View style={styles.upcomingList}>
+                  {upcomingSubs.length > 0 ? (
+                    upcomingSubs.map((sub, idx) => {
+                      const dotColor = getCategoryColor(sub.category_key);
+                      return (
+                        <View key={sub.id || idx} style={styles.upcomingItem}>
+                          <View style={[styles.colorDot, { backgroundColor: dotColor }]} />
+                          <Text style={styles.upcomingAmount}>
+                            €{sub.amount.toFixed(0)}
+                          </Text>
+                          <Text style={styles.upcomingName} numberOfLines={1}>
+                            {sub.name}
+                          </Text>
+                        </View>
+                      );
+                    })
+                  ) : (
+                    <Text style={styles.noUpcomingText}>Nessuno pianificato</Text>
+                  )}
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* PARTE INFERIORE: Overlapping Bottom Sheet in Off-white */}
+          <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 48 + 12 }]}>
+
             <View style={styles.sectionHeaderCompact}>
               <Text style={styles.sectionTitle}>Ultime spese</Text>
-              <Pressable onPress={() => router.push('/history')}>
+              <Pressable onPress={() => router.push('/stats/expenses')}>
                 <Text style={styles.seeAllText}>Vedi tutto</Text>
               </Pressable>
             </View>
@@ -304,11 +321,9 @@ export default function Home() {
               keyExtractor={(item) => item.id.toString()}
               renderItem={renderTransaction}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingBottom: insets.bottom + 48 + 12
-              }}
+              scrollEnabled={false}
               ListEmptyComponent={
-                <Text style={styles.emptyTransactionsText}>Nessuna transazione recente</Text>
+                <Text style={styles.emptyTransactionsText}>Nessuna spesa presente</Text>
               }
             />
           </View>
@@ -321,147 +336,186 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F2F2F7',
   },
   centerContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  topSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+  },
   netWorthHeaderContainer: {
-    paddingHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 6,
+    marginTop: 16,
+    paddingHorizontal: 4,
     alignItems: 'flex-start',
   },
   netWorthLabel: {
-    color: COLORS.secondary,
-    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 13,
     fontFamily: TYPOGRAPHY.fontBold,
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  privacyButton: {
-    paddingVertical: 2,
-    paddingRight: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    letterSpacing: 0.8,
   },
   netWorthValueContainer: {
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
   },
   netWorthValue: {
-    color: COLORS.primary,
-    fontSize: 40,
+    color: '#FFFFFF',
+    fontSize: 34,
     fontFamily: TYPOGRAPHY.fontBold,
-    textAlign: 'left',
-    letterSpacing: -1,
+    letterSpacing: -0.5,
   },
   netWorthCurrency: {
-    fontSize: 24,
-    color: COLORS.primary,
+    fontSize: 28,
+    color: '#FFFFFF',
     fontFamily: TYPOGRAPHY.fontBold,
   },
   netWorthCents: {
-    color: COLORS.secondary,
-    fontSize: 30,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 26,
     fontFamily: TYPOGRAPHY.fontBold,
   },
-  metricsRow: {
-    flexDirection: 'row',
-    marginHorizontal: 12,
-    gap: 8,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  metricCard: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
+  eyeButton: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    minHeight: 92,
-    justifyContent: 'space-between',
-    ...SHADOWS.soft,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
   },
-  cardLabel: {
-    color: COLORS.secondary,
+  cardsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+    width: '100%',
+  },
+  glassCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    padding: 14,
+    height: 106,
+    justifyContent: 'space-between',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardHeaderText: {
+    color: '#FFFFFF',
     fontSize: 9,
     fontFamily: TYPOGRAPHY.fontBold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    opacity: 0.85,
+    letterSpacing: 0.5,
   },
-  expensesCompRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
+  cardDetailText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    opacity: 0.5,
   },
-  expensesValue: {
-    fontSize: 22,
+  cardValueText: {
+    color: '#FFFFFF',
+    fontSize: 20,
     fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
     letterSpacing: -0.5,
+    marginVertical: 4,
   },
-  pctBadge: {
+  cardFooterText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 10,
+    fontFamily: TYPOGRAPHY.fontFamily,
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: -20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  upcomingList: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  upcomingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 2,
-    alignSelf: 'flex-start',
-    marginTop: 2,
   },
-  pctBadgeSuccess: {
-    backgroundColor: '#D1FAE5',
+  colorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
   },
-  pctBadgeDanger: {
-    backgroundColor: '#FEE2E2',
+  upcomingName: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    flex: 1,
+    marginLeft: 6,
   },
-  pctBadgeText: {
-    fontSize: 10,
+  upcomingAmount: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 11,
     fontFamily: TYPOGRAPHY.fontBold,
   },
-  emptyTrendText: {
-    fontSize: 10,
+  noUpcomingText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11,
+    fontStyle: 'italic',
     fontFamily: TYPOGRAPHY.fontFamily,
-    color: COLORS.secondary,
-    marginTop: 2,
   },
-  subEstimateLabel: {
-    fontSize: 10,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    color: COLORS.secondary,
-    marginTop: 2,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    height: 46,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    ...SHADOWS.soft,
   },
-  listSectionContainer: {
+  searchInput: {
     flex: 1,
-    marginHorizontal: 12,
-    marginTop: 8,
+    height: '100%',
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.primary,
   },
   sectionHeaderCompact: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
     paddingHorizontal: 4,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.primary,
   },
   seeAllText: {
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: 13,
     fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.brandBlue,
+    color: '#0A74FF',
   },
   emptyTransactionsText: {
     color: COLORS.secondary,
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: 13,
     fontFamily: TYPOGRAPHY.fontFamily,
     textAlign: 'center',
     paddingVertical: SPACING.lg,

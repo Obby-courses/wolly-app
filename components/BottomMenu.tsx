@@ -284,6 +284,7 @@ export default function BottomMenu() {
       <Pressable
         key={item.path}
         onPress={() => {
+          if (pathname === item.path) return;
           if (isTextChat || isVoiceChat) {
             voiceStore.close(); // Chiude eventuale overlay vocale
           }
@@ -453,7 +454,13 @@ export default function BottomMenu() {
                     },
                   ]}
                 >
-                  <Pressable style={styles.pressable} onPress={() => router.push('/ai-chat')}>
+                  <Pressable 
+                    style={styles.pressable} 
+                    onPress={() => {
+                      if (pathname === '/ai-chat') return;
+                      router.push('/ai-chat');
+                    }}
+                  >
                     <Ionicons name="chatbubble-ellipses" size={20} color="#FFF" />
                   </Pressable>
                 </Animated.View>
