@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, Pressable,
-  TextInput, Modal, Alert, ActivityIndicator, SafeAreaView
+  TextInput, Modal, Alert, ActivityIndicator, SafeAreaView, Keyboard
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -120,8 +120,14 @@ function SubModal({
 
   const set = (k: keyof SubFormState, v: any) => setForm(f => ({ ...f, [k]: v }));
 
+  const handleClose = () => {
+    Keyboard.dismiss();
+    onClose();
+  };
+
   const handleSave = async () => {
     if (!form.name.trim() || !form.amount) return Alert.alert('', 'Nome e importo sono obbligatori.');
+    Keyboard.dismiss();
     setSaving(true);
     try {
       await onSave(form);
@@ -131,6 +137,7 @@ function SubModal({
   };
 
   const handleDeleteClick = () => {
+    Keyboard.dismiss();
     if (onDelete) {
       onDelete();
     }
@@ -142,7 +149,7 @@ function SubModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={modal.container}>
         <View style={modal.header}>
-          <Pressable onPress={onClose}><Ionicons name="close" size={26} color={COLORS.primary} /></Pressable>
+          <Pressable onPress={handleClose}><Ionicons name="close" size={26} color={COLORS.primary} /></Pressable>
           <Text style={modal.title}>{initial ? 'Gestisci Abbonamento' : 'Nuovo Abbonamento'}</Text>
           <Pressable onPress={handleSave} disabled={saving}>
             <Text style={[modal.save, saving && { opacity: 0.5 }]}>{saving ? '...' : 'Salva'}</Text>

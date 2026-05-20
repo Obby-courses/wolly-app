@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, Dimensions, ActivityIndicator, Pressable } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Dimensions, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { G, Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import Svg, { G, Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { TransactionRepository } from '../../services/database/repositories/TransactionRepository';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
 import { CATEGORIES_CONFIG } from '../../constants/categories';
@@ -117,29 +117,64 @@ const SimpleTrendChart = ({ data, color }: { data: any[], color: string }) => {
       <Text style={[styles.emptyText, { marginTop: 0, fontSize: 13 }]}>Dati insufficienti</Text>
     </View>
   );
+
   const chartWidth = width - (SPACING.lg * 4) - 20;
   const chartHeight = 100;
   const maxVal = Math.max(...data.map(d => d.value), 1) * 1.05;
-  const getX = (i: number) => (i * chartWidth / Math.max(1, data.length - 1));
-  const getY = (v: number) => chartHeight - (v / maxVal) * chartHeight;
-  
-  const pathData = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.value)}`).join(' ');
-  const areaData = `${pathData} L ${getX(data.length - 1)} ${chartHeight} L ${getX(0)} ${chartHeight} Z`;
+
+  const totalBars = data.length;
+  const barGap = totalBars > 15 ? 3 : 6;
+  const totalGaps = totalBars - 1;
+  let barWidth = (chartWidth - (totalGaps * barGap)) / totalBars;
+  if (barWidth > 24) barWidth = 24;
+
+  const totalChartContentWidth = (totalBars * barWidth) + (totalGaps * barGap);
+  const startX = (chartWidth - totalChartContentWidth) / 2;
+
+  const getBarHeight = (v: number) => {
+    if (maxVal === 0) return 0;
+    const usableHeight = chartHeight - 8;
+    return Math.max(v > 0 ? 3 : 0, (v / maxVal) * usableHeight);
+  };
 
   return (
     <View style={{ height: 125, marginTop: 10 }}>
       <Svg width={chartWidth} height={chartHeight}>
-        <Defs>
-          <SvgLinearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={color} stopOpacity="0.15" />
-            <Stop offset="100%" stopColor={color} stopOpacity="0.00" />
-          </SvgLinearGradient>
-        </Defs>
-        <Path d={areaData} fill="url(#chartGrad)" />
-        <Path d={pathData} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {data.length < 31 && data.map((d, i) => (
-          <Circle key={i} cx={getX(i)} cy={getY(d.value)} r="3.5" fill={color} />
-        ))}
+        {data.map((d, i) => {
+          const x = startX + i * (barWidth + barGap);
+          const h = getBarHeight(d.value);
+          const y = chartHeight - h;
+          const roundedRadius = Math.min(barWidth / 2, 4);
+
+          return (
+            <G key={i}>
+              {/* Barra Visibile */}
+              <Rect
+                x={x}
+                y={y}
+                width={barWidth}
+                height={h}
+                rx={roundedRadius}
+                ry={roundedRadius}
+                fill={color}
+              />
+              {/* Target di tocco invisibile allargato per una UX perfetta */}
+              <Rect
+                x={x - 2}
+                y={0}
+                width={barWidth + 4}
+                height={chartHeight}
+                fill="transparent"
+                onPress={() => {
+                  Alert.alert(
+                    'Dettaglio Spesa',
+                    `Periodo: ${d.label}\nSpesa Totale: € ${d.value.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  );
+                }}
+              />
+            </G>
+          );
+        })}
       </Svg>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, paddingHorizontal: 2 }}>
         <Text style={[styles.chartLabelText, { fontSize: 10, fontFamily: TYPOGRAPHY.fontBold }]}>{data[0]?.label}</Text>
@@ -276,8 +311,18 @@ export default function ExpensesScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} scrollEnabled={true}>
-          {loading ? <ActivityIndicator size="large" color="#0A74FF" style={{ marginTop: 50 }} /> : (
-            <>
+          {loading && transactions.length === 0 ? (
+            <ActivityIndicator size="large" color="#0A74FF" style={{ marginTop: 50 }} />
+          ) : (
+            <View style={loading && { opacity: 0.6 }}>
+              {/* Spesa Totale del Periodo */}
+              <View style={styles.totalPeriodCard}>
+                <Text style={styles.totalPeriodLabel}>Spesa totale del periodo</Text>
+                <Text style={styles.totalPeriodValue}>
+                  - € {transactions.reduce((acc, tx) => acc + tx.amount, 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+
               {/* Trend Chart */}
               <View style={[styles.card, { padding: 10, marginBottom: 10 }]}>
                 <View style={[styles.cardHeader, { marginBottom: 6 }]}>
@@ -290,7 +335,7 @@ export default function ExpensesScreen() {
               {/* Stacked distributions */}
               <View style={{ gap: 10, marginBottom: 10 }}>
                 <CompactDistributionCard 
-                  title="Domini (Macro)"
+                  title="Domini"
                   data={domainDist}
                   selectedKey={selectedDomain}
                   onSelect={handleSelectDomain}
@@ -308,8 +353,9 @@ export default function ExpensesScreen() {
 
               {/* Transaction List */}
               <View style={[styles.card, { padding: 16, marginBottom: 0 }]}>
-                <View style={[styles.cardHeader, { marginBottom: 8 }]}>
+                <View style={[styles.cardHeader, { marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                   <Text style={[styles.cardTitle, { fontSize: 16 }]}>Tutti i Movimenti</Text>
+                  <Ionicons name="list-outline" size={20} color={COLORS.secondary} />
                 </View>
 
                 {transactions.length === 0 ? (
@@ -339,7 +385,7 @@ export default function ExpensesScreen() {
                   ))
                 )}
               </View>
-            </>
+            </View>
           )}
         </ScrollView>
       </View>
@@ -501,5 +547,27 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  totalPeriodCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    marginBottom: 10,
+    ...SHADOWS.soft,
+  },
+  totalPeriodLabel: {
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+  },
+  totalPeriodValue: {
+    fontSize: 18,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.danger,
   },
 });

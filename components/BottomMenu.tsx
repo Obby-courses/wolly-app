@@ -58,6 +58,12 @@ export default function BottomMenu() {
     };
   }, []);
 
+  // Reset expanded state and dismiss keyboard on page change
+  useEffect(() => {
+    setIsExpanded(false);
+    Keyboard.dismiss();
+  }, [pathname]);
+
   // Expand animation values
   const expandAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -68,26 +74,6 @@ export default function BottomMenu() {
       friction: 8,
     }).start();
   }, [isExpanded]);
-
-  // Rec pulse animation
-  const pulse = useRef(new Animated.Value(0)).current;
-  const pulseAnimRef = useRef<Animated.CompositeAnimation | null>(null);
-  useEffect(() => {
-    if (voiceState.isRecording) {
-      pulseAnimRef.current = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true }),
-          Animated.timing(pulse, { toValue: 0, duration: 600, useNativeDriver: true }),
-        ])
-      );
-      pulseAnimRef.current.start();
-    } else {
-      pulseAnimRef.current?.stop();
-      pulse.setValue(0);
-    }
-  }, [voiceState.isRecording]);
-
-  const pulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
 
   // Pulse animation for wipe/swipe cancel icon
   const chevronTranslateX = useRef(new Animated.Value(0)).current;
@@ -382,11 +368,10 @@ export default function BottomMenu() {
                   {...primaryPanResponder.panHandlers}
                   style={[
                     styles.toolBtn,
-                    isSlidingToCancel && styles.micBtnCancel,
-                    isRecording && !isSlidingToCancel && { transform: [{ scale: pulseScale }] }
+                    isSlidingToCancel && styles.micBtnCancel
                   ]}
                 >
-                  <Ionicons name="mic" size={20} color="#FFF" />
+                  <Ionicons name="mic" size={22} color="#FFF" />
                 </Animated.View>
               </View>
             ) : isTextChat && !isExpanded ? (
@@ -473,12 +458,11 @@ export default function BottomMenu() {
                     styles.toolBtn,
                     isExpanded && styles.micBtnActive,
                     isSlidingToCancel && styles.micBtnCancel,
-                    isRecording && !isSlidingToCancel && { transform: [{ scale: pulseScale }] },
                   ]}
                 >
                   <Ionicons
                     name={isExpanded ? "mic" : "add"}
-                    size={isExpanded ? 20 : 24}
+                    size={22}
                     color="#FFF"
                   />
                 </Animated.View>

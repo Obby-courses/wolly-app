@@ -109,13 +109,23 @@ export default function CashflowScreen() {
               
               <View style={styles.summaryContainer}>
                 <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Totale Entrate</Text>
+                    <Text style={styles.summaryLabel}>Entrate</Text>
                     <Text style={[styles.summaryValue, { color: COLORS.success }]}>+ €{totalIncome.toLocaleString('it-IT', { maximumFractionDigits: 0 })}</Text>
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Totale Uscite</Text>
+                    <Text style={styles.summaryLabel}>Uscite</Text>
                     <Text style={[styles.summaryValue, { color: COLORS.danger }]}>- €{totalExpense.toLocaleString('it-IT', { maximumFractionDigits: 0 })}</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>Differenza</Text>
+                    <Text style={[
+                      styles.summaryValue, 
+                      { color: (totalIncome - totalExpense) >= 0 ? COLORS.success : COLORS.danger }
+                    ]}>
+                      {(totalIncome - totalExpense) >= 0 ? '+' : '-'} €{Math.abs(totalIncome - totalExpense).toLocaleString('it-IT', { maximumFractionDigits: 0 })}
+                    </Text>
                 </View>
               </View>
             </View>
