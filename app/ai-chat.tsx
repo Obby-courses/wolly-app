@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import AiResponseView from '../components/ai/AiResponseView';
 import { askAiChat, AiChatResponse, ChatMessage, aiChatStore } from '../services/aiChat';
+import CustomKeyboard from '../components/CustomKeyboard';
 
 // ─── State types ──────────────────────────────────────────────────────────────
 interface QAState {
@@ -36,6 +37,7 @@ export default function AiChatPage() {
 
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(!aiChatStore.qa);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
 
   // Auto-send message when navigated with params.message
   useEffect(() => {
@@ -134,29 +136,42 @@ export default function AiChatPage() {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <View style={styles.flex}>
         <View style={styles.flex}>
           {isTyping ? (
-            <View style={styles.fullScreenInput}>
-              <TextInput
-                autoFocus
-                multiline
-                style={styles.bigInput}
-                placeholder="Cosa vuoi sapere?"
-                placeholderTextColor={COLORS.secondary + '40'}
-                value={inputText}
-                onChangeText={setInputText}
-                onSubmitEditing={() => sendMessage(inputText)}
-                returnKeyType="send"
-              />
-              {inputText.length > 0 && (
-                <Pressable onPress={() => sendMessage(inputText)} style={styles.sendFab}>
-                  <Ionicons name="arrow-up" size={32} color="#FFF" />
-                </Pressable>
-              )}
+            <View style={styles.fullScreenInputContainer}>
+              <View style={styles.fullScreenInput}>
+                <TextInput
+                  autoFocus
+                  multiline
+                  showSoftInputOnFocus={false}
+                  style={styles.bigInput}
+                  placeholder="Cosa vuoi sapere?"
+                  placeholderTextColor={COLORS.secondary + '40'}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
+                  selection={selection}
+                  onSubmitEditing={() => sendMessage(inputText)}
+                  returnKeyType="send"
+                />
+                {inputText.length > 0 && (
+                  <Pressable onPress={() => sendMessage(inputText)} style={styles.sendFab}>
+                    <Ionicons name="arrow-up" size={32} color="#FFF" />
+                  </Pressable>
+                )}
+              </View>
+              
+              {/* Tastiera virtuale personalizzata posizionata esattamente sopra il BottomMenu */}
+              <View style={{ paddingBottom: Platform.OS === 'ios' ? 90 : 76 }}>
+                <CustomKeyboard
+                  value={inputText}
+                  onChangeText={setInputText}
+                  selection={selection}
+                  onSelectionChange={setSelection}
+                  onSubmit={() => sendMessage(inputText)}
+                />
+              </View>
             </View>
           ) : (
             <View style={styles.qaContainer}>
@@ -188,7 +203,7 @@ export default function AiChatPage() {
             </Pressable>
           </View>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -196,6 +211,11 @@ export default function AiChatPage() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   flex: { flex: 1 },
+
+  fullScreenInputContainer: {
+    flex: 1,
+    width: '100%',
+  },
 
   // ─── Full Screen Input ──────────────────────────────────────────────────
   fullScreenInput: {
