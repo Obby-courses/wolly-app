@@ -302,9 +302,14 @@ export default function BottomMenu() {
                 </Text>
               </View>
             ) : (
-              // Standard Navigation Tabs
+              // Standard Navigation Tabs (mostra solo la pagina corrente se espanso per pulizia visiva)
               <View style={styles.leftNav}>
-                {NAV_ITEMS.map((item) => renderNavItem(item))}
+                {NAV_ITEMS.map((item) => {
+                  if (isExpanded) {
+                    return isActive(item.path) ? renderNavItem(item) : null;
+                  }
+                  return renderNavItem(item);
+                })}
               </View>
             )}
           </View>
