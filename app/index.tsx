@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView } from 'react-native';
+import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 
 // ... (rest of imports)
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { initDatabase } from '../services/database/db';
 import { SubscriptionManager } from '../services/database/SubscriptionManager';
@@ -57,6 +57,7 @@ function getNextOccurrenceDate(sub: any): Date {
 
 export default function Home() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [isDbReady, setIsDbReady] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
@@ -138,7 +139,7 @@ export default function Home() {
         'date',
         now.toISOString().split('T')[0]
       );
-      setTransactions(filteredTrans.slice(0, 5));
+      setTransactions(filteredTrans.slice(0, 15));
 
       // Load Net Worth
       const currentNw = await NetWorthRepository.getCurrentTotal();
@@ -209,18 +210,13 @@ export default function Home() {
   const centsPart = commaIndex !== -1 ? formattedNetWorth.substring(commaIndex + 1) : '00';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: 0 }]}>
       {!isDbReady ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#111827" />
         </View>
       ) : (
-        <ScrollView 
-          style={styles.container} 
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={true}
-        >
+        <View style={{ flex: 1 }}>
           {/* CARD 1: Patrimonio totale (Senza riquadro/card!) */}
           <View style={styles.netWorthHeaderContainer}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -248,21 +244,26 @@ export default function Home() {
             </View>
           </View>
 
-          {/* CARD 2: Spese di questo mese */}
-          <View style={styles.dashboardCard}>
-            <Text style={styles.cardLabel}>Spese di questo mese</Text>
-            <View style={styles.expensesCompRow}>
-              <Text style={styles.expensesValue}>€ {thisMonthExpenses.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+          {/* RIGA DELLE METRICHE: Spese questo mese + programmate */}
+          <View style={styles.metricsRow}>
+            {/* Card Spese del Mese */}
+            <View style={styles.metricCard}>
+              <Text style={styles.cardLabel} numberOfLines={1}>QUESTO MESE</Text>
+              <View style={styles.expensesCompRow}>
+                <Text style={styles.expensesValue} numberOfLines={1}>
+                  €{thisMonthExpenses.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </Text>
+              </View>
               
               {/* Percentuale di confronto */}
-              {percentageChange !== 0 && (
+              {percentageChange !== 0 ? (
                 <View style={[
                   styles.pctBadge, 
                   percentageChange > 0 ? styles.pctBadgeDanger : styles.pctBadgeSuccess
                 ]}>
                   <Ionicons 
                     name={percentageChange > 0 ? "arrow-up" : "arrow-down"} 
-                    size={14} 
+                    size={11} 
                     color={percentageChange > 0 ? '#991B1B' : '#065F46'} 
                   />
                   <Text style={[
@@ -272,87 +273,46 @@ export default function Home() {
                     {Math.abs(percentageChange).toFixed(0)}%
                   </Text>
                 </View>
+              ) : (
+                <Text style={styles.emptyTrendText}>Stabile</Text>
               )}
             </View>
-          </View>
 
-          {/* CARD 3: Spese programmate degli abbonamenti */}
-          <View style={styles.dashboardCard}>
-            <View style={styles.cardHeaderRow}>
-              <View>
-                <Text style={styles.cardLabel}>Spese programmate</Text>
-                <Text style={styles.subEstimateValue}>€ {subMonthlyEstimate.toFixed(2)} <Text style={styles.subEstimateLabel}>/ mese stimato</Text></Text>
+            {/* Card Spese Programmate */}
+            <View style={styles.metricCard}>
+              <Text style={styles.cardLabel} numberOfLines={1}>PROGRAMMATE</Text>
+              <View style={styles.expensesCompRow}>
+                <Text style={styles.expensesValue} numberOfLines={1}>
+                  €{subMonthlyEstimate.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </Text>
               </View>
+              <Text style={styles.subEstimateLabel}>/ mese stimato</Text>
             </View>
-
-            {upcomingSubs.length > 0 && (
-              <View style={styles.upcomingListContainer}>
-                <Text style={styles.upcomingSubtitle}>Prossime uscite a venire</Text>
-                
-                {/* 1. Il prossimo in grande */}
-                {(() => {
-                  const first = upcomingSubs[0];
-                  const color = getCategoryColor(first.category_key);
-                  const formattedDate = first.nextDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                  return (
-                    <View style={styles.firstUpcomingContainer}>
-                      <View style={[styles.firstUpcomingAccent, { backgroundColor: color }]} />
-                      <View style={styles.firstUpcomingContent}>
-                        <Text style={styles.firstUpcomingLabel}>IL PIÙ VICINO</Text>
-                        <Text style={styles.firstUpcomingName}>{first.name}</Text>
-                        <View style={styles.firstUpcomingMeta}>
-                          <Text style={styles.firstUpcomingAmount}>€{first.amount.toFixed(2)}</Text>
-                          <Text style={styles.firstUpcomingSep}>·</Text>
-                          <Text style={styles.firstUpcomingDate}>{formattedDate}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })()}
-
-                {/* 2. I successivi due piccoli */}
-                {upcomingSubs.length > 1 && (
-                  <View style={styles.smallUpcomingRow}>
-                    {upcomingSubs.slice(1, 3).map((sub: any, idx: number) => {
-                      const color = getCategoryColor(sub.category_key);
-                      const formattedDate = sub.nextDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                      return (
-                        <View key={sub.id || idx} style={styles.smallUpcomingItem}>
-                          <View style={[styles.smallUpcomingAccent, { backgroundColor: color }]} />
-                          <View style={styles.smallUpcomingContent}>
-                            <Text style={styles.smallUpcomingName} numberOfLines={1}>{sub.name}</Text>
-                            <Text style={styles.smallUpcomingAmount}>€{sub.amount.toFixed(2)}</Text>
-                            <Text style={styles.smallUpcomingDate}>{formattedDate}</Text>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            )}
           </View>
 
-          {/* CARD 4: Ultimi flussi */}
-          <View style={[styles.dashboardCard, { marginBottom: 120 }]}>
+          {/* LISTA ULTIME SPESE */}
+          <View style={styles.listSectionContainer}>
             <View style={styles.sectionHeaderCompact}>
-              <Text style={styles.cardLabel}>Ultimi flussi</Text>
+              <Text style={styles.sectionTitle}>Ultime spese</Text>
               <Pressable onPress={() => router.push('/history')}>
                 <Text style={styles.seeAllText}>Vedi tutto</Text>
               </Pressable>
             </View>
 
-            <View style={styles.transactionsPreview}>
-              {transactions.length > 0 ? (
-                transactions.slice(0, 5).map((item) => (
-                  <TransactionItem key={item.id} item={item} hideCategory={true} />
-                ))
-              ) : (
+            <FlatList
+              data={transactions}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={renderTransaction}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingBottom: insets.bottom + 48 + 12
+              }}
+              ListEmptyComponent={
                 <Text style={styles.emptyTransactionsText}>Nessuna transazione recente</Text>
-              )}
-            </View>
+              }
+            />
           </View>
-        </ScrollView>
+        </View>
       )}
     </View>
   );
@@ -363,75 +323,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: {
-    padding: SPACING.xl,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontSize: TYPOGRAPHY.sizes.xxl,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
-  },
   centerContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyText: {
-    color: COLORS.secondary,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: TYPOGRAPHY.sizes.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    marginTop: SPACING.lg,
-  },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
-  },
-  seeAllText: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.accent,
-  },
-  transactionsPreview: {
-    paddingHorizontal: SPACING.lg,
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
-  dashboardCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 24,
-    padding: 24,
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
   netWorthHeaderContainer: {
-    paddingHorizontal: SPACING.lg + 4,
-    marginTop: SPACING.xs,
-    marginBottom: SPACING.xs,
+    paddingHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 6,
     alignItems: 'flex-start',
   },
   netWorthLabel: {
     color: COLORS.secondary,
-    fontSize: TYPOGRAPHY.sizes.xs,
+    fontSize: 10,
     fontFamily: TYPOGRAPHY.fontBold,
     textTransform: 'uppercase',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
   },
   privacyButton: {
     paddingVertical: 2,
@@ -439,60 +347,73 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardLabel: {
-    color: COLORS.secondary,
-    fontSize: TYPOGRAPHY.sizes.xs,
-    fontFamily: TYPOGRAPHY.fontBold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    marginBottom: SPACING.sm,
-  },
   netWorthValueContainer: {
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
   netWorthValue: {
     color: COLORS.primary,
-    fontSize: 48,
+    fontSize: 40,
     fontFamily: TYPOGRAPHY.fontBold,
     textAlign: 'left',
     letterSpacing: -1,
   },
   netWorthCurrency: {
-    fontSize: 28,
+    fontSize: 24,
     color: COLORS.primary,
     fontFamily: TYPOGRAPHY.fontBold,
   },
   netWorthCents: {
     color: COLORS.secondary,
-    fontSize: 36,
+    fontSize: 30,
     fontFamily: TYPOGRAPHY.fontBold,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    marginHorizontal: 12,
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  metricCard: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    minHeight: 92,
+    justifyContent: 'space-between',
+    ...SHADOWS.soft,
+  },
+  cardLabel: {
+    color: COLORS.secondary,
+    fontSize: 9,
+    fontFamily: TYPOGRAPHY.fontBold,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
   expensesCompRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginTop: 4,
   },
   expensesValue: {
-    fontSize: 32,
+    fontSize: 22,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.primary,
     letterSpacing: -0.5,
   },
-  expensesSubText: {
-    fontSize: 12,
-    color: COLORS.secondary,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    lineHeight: 16,
-  },
   pctBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
     gap: 2,
+    alignSelf: 'flex-start',
+    marginTop: 2,
   },
   pctBadgeSuccess: {
     backgroundColor: '#D1FAE5',
@@ -501,126 +422,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
   },
   pctBadgeText: {
-    fontSize: 12,
+    fontSize: 10,
     fontFamily: TYPOGRAPHY.fontBold,
   },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  subEstimateValue: {
-    fontSize: 24,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
+  emptyTrendText: {
+    fontSize: 10,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    marginTop: 2,
   },
   subEstimateLabel: {
-    fontSize: 12,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    color: COLORS.secondary,
-  },
-  upcomingListContainer: {
-    paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
-  },
-  upcomingSubtitle: {
-    fontSize: 11,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.sm,
-  },
-  firstUpcomingContainer: {
-    backgroundColor: COLORS.background,
-    borderRadius: 20,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: SPACING.md,
-  },
-  firstUpcomingAccent: {
-    width: 6,
-  },
-  firstUpcomingContent: {
-    flex: 1,
-    padding: SPACING.md,
-  },
-  firstUpcomingLabel: {
     fontSize: 10,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.accent,
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  firstUpcomingName: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
-    marginBottom: 2,
-  },
-  firstUpcomingMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  firstUpcomingAmount: {
-    fontSize: TYPOGRAPHY.sizes.base,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
-  },
-  firstUpcomingSep: {
-    color: COLORS.secondary,
-  },
-  firstUpcomingDate: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.secondary,
     fontFamily: TYPOGRAPHY.fontFamily,
-  },
-  smallUpcomingRow: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  smallUpcomingItem: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    borderRadius: 16,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  smallUpcomingAccent: {
-    width: 4,
-  },
-  smallUpcomingContent: {
-    flex: 1,
-    padding: SPACING.sm,
-  },
-  smallUpcomingName: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
-    marginBottom: 2,
-  },
-  smallUpcomingAmount: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
-    marginBottom: 2,
-  },
-  smallUpcomingDate: {
-    fontSize: 10,
     color: COLORS.secondary,
-    fontFamily: TYPOGRAPHY.fontFamily,
+    marginTop: 2,
+  },
+  listSectionContainer: {
+    flex: 1,
+    marginHorizontal: 12,
+    marginTop: 8,
   },
   sectionHeaderCompact: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+  },
+  seeAllText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.brandBlue,
   },
   emptyTransactionsText: {
     color: COLORS.secondary,
