@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   },
   bottomActions: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 100,
     left: 0,
     right: 0,
     alignItems: 'center',

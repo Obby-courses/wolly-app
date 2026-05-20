@@ -1,54 +1,77 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, View, Pressable, Platform, Text,
-  KeyboardAvoidingView, Animated, PanResponder, Alert,
+  Animated, PanResponder, Alert, Keyboard,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '../constants/Theme';
 import { parseFromReceipt } from '../modules/registration/receiptParser';
 import { voiceStore } from '../services/voiceStore';
-import { askAiChat } from '../services/aiChat';
 import { Audio } from 'expo-av';
 import { networkStore } from '../services/networkStore';
 
-const CANCEL_THRESHOLD_Y = -60;
+const CANCEL_THRESHOLD_X = -50;
 const MIN_RECORDING_DURATION = 500;
-const MIC_SIZE = 56;
+const MIC_SIZE = 40;
 
-const RANDOM_QUESTIONS = [
-  "Cosa ho speso nell'ultimo periodo?",
-  "Quanto ho speso al ristorante questo mese?",
-  "Qual è stata la mia spesa più alta oggi?",
-  "Quanto ho risparmiato rispetto alla settimana scorsa?",
-  "Mostrami le ultime transazioni al supermercato",
+const NAV_ITEMS = [
+  { path: '/', icon: 'home', label: 'Home' },
+  { path: '/stats', icon: 'pie-chart', label: 'Stats' },
+  { path: '/subscriptions', icon: 'card', label: 'Abbonamenti' },
+  { path: '/settings', icon: 'settings', label: 'Impostazioni' }
 ];
 
 export default function BottomMenu() {
   const router = useRouter();
+  const pathname = usePathname();
   const [isProcessing, setIsProcessing] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimerRef = useRef<any>(null);
 
-  // Mirror voiceStore state
+  // States mirroring network and voice stores
   const [voiceState, setVoiceState] = useState(voiceStore.getState());
   const [isOffline, setIsOffline] = useState(networkStore.getState().isOffline);
-  
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
   useEffect(() => {
     const unsubVoice = voiceStore.subscribe(() => setVoiceState(voiceStore.getState()));
     const unsubNet = networkStore.subscribe(() => setIsOffline(networkStore.getState().isOffline));
-    // Chiediamo i permessi subito all'avvio per non interrompere il gesto dopo
     Audio.requestPermissionsAsync().catch(() => {});
+
+    // Gestione visibilità tastiera per nascondere il menu
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+
     return () => {
       unsubVoice();
       unsubNet();
+      showSubscription.remove();
+      hideSubscription.remove();
     };
   }, []);
 
-  // Pulse animation for recording state
+  // Expand animation values
+  const expandAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(expandAnim, {
+      toValue: isExpanded ? 1 : 0,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 8,
+    }).start();
+  }, [isExpanded]);
+
+  // Rec pulse animation
   const pulse = useRef(new Animated.Value(0)).current;
   const pulseAnimRef = useRef<Animated.CompositeAnimation | null>(null);
-
   useEffect(() => {
     if (voiceState.isRecording) {
       pulseAnimRef.current = Animated.loop(
@@ -64,7 +87,22 @@ export default function BottomMenu() {
     }
   }, [voiceState.isRecording]);
 
-  const pulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+  const pulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+
+  // Pulse animation for wipe/swipe cancel icon
+  const chevronTranslateX = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (voiceState.isRecording) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(chevronTranslateX, { toValue: -6, duration: 600, useNativeDriver: true }),
+          Animated.timing(chevronTranslateX, { toValue: 0, duration: 600, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      chevronTranslateX.setValue(0);
+    }
+  }, [voiceState.isRecording]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -76,13 +114,11 @@ export default function BottomMenu() {
     try {
       setIsProcessing(true);
       const parsed = await parseFromReceipt(true, undefined);
-      
-      if (parsed === null) {
-        // L'utente ha annullato la fotocamera
-        return;
-      }
+      if (parsed === null) return;
 
       if (parsed && parsed.amount > 0) {
+        // Collapser menu immediately
+        setIsExpanded(false);
         router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
       } else {
         Alert.alert(
@@ -103,6 +139,27 @@ export default function BottomMenu() {
     }
   };
 
+  const handleOfflinePress = () => {
+    router.push({
+      pathname: '/expense-detail',
+      params: {
+        data: JSON.stringify({
+          amount: 0,
+          date: new Date().toISOString(),
+          category_key: 'default',
+          direction: 'out',
+          tags: [],
+          input_method: 'manual'
+        })
+      }
+    });
+  };
+
+  const handleVoiceClose = async () => {
+    await voiceStore.cancelRecording();
+    voiceStore.close();
+  };
+
   // ── Mic PanResponder ──────────────────────────────────────────────────────────
   const isReleasingRef = useRef(false);
 
@@ -113,13 +170,13 @@ export default function BottomMenu() {
 
       onPanResponderGrant: () => {
         isReleasingRef.current = false;
-        voiceStore.startRecording(); 
+        voiceStore.startRecording();
       },
 
       onPanResponderTerminationRequest: () => false,
 
-      onPanResponderMove: (_, { dy }) => {
-        voiceStore.setIsSlidingToCancel(dy < CANCEL_THRESHOLD_Y);
+      onPanResponderMove: (_, { dx }) => {
+        voiceStore.setIsSlidingToCancel(dx < CANCEL_THRESHOLD_X);
       },
 
       onPanResponderRelease: async () => {
@@ -129,158 +186,252 @@ export default function BottomMenu() {
         const state = voiceStore.getState();
         const duration = Date.now() - state.recordingStartTime;
 
-        // Se scivola per annullare
+        // Se scivola a sinistra per annullare
         if (state.isSlidingToCancel) {
-          voiceStore.cancelRecording(); // asincrono, non blocca la UI
+          voiceStore.cancelRecording();
           voiceStore.close();
+          setIsExpanded(false); // Collapsa anche il menu
           return;
         }
 
-        // Tap veloce: annulla e torna SUBITO indietro senza aspettare l'engine audio
+        // Tap veloce: annulla e chiude
         if (duration < MIN_RECORDING_DURATION) {
           voiceStore.cancelRecording();
           voiceStore.close();
+          setIsExpanded(false);
           return;
         }
 
-        // Ottiene il file (questo ferma la registrazione a livello di sistema)
+        // Ottiene il file
         const result = await voiceStore.stopAndGetUri();
         if (!result || !result.uri) {
           voiceStore.close();
+          setIsExpanded(false);
           return;
         }
 
-        // Delega l'elaborazione (STT -> AI) allo store in modo modulare
+        // Delega l'elaborazione vocale allo store
         voiceStore.processVoiceInput(result.uri);
+        setIsExpanded(false); // Chiude menu dopo invio
       },
 
       onPanResponderTerminate: async () => {
         await voiceStore.cancelRecording();
         voiceStore.close();
+        setIsExpanded(false);
       },
     })
   ).current;
 
   const { isRecording, isOpen, isSlidingToCancel } = voiceState;
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // SINGLE render tree — the mic element is ALWAYS the same instance.
-  // Chat + Camera icons fade out when overlay opens; cancel hint fades in.
-  // This keeps the PanResponder gesture alive through the state change.
-  // ─────────────────────────────────────────────────────────────────────────────
+  // Path helpers
+  const isTextChat = pathname === '/ai-chat';
+  const isVoiceChat = pathname === '/voice-chat' || isOpen;
+
+  const isActive = (path: string) => {
+    if (path === '/') return pathname === '/';
+    return pathname.startsWith(path);
+  };
+
+  // Render navigation item
+  const renderNavItem = (item: typeof NAV_ITEMS[0]) => {
+    const active = isActive(item.path);
+    return (
+      <Pressable
+        key={item.path}
+        onPress={() => {
+          if (isTextChat || isVoiceChat) {
+            voiceStore.close(); // Chiude eventuale overlay vocale
+          }
+          router.replace(item.path as any);
+        }}
+        style={styles.navItem}
+      >
+        <Ionicons
+          name={item.icon as any}
+          size={24}
+          color={active ? '#000000' : '#8E8E93'}
+          style={!active && { opacity: 0.4 }}
+        />
+      </Pressable>
+    );
+  };
+
+  // Interpolations for horizontal slide menu [Back] [Foto] [Chat] [Audio]
+  // Spacing: width 40, gap 8 -> step is 48
+  const backTranslateX = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -144],
+  });
+  const fotoTranslateX = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -96],
+  });
+  const chatTranslateX = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -48],
+  });
+  const toolOpacity = expandAnim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0, 0, 1],
+  });
+
+  // Nascondiamo il menu sotto la tastiera se attiva
+  if (isKeyboardVisible) return null;
+
   return (
     <View style={styles.wrapper}>
-      {/* RACCORDO VISIVO A DUE LAYER (Effetto "Corna") */}
-      <View style={styles.hornsContainer} pointerEvents="none">
-        {/* Corno Sinistro */}
-        <View style={{ position: 'absolute', bottom: 0, left: 0, width: 40, height: 40, overflow: 'hidden' }}>
-          <View style={{
-            position: 'absolute',
-            width: 160,
-            height: 160,
-            borderRadius: 80,
-            borderWidth: 40,
-            borderColor: COLORS.surface,
-            left: -40,
-            top: -80,
-          }} />
-        </View>
-
-        {/* Corno Destro */}
-        <View style={{ position: 'absolute', bottom: 0, right: 0, width: 40, height: 40, overflow: 'hidden' }}>
-          <View style={{
-            position: 'absolute',
-            width: 160,
-            height: 160,
-            borderRadius: 80,
-            borderWidth: 40,
-            borderColor: COLORS.surface,
-            left: -80,
-            top: -80,
-          }} />
-        </View>
-      </View>
-
       <View style={styles.container}>
-
-      {/* Cancel hint — ABSOLUTE so it doesn't move the mic button below */}
-      {isOpen && isRecording && (
-        <View style={styles.cancelHintContainer}>
-          <Ionicons
-            name="chevron-up"
-            size={18}
-            color={isSlidingToCancel ? COLORS.danger : COLORS.secondary}
-          />
-          <Text style={[styles.cancelHintText, isSlidingToCancel && { color: COLORS.danger }]}>
-            {isSlidingToCancel ? 'Rilascia per annullare' : 'Scorri su per annullare'}
-          </Text>
-        </View>
-      )}
-
-      {isOffline ? (
         <View style={styles.row}>
-          <Pressable
-            onPress={() => router.push({ 
-              pathname: '/expense-detail', 
-              params: { data: JSON.stringify({ amount: 0, date: new Date().toISOString(), category_key: 'altro_altro', direction: 'out', tags: [], input_method: 'manual' }) } 
-            })}
-            style={[styles.micBtn, { backgroundColor: COLORS.primary }]}
-          >
-            <Ionicons name="add" size={36} color="#FFF" />
-          </Pressable>
-        </View>
-      ) : (
-        <View style={styles.row}>
-          {/* Left: Chat icon — hidden when overlay is open */}
-          <Pressable
-            onPress={() => router.push('/ai-chat')}
-            style={[styles.sideIcon, isOpen && styles.hidden]}
-            pointerEvents={isOpen ? 'none' : 'auto'}
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={26} color={COLORS.secondary} />
-          </Pressable>
+          
+          {/* LEFT SIDE: Navigation Icons OR Dynamic Cancel text */}
+          <View style={styles.leftContainer}>
+            {isVoiceChat && isRecording ? (
+              // Pulse/Slide arrow with "Wipe per annullare" text when recording
+              <View style={styles.cancelContainer}>
+                <Animated.View style={{ transform: [{ translateX: chevronTranslateX }] }}>
+                  <Ionicons
+                    name="chevron-back"
+                    size={16}
+                    color={isSlidingToCancel ? COLORS.danger : COLORS.secondary}
+                  />
+                </Animated.View>
+                <Text style={[styles.cancelText, isSlidingToCancel && { color: COLORS.danger }]}>
+                  {isSlidingToCancel ? 'Rilascia per annullare' : 'Wipe per annullare'}
+                </Text>
+              </View>
+            ) : (
+              // Standard Navigation Tabs
+              <View style={styles.leftNav}>
+                {NAV_ITEMS.map((item) => renderNavItem(item))}
+              </View>
+            )}
+          </View>
 
-          {/* Center: Mic — ALWAYS rendered, same element, same position */}
-          <Animated.View
-            {...micPanResponder.panHandlers}
-            style={[
-              styles.micBtn,
-              isOpen && styles.micBtnActive,
-              isSlidingToCancel && styles.micBtnCancel,
-              isRecording && !isSlidingToCancel && { transform: [{ scale: pulseScale }] },
-            ]}
-          >
-            <Ionicons
-              name={isRecording ? 'mic' : 'mic-outline'}
-              size={32}
-              color={
-                isSlidingToCancel
-                  ? COLORS.danger
-                  : isOpen
-                  ? '#FFF'
-                  : COLORS.primary
-              }
-            />
-          </Animated.View>
+          {/* RIGHT SIDE: Dynamic Actions */}
+          <View style={styles.rightContainer}>
+            {isVoiceChat ? (
+              // 1. Voice Chat active state: [X] and [Rec]
+              <View style={styles.voiceActionsRow}>
+                <Pressable onPress={handleVoiceClose} style={styles.closeBtn}>
+                  <Ionicons name="close" size={24} color="#1C1C1E" />
+                </Pressable>
+                <Animated.View
+                  {...micPanResponder.panHandlers}
+                  style={[
+                    styles.toolBtn,
+                    isSlidingToCancel && styles.micBtnCancel,
+                    isRecording && !isSlidingToCancel && { transform: [{ scale: pulseScale }] }
+                  ]}
+                >
+                  <Ionicons name="mic" size={20} color="#FFF" />
+                </Animated.View>
+              </View>
+            ) : isTextChat ? (
+              // 2. Text AI Chat active state: just [X]
+              <Pressable onPress={() => router.back()} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color="#1C1C1E" />
+              </Pressable>
+            ) : isOffline ? (
+              // 3. Offline Idle state: Rounded rectangle "Nuova spesa"
+              <Pressable onPress={handleOfflinePress} style={styles.offlineBtn}>
+                <Ionicons name="add" size={18} color="#FFF" />
+                <Text style={styles.offlineBtnText}>Nuova spesa</Text>
+              </Pressable>
+            ) : (
+              // 4. Online Idle state: Animated Expandable tools [Back] [Foto] [Chat] [Audio]
+              <View style={styles.expandedWrapper}>
+                
+                {/* Back tool button */}
+                <Animated.View
+                  pointerEvents={isExpanded ? 'auto' : 'none'}
+                  style={[
+                    styles.toolBtn,
+                    styles.backBtn,
+                    {
+                      position: 'absolute',
+                      right: 0,
+                      transform: [{ translateX: backTranslateX }],
+                      opacity: toolOpacity,
+                    },
+                  ]}
+                >
+                  <Pressable style={styles.pressable} onPress={() => setIsExpanded(false)}>
+                    <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+                  </Pressable>
+                </Animated.View>
 
-          {/* Right: Camera icon — hidden when overlay is open */}
-          <Pressable
-            onPress={handleCamera}
-            disabled={isProcessing || isOpen}
-            style={[styles.sideIcon, (isOpen || isProcessing) && styles.hidden]}
-            pointerEvents={isOpen ? 'none' : 'auto'}
-          >
-            <Ionicons name="camera-outline" size={26} color={COLORS.secondary} />
-          </Pressable>
-        </View>
-      )}
+                {/* Foto tool button */}
+                <Animated.View
+                  pointerEvents={isExpanded ? 'auto' : 'none'}
+                  style={[
+                    styles.toolBtn,
+                    {
+                      position: 'absolute',
+                      right: 0,
+                      transform: [{ translateX: fotoTranslateX }],
+                      opacity: toolOpacity,
+                    },
+                  ]}
+                >
+                  <Pressable style={styles.pressable} onPress={handleCamera} disabled={isProcessing}>
+                    <Ionicons name="camera" size={20} color="#FFF" />
+                  </Pressable>
+                </Animated.View>
 
-      {toastMsg && (
-        <View style={styles.toast}>
-          <Text style={styles.toastText}>{toastMsg}</Text>
+                {/* Chat tool button */}
+                <Animated.View
+                  pointerEvents={isExpanded ? 'auto' : 'none'}
+                  style={[
+                    styles.toolBtn,
+                    {
+                      position: 'absolute',
+                      right: 0,
+                      transform: [{ translateX: chatTranslateX }],
+                      opacity: toolOpacity,
+                    },
+                  ]}
+                >
+                  <Pressable style={styles.pressable} onPress={() => router.push('/ai-chat')}>
+                    <Ionicons name="chatbubble-ellipses" size={20} color="#FFF" />
+                  </Pressable>
+                </Animated.View>
+
+                {/* Audio button (or Collapsed '+' button) */}
+                {isExpanded ? (
+                  <Animated.View
+                    {...micPanResponder.panHandlers}
+                    style={[
+                      styles.toolBtn,
+                      isRecording && styles.micBtnActive,
+                      isSlidingToCancel && styles.micBtnCancel,
+                      isRecording && !isSlidingToCancel && { transform: [{ scale: pulseScale }] },
+                    ]}
+                  >
+                    <Ionicons name="mic" size={20} color="#FFF" />
+                  </Animated.View>
+                ) : (
+                  <Pressable
+                    style={styles.toolBtn}
+                    onPress={() => setIsExpanded(true)}
+                  >
+                    <Ionicons name="add" size={24} color="#FFF" />
+                  </Pressable>
+                )}
+
+              </View>
+            )}
+          </View>
+
         </View>
-      )}
-    </View>
+
+        {toastMsg && (
+          <View style={styles.toast}>
+            <Text style={styles.toastText}>{toastMsg}</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -293,70 +444,115 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 101,
   },
-  hornsContainer: {
-    height: 40,
-    width: '100%',
-    backgroundColor: 'transparent',
-  },
   container: {
-    backgroundColor: COLORS.surface,
-    paddingTop: 4,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+    paddingTop: 8,
     paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  cancelHintContainer: {
-    position: 'absolute',
-    top: -45,
-    alignItems: 'center',
-    gap: 4,
-    zIndex: 110,
-  },
-  cancelHintText: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 13,
-    color: COLORS.secondary,
+    ...SHADOWS.medium,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.lg,
-    zIndex: 102,
-  },
-  sideIcon: {
-    width: 48,
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 20,
+    position: 'relative',
     height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.surface,
+  },
+  leftContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  rightContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    minWidth: 48,
+  },
+  leftNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  navItem: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  closeBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F2F2F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.brandBlue,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
     ...SHADOWS.soft,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
-  hidden: {
-    opacity: 0,
-    // pointerEvents handled via prop
+  offlineBtnText: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: 13,
+    color: '#FFFFFF',
   },
-  micBtn: {
+  expandedWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    width: 40,
+    height: 40,
+  },
+  pressable: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolBtn: {
     width: MIC_SIZE,
     height: MIC_SIZE,
     borderRadius: MIC_SIZE / 2,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.brandBlue,
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.medium,
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
+    ...SHADOWS.soft,
+  },
+  backBtn: {
+    backgroundColor: '#F2F2F7',
   },
   micBtnActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.brandBlue,
   },
   micBtnCancel: {
-    backgroundColor: COLORS.danger + '20',
-    borderColor: COLORS.danger,
+    backgroundColor: COLORS.danger,
+  },
+  cancelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 4,
+  },
+  cancelText: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: 13,
+    color: COLORS.secondary,
+  },
+  voiceActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   toast: {
     position: 'absolute',

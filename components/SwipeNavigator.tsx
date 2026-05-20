@@ -6,7 +6,7 @@ import { voiceStore } from '../services/voiceStore';
 const { width } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.15; // Più sensibile (era 0.25)
 
-const ROUTES = ['/', '/stats', '/subscriptions', '/history', '/settings'];
+const ROUTES = ['/', '/stats', '/subscriptions', '/settings'];
 
 export default function SwipeNavigator({ children }: { children: React.ReactNode }) {
   const router = useRouter();

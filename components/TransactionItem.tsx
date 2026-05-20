@@ -62,13 +62,14 @@ export default function TransactionItem({ item, hideCategory }: TransactionItemP
 const styles = StyleSheet.create({
   transactionCard: {
     backgroundColor: COLORS.surface,
-    paddingVertical: 12,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: 16,
-    marginBottom: 6,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    ...SHADOWS.soft
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   categoryIndicator: {
     width: 3,

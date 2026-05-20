@@ -1362,16 +1362,19 @@ const styles = StyleSheet.create({
   card: { 
     backgroundColor: COLORS.surface, 
     borderRadius: 24, 
-    padding: 20, 
+    padding: 24, 
     marginBottom: 20,
-    ...SHADOWS.soft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   sliderContainer: { 
     flexDirection: 'row', 
-    backgroundColor: '#F3F4F6', 
-    borderRadius: 14, 
+    backgroundColor: COLORS.background, 
+    borderRadius: 16, 
     padding: 4, 
-    marginBottom: 20 
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   sliderBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
   sliderBtnOut: { backgroundColor: COLORS.primary },
@@ -1382,10 +1385,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'center',
-    marginBottom: 25,
-    paddingBottom: 20,
+    marginBottom: 24,
+    paddingBottom: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6'
+    borderBottomColor: COLORS.border
   },
   currency: { fontSize: 24, fontWeight: '700', marginRight: 5 },
   amountInput: { fontSize: 44, fontWeight: '800', minWidth: 100, textAlign: 'center' },
@@ -1396,7 +1399,7 @@ const styles = StyleSheet.create({
   },
   detailItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6'
+    borderBottomColor: COLORS.border
   },
   detailTextContainer: { flex: 1 },
   detailLabel: { fontSize: 10, color: COLORS.secondary, textTransform: 'uppercase', fontWeight: '700', marginBottom: 4 },
@@ -1418,24 +1421,26 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   directTextInput: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.background,
     borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
+    paddingVertical: 14,
+    fontSize: 16,
     color: COLORS.primary,
     fontFamily: TYPOGRAPHY.fontFamily,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: COLORS.border,
   },
 
   // Accordion Editors Style
   editorExpandContainer: {
     paddingVertical: 10,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.background,
     borderRadius: 16,
     paddingHorizontal: 12,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   inlineTextInput: {
     backgroundColor: '#FFF',

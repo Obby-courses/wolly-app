@@ -414,10 +414,11 @@ const styles = StyleSheet.create({
   dashboardCard: {
     backgroundColor: COLORS.surface,
     borderRadius: 24,
-    padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.sm,
-    ...SHADOWS.soft,
+    padding: 24,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   netWorthHeaderContainer: {
     paddingHorizontal: SPACING.lg + 4,
@@ -452,17 +453,20 @@ const styles = StyleSheet.create({
   },
   netWorthValue: {
     color: COLORS.primary,
-    fontSize: 44,
+    fontSize: 48,
     fontFamily: TYPOGRAPHY.fontBold,
     textAlign: 'left',
+    letterSpacing: -1,
   },
   netWorthCurrency: {
-    fontSize: 24,
+    fontSize: 28,
     color: COLORS.primary,
+    fontFamily: TYPOGRAPHY.fontBold,
   },
   netWorthCents: {
-    color: '#9CA3AF',
-    fontSize: 32,
+    color: COLORS.secondary,
+    fontSize: 36,
+    fontFamily: TYPOGRAPHY.fontBold,
   },
   expensesCompRow: {
     flexDirection: 'row',
@@ -471,9 +475,10 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   expensesValue: {
-    fontSize: 28,
+    fontSize: 32,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.primary,
+    letterSpacing: -0.5,
   },
   expensesSubText: {
     fontSize: 12,
@@ -528,12 +533,12 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   firstUpcomingContainer: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 18,
+    backgroundColor: COLORS.background,
+    borderRadius: 20,
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: COLORS.border,
     marginBottom: SPACING.md,
   },
   firstUpcomingAccent: {
@@ -580,12 +585,12 @@ const styles = StyleSheet.create({
   },
   smallUpcomingItem: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 14,
+    backgroundColor: COLORS.background,
+    borderRadius: 16,
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: COLORS.border,
   },
   smallUpcomingAccent: {
     width: 4,

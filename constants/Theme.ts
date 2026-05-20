@@ -4,15 +4,16 @@
 
 export const COLORS = {
   // Brand Colors
-  primary: '#111827', // Black/Dark Gray
-  secondary: '#6B7280', // Medium Gray
-  accent: '#3B82F6', // Blue
-  success: '#10B981', // Green
-  warning: '#F59E0B', // Orange
-  danger: '#EF4444', // Red
-  background: '#F9FAFB',
+  primary: '#1C1C1E', // Soft, deep off-black
+  secondary: '#8E8E93', // Sophisticated warm gray
+  accent: '#000000', // Deep contrast for accents
+  brandBlue: '#007AFF', // Saturated premium blue (main color after black/white)
+  success: '#34C759',
+  warning: '#FF9500',
+  danger: '#FF3B30',
+  background: '#F2F2F7', // Premium warm off-white
   surface: '#FFFFFF',
-  border: '#F3F4F6',
+  border: '#E5E5EA',
 
   // Category Specific Colors
   categories: {
@@ -58,14 +59,16 @@ export const SPACING = {
 export const SHADOWS = {
   soft: {
     shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 5,
+    shadowOpacity: 0.02,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 2
   },
   medium: {
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 5
+    shadowOpacity: 0.04,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4
   }
 };
