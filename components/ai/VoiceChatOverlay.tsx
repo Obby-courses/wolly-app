@@ -91,12 +91,8 @@ export default function VoiceChatOverlay() {
       ]}
       pointerEvents={voiceState.isOpen ? 'auto' : 'none'}
     >
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={handleClose} style={styles.closeBtn}>
-          <Ionicons name="close" size={28} color={COLORS.primary} />
-        </Pressable>
-      </View>
+      {/* Spacer per respiro visivo in alto */}
+      <View style={{ height: insets.top + 16 }} />
 
       {/* Content area — bottom padding for mic button */}
       <View style={styles.content}>

@@ -121,20 +121,8 @@ export default function AiChatPage() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Header - Transparent and minimal */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="close" size={28} color={COLORS.primary} />
-        </Pressable>
-        <View style={styles.headerRight}>
-          <Pressable
-            onPress={handleReset}
-            style={[styles.iconBtn, !qa && { opacity: 0 }]}
-          >
-            <Ionicons name="refresh-outline" size={20} color={COLORS.secondary} />
-          </Pressable>
-        </View>
-      </View>
+      {/* Spacer per respiro visivo in alto */}
+      <View style={{ height: 16 }} />
 
       <View style={styles.flex}>
         <View style={styles.flex}>
@@ -163,7 +151,7 @@ export default function AiChatPage() {
               </View>
               
               {/* Tastiera virtuale personalizzata posizionata esattamente sopra il BottomMenu */}
-              <View style={{ paddingBottom: Platform.OS === 'ios' ? 90 : 76 }}>
+              <View style={{ paddingBottom: Platform.OS === 'ios' ? 74 : 60 }}>
                 <CustomKeyboard
                   value={inputText}
                   onChangeText={setInputText}
