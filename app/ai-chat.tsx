@@ -11,6 +11,7 @@ import AiResponseView from '../components/ai/AiResponseView';
 import { askAiChat, AiChatResponse, ChatMessage, aiChatStore } from '../services/aiChat';
 import CustomKeyboard from '../components/CustomKeyboard';
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
+import { routeInput } from '../services/inputRouter';
 
 // ─── State types ──────────────────────────────────────────────────────────────
 interface QAState {
@@ -60,6 +61,31 @@ export default function AiChatPage() {
     });
 
     const userMsg = text.trim();
+
+    // Controlla se l'input contiene una spesa da registrare (parsing deterministico)
+    const route = routeInput(userMsg);
+    if (route === 'expense') {
+      setIsLoading(true);
+      setInputText('');
+      setIsTyping(false);
+      try {
+        const { parseExpenseWithAI } = require('../services/groqParser');
+        const parsed = await parseExpenseWithAI(userMsg, 'text');
+        router.push({
+          pathname: '/expense-detail',
+          params: { data: JSON.stringify(parsed) },
+        });
+        // Resettiamo lo stato QA se l'utente esce dalla chat per inserire la spesa
+        setQa(null);
+        aiChatStore.qa = null;
+        return;
+      } catch (err) {
+        console.error('[ai-chat] Error parsing expense:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
     const newQa = { question: userMsg, answer: null };
     setQa(newQa);
     aiChatStore.qa = newQa;
