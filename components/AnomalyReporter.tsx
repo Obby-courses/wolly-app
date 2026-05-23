@@ -138,14 +138,8 @@ export default function AnomalyReporter() {
               </View>
 
               <Text style={styles.cardSubtitle}>
-                Aiutaci a migliorare Wolly. Descrivi brevemente cosa non funziona in questa schermata.
+                Aiutaci a migliorare Wolly. Descrivi brevemente cosa non funziona.
               </Text>
-
-              {/* Informazioni Rotta Attiva */}
-              <View style={styles.pageBadge}>
-                <Text style={styles.pageBadgeLabel}>SCHERMATA:</Text>
-                <Text style={styles.pageBadgeValue} numberOfLines={1}>{pathname || '/'}</Text>
-              </View>
 
               {/* Messaggio Input */}
               <TextInput
@@ -249,29 +243,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 14,
   },
-  pageBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  pageBadgeLabel: {
-    fontSize: 9,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.secondary,
-    marginRight: 6,
-  },
-  pageBadgeValue: {
-    fontSize: 11,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
-    flex: 1,
-  },
+
   textInput: {
     height: 100,
     backgroundColor: COLORS.background,
