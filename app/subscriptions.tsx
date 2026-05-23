@@ -13,6 +13,7 @@ import { ALL_CATEGORIES, getDomainForCategory, getCategory } from '../constants/
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
+import AnomalyReporter from '../components/AnomalyReporter';
 
 const FREQUENCIES: { key: Frequency; label: string }[] = [
   { key: 'monthly',       label: 'Mensile' },
@@ -277,6 +278,8 @@ function SubModal({
             </Pressable>
           )}
         </ScrollView>
+        {/* Renderizziamo AnomalyReporter localmente dentro il Modal per renderlo visibile ed evitare sovrapposizioni */}
+        <AnomalyReporter forcePosition="left" />
       </SafeAreaView>
     </Modal>
   );

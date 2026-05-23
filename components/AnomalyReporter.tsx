@@ -10,7 +10,11 @@ import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import Constants from 'expo-constants';
 
-export default function AnomalyReporter() {
+interface AnomalyReporterProps {
+  forcePosition?: 'left' | 'right';
+}
+
+export default function AnomalyReporter({ forcePosition }: AnomalyReporterProps = {}) {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
@@ -19,11 +23,12 @@ export default function AnomalyReporter() {
   const appVersion = Constants.expoConfig?.version || '0.2.0';
 
   // Logica di posizionamento condizionale del pulsante:
-  // In expense-detail (Modifica transazione) e manual-entry (Inserimento manuale) ci sono già pulsanti
-  // nell'angolo in alto a destra. Spostiamo il tasto bug più a sinistra (right: 80) in queste schermate.
+  // In expense-detail (Modifica transazione) e nelle rotte di transazione ci sono già pulsanti
+  // nell'angolo in alto a destra. Spostiamo il tasto bug a sinistra per evitare sovrapposizioni.
   const isDetailScreen = pathname.includes('/expense-detail') || pathname.includes('/transaction');
-  const isManualEntry = pathname.includes('/manual-entry');
-  const buttonRight = (isDetailScreen || isManualEntry) ? 80 : 16;
+  
+  // Allineiamo a sinistra se specificato esplicitamente o se siamo in una schermata di dettaglio transazione
+  const alignLeft = forcePosition === 'left' || (forcePosition === undefined && isDetailScreen);
 
   // Non mostrare il pulsante se siamo nella chat vocale a tutto schermo o se stiamo registrando
   const isVoiceChat = pathname === '/voice-chat';
@@ -106,8 +111,10 @@ export default function AnomalyReporter() {
           styles.bugButton,
           {
             top: Platform.OS === 'ios' ? insets.top + 4 : insets.top + 12,
-            right: buttonRight,
-          }
+          },
+          alignLeft
+            ? { left: Platform.OS === 'ios' ? 52 : 56 }
+            : { right: 16 }
         ]}
       >
         <Ionicons name="flag" size={16} color="#FFF" />
