@@ -1,14 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
+import { analytics, ANALYTICS_SCREENS } from '../../services/analytics';
 
 export default function StatsHubScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    analytics.trackScreen(ANALYTICS_SCREENS.STATS_OVERVIEW);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -28,7 +33,13 @@ export default function StatsHubScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
-          <Pressable style={styles.card} onPress={() => router.push('/stats/net-worth')}>
+          <Pressable 
+            style={styles.card} 
+            onPress={() => {
+              analytics.trackClick('btn_stats_net_worth_open', ANALYTICS_SCREENS.STATS_OVERVIEW);
+              router.push('/stats/net-worth');
+            }}
+          >
             <View style={[styles.cardIcon, { backgroundColor: '#E6F0FF' }]}>
                <Ionicons name="wallet" size={26} color="#0A74FF" />
             </View>
@@ -39,7 +50,13 @@ export default function StatsHubScreen() {
             <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
           </Pressable>
 
-          <Pressable style={styles.card} onPress={() => router.push('/stats/incomes')}>
+          <Pressable 
+            style={styles.card} 
+            onPress={() => {
+              analytics.trackClick('btn_stats_incomes_open', ANALYTICS_SCREENS.STATS_OVERVIEW);
+              router.push('/stats/incomes');
+            }}
+          >
             <View style={[styles.cardIcon, { backgroundColor: '#E6F4EA' }]}>
                <Ionicons name="trending-up" size={26} color="#34C759" />
             </View>
@@ -50,7 +67,13 @@ export default function StatsHubScreen() {
             <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
           </Pressable>
 
-          <Pressable style={styles.card} onPress={() => router.push('/stats/expenses')}>
+          <Pressable 
+            style={styles.card} 
+            onPress={() => {
+              analytics.trackClick('btn_stats_expenses_open', ANALYTICS_SCREENS.STATS_OVERVIEW);
+              router.push('/stats/expenses');
+            }}
+          >
             <View style={[styles.cardIcon, { backgroundColor: '#FCE8E6' }]}>
                <Ionicons name="trending-down" size={26} color="#FF3B30" />
             </View>
@@ -61,7 +84,13 @@ export default function StatsHubScreen() {
             <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
           </Pressable>
 
-          <Pressable style={styles.card} onPress={() => router.push('/stats/cashflow')}>
+          <Pressable 
+            style={styles.card} 
+            onPress={() => {
+              analytics.trackClick('btn_stats_cashflow_open', ANALYTICS_SCREENS.STATS_OVERVIEW);
+              router.push('/stats/cashflow');
+            }}
+          >
             <View style={[styles.cardIcon, { backgroundColor: '#F3E8FF' }]}>
                <Ionicons name="swap-vertical" size={26} color="#AF52DE" />
             </View>

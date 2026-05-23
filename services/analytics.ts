@@ -1,0 +1,99 @@
+/**
+ * WOLLY ANALYTICS SERVICE
+ * 
+ * Servizio centralizzato per il tracciamento degli eventi dell'applicazione.
+ * Allinea le schermate e i pulsanti a una tassonomia ufficiale per la comprensione delle sezioni
+ * in ottica di analytics comportamentale ed esplorazione dei dati.
+ */
+
+// Tassonomia ufficiale delle schermate (Screens)
+export const ANALYTICS_SCREENS = {
+  HOME: 'screen_home',
+  STATS_OVERVIEW: 'screen_stats_overview',
+  STATS_EXPENSES: 'screen_stats_expenses',
+  STATS_INCOMES: 'screen_stats_incomes',
+  STATS_CASHFLOW: 'screen_stats_cashflow',
+  STATS_NET_WORTH: 'screen_stats_net_worth',
+  SUBSCRIPTIONS: 'screen_subscriptions',
+  SETTINGS: 'screen_settings',
+  EXPENSE_DETAIL: 'screen_expense_detail',
+  MANUAL_ENTRY: 'screen_manual_entry',
+  AI_CHAT: 'screen_ai_chat',
+  VOICE_CHAT: 'screen_voice_chat',
+} as const;
+
+// Tassonomia ufficiale dei pulsanti (Buttons)
+export const ANALYTICS_BUTTONS = {
+  // Bottom Tabs Navigation
+  TAB_HOME: 'btn_tab_home',
+  TAB_STATS: 'btn_tab_stats',
+  TAB_SUBSCRIPTIONS: 'btn_tab_subscriptions',
+  TAB_SETTINGS: 'btn_tab_settings',
+  
+  // Quick Access AI
+  VOICE_CHAT_OPEN: 'btn_voice_chat_open',
+  AI_CHAT_OPEN: 'btn_ai_chat_open',
+  
+  // Transaction Actions
+  SAVE_TRANSACTION: 'btn_save_transaction',
+  DELETE_TRANSACTION: 'btn_delete_transaction',
+  MANUAL_ENTRY_OPEN: 'btn_manual_entry_open',
+  
+  // Filters & Interactions
+  TIME_FILTER_SELECT: 'btn_time_filter_select',
+  CHART_BAR_CLICK: 'btn_chart_bar_click',
+  
+  // Recording
+  VOICE_REC_START: 'btn_voice_rec_start',
+  VOICE_REC_STOP: 'btn_voice_rec_stop',
+} as const;
+
+class WollyAnalytics {
+  private isDevelopment = __DEV__;
+
+  /**
+   * Traccia la visualizzazione di una schermata (Screen View)
+   */
+  trackScreen(screenName: typeof ANALYTICS_SCREENS[keyof typeof ANALYTICS_SCREENS] | string, properties?: object) {
+    this.logEvent('SCREEN_VIEW', { screen_name: screenName, ...properties });
+  }
+
+  /**
+   * Traccia il click su un pulsante o elemento interattivo (Button Click)
+   */
+  trackClick(
+    buttonName: typeof ANALYTICS_BUTTONS[keyof typeof ANALYTICS_BUTTONS] | string,
+    screenName: typeof ANALYTICS_SCREENS[keyof typeof ANALYTICS_SCREENS] | string,
+    properties?: object
+  ) {
+    this.logEvent('BUTTON_CLICK', {
+      button_name: buttonName,
+      screen_name: screenName,
+      ...properties,
+    });
+  }
+
+  /**
+   * Traccia un evento di business o di logica (Custom Event)
+   */
+  trackEvent(eventName: string, properties?: object) {
+    this.logEvent(eventName, properties);
+  }
+
+  /**
+   * Funzione interna di logging strutturato (pronta per Firebase / Amplitude / Mixpanel)
+   */
+  private logEvent(eventType: 'SCREEN_VIEW' | 'BUTTON_CLICK' | string, payload?: object) {
+    if (this.isDevelopment) {
+      const emoji = eventType === 'SCREEN_VIEW' ? '📱' : eventType === 'BUTTON_CLICK' ? '⚡' : '📊';
+      console.log(`[WollyAnalytics] ${emoji} [${eventType}]`, JSON.stringify(payload, null, 2));
+    }
+    
+    // NOTA PER FUTURA INTEGRAZIONE CLOUD:
+    // Qui andranno collegate le chiamate native come:
+    // FirebaseAnalytics.logEvent(eventType, payload);
+    // Amplitude.track(eventType, payload);
+  }
+}
+
+export const analytics = new WollyAnalytics();

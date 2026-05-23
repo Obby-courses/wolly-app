@@ -9,6 +9,7 @@ import { TransactionRepository } from '../../services/database/repositories/Tran
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
 import { CATEGORIES_CONFIG } from '../../constants/categories';
 import TimeFilter, { TimeRange } from '../../components/TimeFilter';
+import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../../services/analytics';
 
 const { width } = Dimensions.get('window');
 
@@ -166,6 +167,7 @@ const SimpleTrendChart = ({ data, color }: { data: any[], color: string }) => {
                 height={chartHeight}
                 fill="transparent"
                 onPress={() => {
+                  analytics.trackClick(ANALYTICS_BUTTONS.CHART_BAR_CLICK, ANALYTICS_SCREENS.STATS_EXPENSES, { period: d.label, amount: d.value });
                   Alert.alert(
                     'Dettaglio Spesa',
                     `Periodo: ${d.label}\nSpesa Totale: € ${d.value.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -202,6 +204,7 @@ export default function ExpensesScreen() {
   // Automatic reset when entering the screen
   useFocusEffect(
     useCallback(() => {
+      analytics.trackScreen(ANALYTICS_SCREENS.STATS_EXPENSES);
       setTimeRange('Mese');
       setBaseDate(new Date().toISOString().split('T')[0]);
       setSelectedDomain(null);
@@ -214,6 +217,11 @@ export default function ExpensesScreen() {
   useEffect(() => {
     loadStats();
   }, [timeRange, baseDate, selectedDomain, selectedCategory, sortBy]);
+
+  // Track time range changes
+  useEffect(() => {
+    analytics.trackClick(ANALYTICS_BUTTONS.TIME_FILTER_SELECT, ANALYTICS_SCREENS.STATS_EXPENSES, { range: timeRange });
+  }, [timeRange]);
 
   const loadStats = async () => {
     setLoading(true);

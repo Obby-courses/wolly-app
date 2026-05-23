@@ -7,6 +7,7 @@ import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 import { networkStore } from '../services/networkStore';
+import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function SettingsScreen() {
   
   const [networkState, setNetworkState] = useState(networkStore.getState());
   useEffect(() => {
+    analytics.trackScreen(ANALYTICS_SCREENS.SETTINGS);
     const unsub = networkStore.subscribe(() => setNetworkState(networkStore.getState()));
     return () => { unsub(); };
   }, []);

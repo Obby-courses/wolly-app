@@ -13,6 +13,7 @@ import { TransactionRepository } from '../services/database/repositories/Transac
 import { SubscriptionRepository } from '../services/database/repositories/SubscriptionRepository';
 import { SubscriptionSuggestion } from '../services/groqParser';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
+import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../services/analytics';
 import { COMUNI_ITALIANI, ComuneItem } from '../constants/comuni';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
@@ -123,6 +124,10 @@ export default function ExpenseDetail() {
       setCalendarDate({ year: d.getFullYear(), month: d.getMonth() });
     }
   }, [activeField]);
+
+  useEffect(() => {
+    analytics.trackScreen(ANALYTICS_SCREENS.EXPENSE_DETAIL);
+  }, []);
 
   // Inizializza lo stato con i dati ricevuti (sia da parsing che da DB esistente)
   useEffect(() => {
@@ -272,6 +277,13 @@ export default function ExpenseDetail() {
         return;
       }
 
+      analytics.trackClick(ANALYTICS_BUTTONS.SAVE_TRANSACTION, ANALYTICS_SCREENS.EXPENSE_DETAIL, {
+        is_existing: isEditingExisting,
+        amount: editableExpense.amount,
+        category: editableExpense.category_key,
+        direction: editableExpense.direction,
+      });
+
       setIsSaving(true);
       
       const todayStr = new Date().toISOString().split('T')[0];
@@ -325,6 +337,9 @@ export default function ExpenseDetail() {
         text: 'Elimina', 
         style: 'destructive', 
         onPress: async () => {
+          analytics.trackClick(ANALYTICS_BUTTONS.DELETE_TRANSACTION, ANALYTICS_SCREENS.EXPENSE_DETAIL, {
+            id: id
+          });
           try {
             setIsDeleting(true);
             await TransactionRepository.softDelete(id!);

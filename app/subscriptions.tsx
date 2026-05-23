@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import { SubscriptionRepository, Subscription, Frequency } from '../services/database/repositories/SubscriptionRepository';
 import { ALL_CATEGORIES, getDomainForCategory, getCategory } from '../constants/categories';
+import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
 
@@ -302,7 +303,10 @@ export default function SubscriptionsScreen() {
     setLoading(false);
   };
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(useCallback(() => {
+    analytics.trackScreen(ANALYTICS_SCREENS.SUBSCRIPTIONS);
+    load();
+  }, []));
 
   const active = subs.filter(s => s.is_active);
   const inactive = subs.filter(s => !s.is_active);

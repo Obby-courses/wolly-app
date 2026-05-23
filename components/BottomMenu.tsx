@@ -10,6 +10,7 @@ import { parseFromReceipt } from '../modules/registration/receiptParser';
 import { voiceStore } from '../services/voiceStore';
 import { Audio } from 'expo-av';
 import { networkStore } from '../services/networkStore';
+import { analytics } from '../services/analytics';
 
 const CANCEL_THRESHOLD_X = -50;
 const MIN_RECORDING_DURATION = 500;
@@ -166,6 +167,7 @@ export default function BottomMenu() {
         holdTimeoutRef.current = setTimeout(() => {
           hasStartedRecordingRef.current = true;
           voiceStore.startRecording();
+          analytics.trackClick('btn_voice_rec_start', pathname);
         }, 150);
       },
 
@@ -211,6 +213,7 @@ export default function BottomMenu() {
 
         // Se scivola a sinistra per annullare
         if (state.isSlidingToCancel) {
+          analytics.trackEvent('voice_rec_cancelled', { screen: pathname });
           voiceStore.cancelRecording();
           voiceStore.close();
           setIsExpanded(false);
@@ -219,6 +222,7 @@ export default function BottomMenu() {
 
         // Tap veloce (sicurezza sulla durata minima)
         if (duration < MIN_RECORDING_DURATION) {
+          analytics.trackEvent('voice_rec_aborted_too_short', { screen: pathname });
           voiceStore.cancelRecording();
           voiceStore.close();
           setIsExpanded(false);
@@ -233,6 +237,7 @@ export default function BottomMenu() {
           return;
         }
 
+        analytics.trackClick('btn_voice_rec_stop', pathname);
         // Elabora l'input vocale
         voiceStore.processVoiceInput(result.uri);
         setIsExpanded(false);
@@ -271,6 +276,14 @@ export default function BottomMenu() {
         key={item.path}
         onPress={() => {
           if (pathname === item.path) return;
+          let btnKey = '';
+          if (item.path === '/') btnKey = 'btn_tab_home';
+          else if (item.path === '/stats') btnKey = 'btn_tab_stats';
+          else if (item.path === '/subscriptions') btnKey = 'btn_tab_subscriptions';
+          else if (item.path === '/settings') btnKey = 'btn_tab_settings';
+          if (btnKey) {
+            analytics.trackClick(btnKey, pathname);
+          }
           if (isTextChat || isVoiceChat) {
             voiceStore.close(); // Chiude eventuale overlay vocale
           }
@@ -421,7 +434,14 @@ export default function BottomMenu() {
                     },
                   ]}
                 >
-                  <Pressable style={styles.pressable} onPress={handleCamera} disabled={isProcessing}>
+                  <Pressable 
+                    style={styles.pressable} 
+                    onPress={() => {
+                      analytics.trackClick('btn_camera_scontrino_open', pathname);
+                      handleCamera();
+                    }} 
+                    disabled={isProcessing}
+                  >
                     <Ionicons name="camera" size={20} color="#FFF" />
                   </Pressable>
                 </Animated.View>
@@ -442,6 +462,7 @@ export default function BottomMenu() {
                   <Pressable 
                     style={styles.pressable} 
                     onPress={() => {
+                      analytics.trackClick('btn_ai_chat_open', pathname);
                       if (pathname === '/ai-chat') return;
                       router.push('/ai-chat');
                     }}

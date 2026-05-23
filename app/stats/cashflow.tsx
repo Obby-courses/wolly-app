@@ -8,6 +8,7 @@ import { TransactionRepository } from '../../services/database/repositories/Tran
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
 import TimeFilter, { TimeRange } from '../../components/TimeFilter';
 import AnnualChart from '../../components/AnnualChart';
+import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../../services/analytics';
 
 export default function CashflowScreen() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function CashflowScreen() {
   // Automatic reset when entering the screen
   useFocusEffect(
     useCallback(() => {
+      analytics.trackScreen(ANALYTICS_SCREENS.STATS_CASHFLOW);
       setTimeRange('Mese');
       setBaseDate(new Date().toISOString().split('T')[0]);
     }, [])
@@ -31,6 +33,11 @@ export default function CashflowScreen() {
   useEffect(() => {
     loadStats();
   }, [timeRange, baseDate]);
+
+  // Track time range changes
+  useEffect(() => {
+    analytics.trackClick(ANALYTICS_BUTTONS.TIME_FILTER_SELECT, ANALYTICS_SCREENS.STATS_CASHFLOW, { range: timeRange });
+  }, [timeRange]);
 
   const loadStats = async () => {
     setLoading(true);

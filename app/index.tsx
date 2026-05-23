@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextI
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 
 // ... (rest of imports)
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -104,6 +105,7 @@ export default function Home() {
   // Ricarica le transazioni ogni volta che la schermata acquisisce il focus
   useFocusEffect(
     useCallback(() => {
+      analytics.trackScreen(ANALYTICS_SCREENS.HOME);
       if (isDbReady) {
         loadData();
       }

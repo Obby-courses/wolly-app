@@ -9,6 +9,7 @@ import { TransactionRepository } from '../../services/database/repositories/Tran
 import { NetWorthRepository } from '../../services/database/repositories/NetWorthRepository';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
 import TimeFilter, { TimeRange } from '../../components/TimeFilter';
+import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../../services/analytics';
 
 const { width } = Dimensions.get('window');
 
@@ -55,6 +56,7 @@ export default function NetWorthScreen() {
   // Automatic reset when entering the screen
   useFocusEffect(
     useCallback(() => {
+      analytics.trackScreen(ANALYTICS_SCREENS.STATS_NET_WORTH);
       setTimeRange('Mese');
       setBaseDate(new Date().toISOString().split('T')[0]);
     }, [])
@@ -64,6 +66,11 @@ export default function NetWorthScreen() {
   useEffect(() => {
     loadStats();
   }, [timeRange, baseDate]);
+
+  // Track time range changes
+  useEffect(() => {
+    analytics.trackClick(ANALYTICS_BUTTONS.TIME_FILTER_SELECT, ANALYTICS_SCREENS.STATS_NET_WORTH, { range: timeRange });
+  }, [timeRange]);
 
   const loadStats = async () => {
     setLoading(true);

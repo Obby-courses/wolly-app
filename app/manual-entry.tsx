@@ -10,6 +10,7 @@ import { CATEGORIES_CONFIG } from '../constants/categories';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { ParsedExpense, TimeOfDay, SocialContext, LocationType } from '../modules/registration/types';
 import { getCurrentLocationContext } from '../services/location';
+import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../services/analytics';
 
 export default function ManualEntry() {
   const router = useRouter();
@@ -38,6 +39,10 @@ export default function ManualEntry() {
   const [isLocating, setIsLocating] = useState(false);
 
   // Update subcategories when category changes
+  useEffect(() => {
+    analytics.trackScreen(ANALYTICS_SCREENS.MANUAL_ENTRY);
+  }, []);
+
   useEffect(() => {
     const cat = CATEGORIES_CONFIG.find(c => c.key === selectedCategoryKey);
     if (cat && cat.subcategories.length > 0) {
@@ -104,6 +109,13 @@ export default function ManualEntry() {
       Alert.alert('Errore', 'Inserisci un importo valido.');
       return;
     }
+
+    analytics.trackClick(ANALYTICS_BUTTONS.SAVE_TRANSACTION, ANALYTICS_SCREENS.MANUAL_ENTRY, {
+      amount: parsedVal,
+      category: selectedCategoryKey,
+      direction: direction,
+      is_manual_entry_advanced: true
+    });
 
     const expense: ParsedExpense = {
       id: uuid.v4() as string,

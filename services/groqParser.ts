@@ -44,13 +44,13 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
 - cibo_bevande -> [alimentari, ristorante_fast_food, bar_caffe]
 - acquisti -> [abbigliamento_scarpe, gioielli_accessori, salute_bellezza, bambini, casa_giardino, animali, elettronica_accessori, regali_gioia, cancelleria_attrezzi, tempo_libero, drogheria_farmacia]
 - alloggio -> [affitto, mutuo, energia_utenze, manutenzione_riparazioni, assicurazione_proprieta]
-- trasporti -> [trasporto_pubblico, taxi, lunga_distanza]
+- trasporti -> [trasporto_pubblico, taxi, lunga_distanza, viaggi_lavoro]
 - veicolo -> [carburante, parcheggio, manutenzione_veicoli, noleggio, assicurazione_veicolo, leasing]
 - vita_intrattenimento -> [assistenza_sanitaria, wellness_bellezza, sport_fitness, cultura_eventi, eventi_vita, hobby, formazione_sviluppo, libri_audio_abbonamenti, tv_streaming, vacanze_viaggi_hotel, beneficienza_regali, alcool_tabacco, lotteria_azzardo]
 - comunicazione_pc -> [telefono_cellulare, internet, software_app_giochi, servizi_postali]
 - spese_finanziarie -> [tasse, assicurazioni, prestiti_interessi, multe, consulenza, commissioni, mantenimento]
 - investimenti -> [immobili, veicoli_beni_immobili, investimenti_finanziari, risparmi, collezioni]
-- entrata -> [salario_fatture, interessi_dividendi, vendita, entrate_affitto, quote_sovvenzioni, entrata_prestiti, assegni_buoni, lotteria_vincite, rimborsi, regali]
+- entrata -> [salario_fatture, interessi_dividendi, vendita, entrate_affitto, quote_sovvenzioni, entrata_prestiti, assegni_buoni, lotteria_azzardo, rimborsi, regali]
 
  REGOLE CRITICHE:
 1. category_key: Scegli SEMPRE la categoria specifica più precisa (es: "cultura_eventi", NON "vita_intrattenimento").

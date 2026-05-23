@@ -10,6 +10,7 @@ import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import AiResponseView from '../components/ai/AiResponseView';
 import { askAiChat, AiChatResponse, ChatMessage, aiChatStore } from '../services/aiChat';
 import CustomKeyboard from '../components/CustomKeyboard';
+import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 
 // ─── State types ──────────────────────────────────────────────────────────────
 interface QAState {
@@ -39,6 +40,10 @@ export default function AiChatPage() {
   const [isTyping, setIsTyping] = useState(!aiChatStore.qa);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
 
+  useEffect(() => {
+    analytics.trackScreen(ANALYTICS_SCREENS.AI_CHAT);
+  }, []);
+
   // Auto-send message when navigated with params.message
   useEffect(() => {
     if (params.message && !autoSentRef.done) {
@@ -49,6 +54,10 @@ export default function AiChatPage() {
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
+
+    analytics.trackClick('btn_ai_chat_send_message', ANALYTICS_SCREENS.AI_CHAT, {
+      message_length: text.length
+    });
 
     const userMsg = text.trim();
     const newQa = { question: userMsg, answer: null };

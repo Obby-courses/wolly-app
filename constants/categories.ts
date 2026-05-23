@@ -71,6 +71,7 @@ export const DOMAINS_CONFIG: Domain[] = [
       { key: 'trasporto_pubblico', label: 'Trasporto pubblico', domain_key: 'trasporti' },
       { key: 'taxi', label: 'Taxi', domain_key: 'trasporti' },
       { key: 'lunga_distanza', label: 'Lunga distanza', domain_key: 'trasporti' },
+      { key: 'viaggi_lavoro', label: 'Viaggi di lavoro', domain_key: 'trasporti' },
     ]
   },
   {
@@ -155,7 +156,7 @@ export const DOMAINS_CONFIG: Domain[] = [
       { key: 'quote_sovvenzioni', label: 'Quote o sovvenzioni', domain_key: 'entrata' },
       { key: 'entrata_prestiti', label: 'Entrata da prestiti', domain_key: 'entrata' },
       { key: 'assegni_buoni', label: 'Assegni, buoni, ticket', domain_key: 'entrata' },
-      { key: 'lotteria_vincite', label: "Lotteria, vincite", domain_key: 'entrata' },
+      { key: 'lotteria_azzardo', label: "Lotteria, gioco d'azzardo", domain_key: 'entrata' },
       { key: 'rimborsi', label: 'Rimborsi (tassa, acquisto)', domain_key: 'entrata' },
       { key: 'regali', label: 'Regali', domain_key: 'entrata' },
     ]

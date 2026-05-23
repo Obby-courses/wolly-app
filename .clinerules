@@ -158,5 +158,14 @@ voiceStore.ts           → stato singleton + lifecycle audio
 - **Clean Code**: Rimuovere sempre codice morto, log ridondanti e commenti obsoleti dopo ogni implementazione.
 - **Git Flow**: Ogni modifica significativa deve essere accompagnata da un commit descrittivo.
 
+## 8. Tassonomia e Regole di Analytics (Tracciamento Eventi)
+- **Centralizzazione e Coerenza**: Qualsiasi nuova schermata o pulsante d'azione significativo deve essere tracciato tramite il servizio `WollyAnalytics` definito in `services/analytics.ts`.
+- **Tassonomia Schermate (`ANALYTICS_SCREENS`)**: Le nuove viste devono mappare una costante con prefisso `screen_` (es: `screen_home`, `screen_subscriptions`).
+- **Tassonomia Pulsanti (`ANALYTICS_BUTTONS`)**: I nuovi pulsanti rilevanti per l'analytics devono mappare una costante con prefisso `btn_` (es: `btn_save_transaction`, `btn_ai_chat_open`).
+- **Logica di Tracciamento**:
+  - Utilizzare `analytics.trackScreen(screenName)` nell'effetto di montaggio/focus della schermata (`useEffect` or `useFocusEffect`).
+  - Utilizzare `analytics.trackClick(buttonName, screenName, properties)` nei gestori di tocco (`onPress`).
+  - Utilizzare `analytics.trackEvent(eventName, properties)` per eventi deterministici o di business (es: `voice_rec_cancelled`).
+
 ---
-*Ultimo aggiornamento: 20 Maggio 2026*
+*Ultimo aggiornamento: 23 Maggio 2026*
