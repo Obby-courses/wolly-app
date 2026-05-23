@@ -13,9 +13,10 @@ import Constants from 'expo-constants';
 
 interface AnomalyReporterProps {
   forcePosition?: 'left' | 'right';
+  inline?: boolean;
 }
 
-export default function AnomalyReporter({ forcePosition }: AnomalyReporterProps = {}) {
+export default function AnomalyReporter({ forcePosition, inline = false }: AnomalyReporterProps = {}) {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
@@ -38,6 +39,11 @@ export default function AnomalyReporter({ forcePosition }: AnomalyReporterProps 
   // nell'angolo in alto a destra. Spostiamo il tasto bug a sinistra per evitare sovrapposizioni.
   const isDetailScreen = pathname.includes('/expense-detail') || pathname.includes('/transaction');
   
+  // Se siamo su una schermata di dettaglio e questa è l'istanza fluttuante globale, nascondila
+  if (!inline && isDetailScreen) {
+    return null;
+  }
+
   // Allineiamo a sinistra se specificato esplicitamente o se siamo in una schermata di dettaglio transazione
   const alignLeft = forcePosition === 'left' || (forcePosition === undefined && isDetailScreen);
 
@@ -81,9 +87,16 @@ export default function AnomalyReporter({ forcePosition }: AnomalyReporterProps 
     setIsSending(true);
     Keyboard.dismiss();
 
+    const normalizePageRoute = (path: string): string => {
+      if (path.includes('/expense-detail') || path.includes('/transaction/')) {
+        return '/transaction/';
+      }
+      return path;
+    };
+
     try {
       const { error } = await supabase.from('anomaly_reports').insert({
-        page_route: voiceOpen ? '/voice-chat' : pathname,
+        page_route: voiceOpen ? '/voice-chat' : normalizePageRoute(pathname),
         message: cleanMsg,
         device_os: Platform.OS,
         app_version: appVersion,
@@ -108,6 +121,97 @@ export default function AnomalyReporter({ forcePosition }: AnomalyReporterProps 
       setIsSending(false);
     }
   };
+
+  if (inline) {
+    return (
+      <>
+        {/* Pulsante in linea per Header */}
+        <Pressable
+          onPress={handleOpen}
+          style={{
+            padding: 8,
+            borderRadius: 10,
+            backgroundColor: 'rgba(239, 68, 68, 0.1)', // sfumato rosso opaco premium
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 6,
+          }}
+        >
+          <Ionicons name="flag" size={18} color="#EF4444" />
+        </Pressable>
+
+        {/* Banner / Modal di segnalazione */}
+        <Modal
+          visible={modalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={handleClose}
+        >
+          <Pressable style={styles.overlay} onPress={handleClose}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.keyboardAvoid}
+            >
+              {/* Impediamo al tocco sulla card di chiudere il modal */}
+              <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
+                
+                {/* Header */}
+                <View style={styles.cardHeader}>
+                  <Ionicons name="flag" size={22} color={COLORS.danger} style={{ marginRight: 8 }} />
+                  <Text style={styles.cardTitle}>Segnala un'Anomalia</Text>
+                  <Pressable onPress={handleClose} style={styles.closeIcon}>
+                    <Ionicons name="close" size={20} color={COLORS.secondary} />
+                  </Pressable>
+                </View>
+
+                <Text style={styles.cardSubtitle}>
+                  Aiutaci a migliorare Wolly. Descrivi brevemente cosa non funziona.
+                </Text>
+
+                {/* Messaggio Input */}
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="es. Il grafico delle spese non mostra le colonne corrette..."
+                  placeholderTextColor={COLORS.secondary + '60'}
+                  value={message}
+                  onChangeText={setMessage}
+                  multiline={true}
+                  numberOfLines={4}
+                  maxLength={500}
+                  autoFocus={true}
+                  textAlignVertical="top"
+                />
+
+                {/* Bottoni d'azione */}
+                <View style={styles.actionsRow}>
+                  <Pressable
+                    onPress={handleClose}
+                    disabled={isSending}
+                    style={[styles.btn, styles.btnCancel]}
+                  >
+                    <Text style={styles.btnCancelText}>Annulla</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleSend}
+                    disabled={isSending}
+                    style={[styles.btn, styles.btnSend, isSending && { opacity: 0.7 }]}
+                  >
+                    {isSending ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.btnSendText}>Invia</Text>
+                    )}
+                  </Pressable>
+                </View>
+
+              </Pressable>
+            </KeyboardAvoidingView>
+          </Pressable>
+        </Modal>
+      </>
+    );
+  }
 
   return (
     <>

@@ -17,6 +17,7 @@ import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../services/ana
 import { COMUNI_ITALIANI, ComuneItem } from '../constants/comuni';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
+import AnomalyReporter from '../components/AnomalyReporter';
 
 const DEFAULT_EXPENSE = {
   amount: 0,
@@ -495,6 +496,8 @@ export default function ExpenseDetail() {
           {isEditingExisting ? 'Modifica Transazione' : 'Verifica Dati'}
         </Text>
         <View style={styles.headerRightContainer}>
+          {/* Pulsante di segnalazione integrato in linea (bandierina rossa sfumata) */}
+          <AnomalyReporter inline={true} />
           {isEditingExisting && (
             <Pressable onPress={handleDelete} disabled={isDeleting || isSaving} style={styles.headerActionBtn}>
               {isDeleting ? (
