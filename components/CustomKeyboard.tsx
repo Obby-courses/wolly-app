@@ -51,9 +51,14 @@ export default function CustomKeyboard({
     let newValue = '';
     let newCursorPos = 0;
 
-    if (start === 0 && end === 0) return;
-
-    if (start === end) {
+    if (start === 0 && end === 0) {
+      if (value.length > 0) {
+        newValue = value.slice(0, -1);
+        newCursorPos = newValue.length;
+      } else {
+        return;
+      }
+    } else if (start === end) {
       newValue = value.slice(0, start - 1) + value.slice(start);
       newCursorPos = Math.max(0, start - 1);
     } else {

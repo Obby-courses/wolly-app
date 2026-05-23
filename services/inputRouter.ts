@@ -40,7 +40,6 @@ const EXPENSE_VERB_PATTERNS = [
 ];
 
 // ─── Pattern per QUERY (analisi AI) ───────────────────────────────────────────
-
 const QUERY_PATTERNS = [
   /\b(quanto|quante|quanti|quanta|quant'era|quant'è)\b/i,
   /\b(come\s+ho\s+speso|dove\s+spendo|cosa\s+ho\s+speso)\b/i,
@@ -50,6 +49,14 @@ const QUERY_PATTERNS = [
   /\b(questo\s+mese|quest'anno|questa\s+settimana|nel\s+mese|nell'anno)\b/i,
   /\b(categoria|categorie|distribuzione|grafico|andamento)\b/i,
   /\bwolly\b/i,
+];
+
+// Pattern interrogativi o analitici STRETTI (che definiscono una query anche se c'è un importo)
+const STRICT_QUERY_PATTERNS = [
+  /\b(quanto|quante|quanti|quanta|quant'era|quant'è)\b/i,
+  /\b(come\s+ho\s+speso|dove\s+spendo|cosa\s+ho\s+speso)\b/i,
+  /\b(mostrami|dimmi|analizza|fammi\s+vedere|mostra)\b/i,
+  /\b(media|somma|conteggio|confronta|comparazione|grafico|andamento|distribuzione)\b/i,
 ];
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -64,14 +71,15 @@ export function routeInput(text: string): RouteResult {
   const hasAmount = AMOUNT_PATTERNS.some(p => p.test(t));
   const hasExpenseVerb = EXPENSE_VERB_PATTERNS.some(p => p.test(t));
   const hasQuery = QUERY_PATTERNS.some(p => p.test(t));
+  const hasStrictQuery = STRICT_QUERY_PATTERNS.some(p => p.test(t));
 
-  // Regola 1: importo + verbo di spesa → expense (precedenza massima)
+  // Regola 1: se c'è un importo e NON c'è un intento interrogativo/analitico stretto, è SEMPRE una spesa (registrazione)
+  if (hasAmount && !hasStrictQuery) return 'expense';
+
+  // Regola 2: importo + verbo di spesa (precedenza massima)
   if (hasAmount && hasExpenseVerb) return 'expense';
 
-  // Regola 2: solo importo numerico → expense
-  if (hasAmount && !hasQuery) return 'expense';
-
-  // Regola 3: keyword interrogativa/analitica → query
+  // Regola 3: keyword interrogativa/analitica
   if (hasQuery) return 'query';
 
   // Regola 4: solo verbo di spesa senza importo → query (per sicurezza, non expense)
