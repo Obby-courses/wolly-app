@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, Text, View, Pressable, TextInput,
   Modal, ActivityIndicator, Alert, Platform, KeyboardAvoidingView, Keyboard
@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { voiceStore } from '../services/voiceStore';
 import Constants from 'expo-constants';
 
 interface AnomalyReporterProps {
@@ -20,7 +21,17 @@ export default function AnomalyReporter({ forcePosition }: AnomalyReporterProps 
   const [modalVisible, setModalVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(voiceStore.getState().isOpen);
   const appVersion = Constants.expoConfig?.version || '0.2.0';
+
+  useEffect(() => {
+    const unsub = voiceStore.subscribe(() => {
+      setVoiceOpen(voiceStore.getState().isOpen);
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
 
   // Logica di posizionamento condizionale del pulsante:
   // In expense-detail (Modifica transazione) e nelle rotte di transazione ci sono già pulsanti
@@ -29,10 +40,6 @@ export default function AnomalyReporter({ forcePosition }: AnomalyReporterProps 
   
   // Allineiamo a sinistra se specificato esplicitamente o se siamo in una schermata di dettaglio transazione
   const alignLeft = forcePosition === 'left' || (forcePosition === undefined && isDetailScreen);
-
-  // Non mostrare il pulsante se siamo nella chat vocale a tutto schermo o se stiamo registrando
-  const isVoiceChat = pathname === '/voice-chat';
-  if (isVoiceChat) return null;
 
   const handleOpen = () => {
     if (!isSupabaseConfigured()) {
@@ -76,7 +83,7 @@ export default function AnomalyReporter({ forcePosition }: AnomalyReporterProps 
 
     try {
       const { error } = await supabase.from('anomaly_reports').insert({
-        page_route: pathname,
+        page_route: voiceOpen ? '/voice-chat' : pathname,
         message: cleanMsg,
         device_os: Platform.OS,
         app_version: appVersion,
