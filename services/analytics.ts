@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 /**
  * WOLLY ANALYTICS SERVICE
@@ -103,7 +103,14 @@ class WollyAnalytics {
       console.log(`[WollyAnalytics] ${emoji} [${eventType}]`, JSON.stringify({ screenName, buttonName, cleanedPayload }, null, 2));
     }
     
-    // Invia i dati a Supabase per il calcolo dei KPI
+    // Invia i dati a Supabase solo se configurato correttamente
+    if (!isSupabaseConfigured()) {
+      if (this.isDevelopment) {
+        console.log('[WollyAnalytics] Skip invio a Supabase (non configurato o placeholder)');
+      }
+      return;
+    }
+
     try {
       const { error } = await supabase.from('analytics_events').insert({
         event_type: eventType,

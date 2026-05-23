@@ -7,7 +7,7 @@ import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
-import { supabase } from '../services/supabase';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 import Constants from 'expo-constants';
 
 export default function AnomalyReporter() {
@@ -30,6 +30,18 @@ export default function AnomalyReporter() {
   if (isVoiceChat) return null;
 
   const handleOpen = () => {
+    if (!isSupabaseConfigured()) {
+      Alert.alert(
+        'Supabase Non Configurato',
+        'Per poter segnalare anomalie o tracciare i KPI, configura le credenziali di Supabase nel file `.env`:\n\n' +
+        '1. Imposta EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY con le tue chiavi reali.\n' +
+        '2. Ferma il server Expo corrente (Ctrl+C) e riavvialo cancellando la cache:\n' +
+        'npx expo start --clear\n\n' +
+        'Se hai già modificato il file .env, il riavvio completo di Metro risolverà il problema.',
+        [{ text: 'Ho Capito' }]
+      );
+      return;
+    }
     setMessage('');
     setModalVisible(true);
   };
@@ -40,6 +52,14 @@ export default function AnomalyReporter() {
   };
 
   const handleSend = async () => {
+    if (!isSupabaseConfigured()) {
+      Alert.alert(
+        'Errore di Configurazione',
+        'Supabase non risulta configurato correttamente nel file `.env`.'
+      );
+      return;
+    }
+
     const cleanMsg = message.trim();
     if (!cleanMsg) {
       Alert.alert('Attenzione', 'Inserisci una descrizione per segnalare l\'anomalia.');
