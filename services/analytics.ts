@@ -98,16 +98,8 @@ class WollyAnalytics {
     delete cleanedPayload.screen_name;
     delete cleanedPayload.button_name;
 
-    if (this.isDevelopment) {
-      const emoji = eventType === 'SCREEN_VIEW' ? '📱' : eventType === 'BUTTON_CLICK' ? '⚡' : '📊';
-      console.log(`[WollyAnalytics] ${emoji} [${eventType}]`, JSON.stringify({ screenName, buttonName, cleanedPayload }, null, 2));
-    }
-    
     // Invia i dati a Supabase solo se configurato correttamente
     if (!isSupabaseConfigured()) {
-      if (this.isDevelopment) {
-        console.log('[WollyAnalytics] Skip invio a Supabase (non configurato o placeholder)');
-      }
       return;
     }
 
