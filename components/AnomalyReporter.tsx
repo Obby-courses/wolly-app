@@ -110,7 +110,7 @@ export default function AnomalyReporter() {
           }
         ]}
       >
-        <Ionicons name="bug-outline" size={18} color={COLORS.secondary} />
+        <Ionicons name="flag" size={16} color="#FFF" />
       </Pressable>
 
       {/* Banner / Modal di segnalazione */}
@@ -130,7 +130,7 @@ export default function AnomalyReporter() {
               
               {/* Header */}
               <View style={styles.cardHeader}>
-                <Ionicons name="bug" size={24} color={COLORS.primary} style={{ marginRight: 8 }} />
+                <Ionicons name="flag" size={22} color={COLORS.danger} style={{ marginRight: 8 }} />
                 <Text style={styles.cardTitle}>Segnala un'Anomalia</Text>
                 <Pressable onPress={handleClose} style={styles.closeIcon}>
                   <Ionicons name="close" size={20} color={COLORS.secondary} />
@@ -198,12 +198,12 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(239, 68, 68, 0.9)', // Sfondo rosso opaco premium
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
     ...SHADOWS.soft,
   },
   overlay: {
