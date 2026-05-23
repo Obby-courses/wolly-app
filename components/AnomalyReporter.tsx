@@ -14,9 +14,10 @@ import Constants from 'expo-constants';
 interface AnomalyReporterProps {
   forcePosition?: 'left' | 'right';
   inline?: boolean;
+  isWhite?: boolean;
 }
 
-export default function AnomalyReporter({ forcePosition, inline = false }: AnomalyReporterProps = {}) {
+export default function AnomalyReporter({ forcePosition, inline = false, isWhite = false }: AnomalyReporterProps = {}) {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
@@ -39,8 +40,10 @@ export default function AnomalyReporter({ forcePosition, inline = false }: Anoma
   // nell'angolo in alto a destra. Spostiamo il tasto bug a sinistra per evitare sovrapposizioni.
   const isDetailScreen = pathname.includes('/expense-detail') || pathname.includes('/transaction');
   
-  // Se siamo su una schermata di dettaglio e questa è l'istanza fluttuante globale, nascondila
-  if (!inline && isDetailScreen) {
+  // Se siamo in una delle schermate con pulsante integrato in linea (testata),
+  // nascondiamo il pulsante fluttuante globale.
+  const isSubscriptionsScreen = pathname === '/subscriptions';
+  if (!inline && (isDetailScreen || isSubscriptionsScreen)) {
     return null;
   }
 
@@ -131,13 +134,13 @@ export default function AnomalyReporter({ forcePosition, inline = false }: Anoma
           style={{
             padding: 8,
             borderRadius: 10,
-            backgroundColor: 'rgba(239, 68, 68, 0.1)', // sfumato rosso opaco premium
+            backgroundColor: isWhite ? 'rgba(255, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.1)', // sfumato bianco o rosso opaco premium
             alignItems: 'center',
             justifyContent: 'center',
             marginRight: 6,
           }}
         >
-          <Ionicons name="flag" size={18} color="#EF4444" />
+          <Ionicons name="flag" size={18} color={isWhite ? '#FFFFFF' : '#EF4444'} />
         </Pressable>
 
         {/* Banner / Modal di segnalazione */}

@@ -153,9 +153,12 @@ function SubModal({
         <View style={modal.header}>
           <Pressable onPress={handleClose}><Ionicons name="close" size={26} color={COLORS.primary} /></Pressable>
           <Text style={modal.title}>{initial ? 'Gestisci Abbonamento' : 'Nuovo Abbonamento'}</Text>
-          <Pressable onPress={handleSave} disabled={saving}>
-            <Text style={[modal.save, saving && { opacity: 0.5 }]}>{saving ? '...' : 'Salva'}</Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <AnomalyReporter inline={true} />
+            <Pressable onPress={handleSave} disabled={saving}>
+              <Text style={[modal.save, saving && { opacity: 0.5 }]}>{saving ? '...' : 'Salva'}</Text>
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={modal.content}>
@@ -278,8 +281,6 @@ function SubModal({
             </Pressable>
           )}
         </ScrollView>
-        {/* Renderizziamo AnomalyReporter localmente dentro il Modal per renderlo visibile ed evitare sovrapposizioni */}
-        <AnomalyReporter forcePosition="left" />
       </SafeAreaView>
     </Modal>
   );
@@ -425,11 +426,14 @@ export default function SubscriptionsScreen() {
             style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
           >
             <View style={styles.header}>
-              <View style={{ width: 32 }} />
+              <View style={{ width: 80 }} />
               <Text style={styles.title}>Abbonamenti</Text>
-              <Pressable onPress={() => setShowModal(true)} style={styles.addButton}>
-                <Ionicons name="add" size={22} color="#FFFFFF" />
-              </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Pressable onPress={() => setShowModal(true)} style={styles.addButton}>
+                  <Ionicons name="add" size={22} color="#FFFFFF" />
+                </Pressable>
+                <AnomalyReporter inline={true} isWhite={true} />
+              </View>
             </View>
 
             {/* Summary card inside blue header */}
