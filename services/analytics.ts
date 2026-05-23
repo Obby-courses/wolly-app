@@ -1,3 +1,7 @@
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { supabase } from './supabase';
+
 /**
  * WOLLY ANALYTICS SERVICE
  * 
@@ -50,6 +54,7 @@ export const ANALYTICS_BUTTONS = {
 
 class WollyAnalytics {
   private isDevelopment = __DEV__;
+  private appVersion = Constants.expoConfig?.version || '0.2.0';
 
   /**
    * Traccia la visualizzazione di una schermata (Screen View)
@@ -81,19 +86,44 @@ class WollyAnalytics {
   }
 
   /**
-   * Funzione interna di logging strutturato (pronta per Firebase / Amplitude / Mixpanel)
+   * Funzione interna di logging strutturato (invia a Console + Supabase in background)
    */
-  private logEvent(eventType: 'SCREEN_VIEW' | 'BUTTON_CLICK' | string, payload?: object) {
+  private async logEvent(eventType: 'SCREEN_VIEW' | 'BUTTON_CLICK' | string, payload?: object) {
+    const rawPayload = (payload || {}) as Record<string, any>;
+    const screenName = rawPayload.screen_name || null;
+    const buttonName = rawPayload.button_name || null;
+
+    // Rimuoviamo screen_name e button_name dal payload per non duplicarli nella colonna JSONB
+    const cleanedPayload = { ...rawPayload };
+    delete cleanedPayload.screen_name;
+    delete cleanedPayload.button_name;
+
     if (this.isDevelopment) {
       const emoji = eventType === 'SCREEN_VIEW' ? '📱' : eventType === 'BUTTON_CLICK' ? '⚡' : '📊';
-      console.log(`[WollyAnalytics] ${emoji} [${eventType}]`, JSON.stringify(payload, null, 2));
+      console.log(`[WollyAnalytics] ${emoji} [${eventType}]`, JSON.stringify({ screenName, buttonName, cleanedPayload }, null, 2));
     }
     
-    // NOTA PER FUTURA INTEGRAZIONE CLOUD:
-    // Qui andranno collegate le chiamate native come:
-    // FirebaseAnalytics.logEvent(eventType, payload);
-    // Amplitude.track(eventType, payload);
+    // Invia i dati a Supabase per il calcolo dei KPI
+    try {
+      const { error } = await supabase.from('analytics_events').insert({
+        event_type: eventType,
+        screen_name: screenName,
+        button_name: buttonName,
+        payload: cleanedPayload,
+        device_os: Platform.OS,
+        app_version: this.appVersion,
+      });
+
+      if (error && this.isDevelopment) {
+        console.warn('[WollyAnalytics Error] Impossibile inviare evento a Supabase:', error.message);
+      }
+    } catch (err) {
+      if (this.isDevelopment) {
+        console.warn('[WollyAnalytics Error] Errore di rete Supabase:', err);
+      }
+    }
   }
 }
 
 export const analytics = new WollyAnalytics();
+
