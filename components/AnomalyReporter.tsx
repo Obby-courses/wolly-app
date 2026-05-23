@@ -1,0 +1,297 @@
+import React, { useState } from 'react';
+import {
+  StyleSheet, Text, View, Pressable, TextInput,
+  Modal, ActivityIndicator, Alert, Platform, KeyboardAvoidingView, Keyboard
+} from 'react-native';
+import { usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
+import { supabase } from '../services/supabase';
+import Constants from 'expo-constants';
+
+export default function AnomalyReporter() {
+  const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const appVersion = Constants.expoConfig?.version || '0.2.0';
+
+  // Logica di posizionamento condizionale del pulsante:
+  // In expense-detail (Modifica transazione) e manual-entry (Inserimento manuale) ci sono già pulsanti
+  // nell'angolo in alto a destra. Spostiamo il tasto bug più a sinistra (right: 80) in queste schermate.
+  const isDetailScreen = pathname.includes('/expense-detail') || pathname.includes('/transaction');
+  const isManualEntry = pathname.includes('/manual-entry');
+  const buttonRight = (isDetailScreen || isManualEntry) ? 80 : 16;
+
+  // Non mostrare il pulsante se siamo nella chat vocale a tutto schermo o se stiamo registrando
+  const isVoiceChat = pathname === '/voice-chat';
+  if (isVoiceChat) return null;
+
+  const handleOpen = () => {
+    setMessage('');
+    setModalVisible(true);
+  };
+
+  const handleClose = () => {
+    Keyboard.dismiss();
+    setModalVisible(false);
+  };
+
+  const handleSend = async () => {
+    const cleanMsg = message.trim();
+    if (!cleanMsg) {
+      Alert.alert('Attenzione', 'Inserisci una descrizione per segnalare l\'anomalia.');
+      return;
+    }
+
+    setIsSending(true);
+    Keyboard.dismiss();
+
+    try {
+      const { error } = await supabase.from('anomaly_reports').insert({
+        page_route: pathname,
+        message: cleanMsg,
+        device_os: Platform.OS,
+        app_version: appVersion,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      Alert.alert(
+        'Segnalazione Inviata',
+        'Grazie per il supporto! 💙\nLa tua segnalazione aiuterà a migliorare Wolly.',
+        [{ text: 'Ottimo', onPress: () => setModalVisible(false) }]
+      );
+    } catch (err: any) {
+      console.error('[AnomalyReporter Error] Errore di invio:', err);
+      Alert.alert(
+        'Errore di Invio',
+        'Impossibile inviare la segnalazione a causa di un problema di rete. Riprova più tardi.'
+      );
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <>
+      {/* Pulsante Bug Fluttuante Centralizzato ed Elegante */}
+      <Pressable
+        onPress={handleOpen}
+        style={[
+          styles.bugButton,
+          {
+            top: Platform.OS === 'ios' ? insets.top + 4 : insets.top + 12,
+            right: buttonRight,
+          }
+        ]}
+      >
+        <Ionicons name="bug-outline" size={18} color={COLORS.secondary} />
+      </Pressable>
+
+      {/* Banner / Modal di segnalazione */}
+      <Modal
+        visible={modalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={handleClose}
+      >
+        <Pressable style={styles.overlay} onPress={handleClose}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoid}
+          >
+            {/* Impediamo al tocco sulla card di chiudere il modal */}
+            <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
+              
+              {/* Header */}
+              <View style={styles.cardHeader}>
+                <Ionicons name="bug" size={24} color={COLORS.primary} style={{ marginRight: 8 }} />
+                <Text style={styles.cardTitle}>Segnala un'Anomalia</Text>
+                <Pressable onPress={handleClose} style={styles.closeIcon}>
+                  <Ionicons name="close" size={20} color={COLORS.secondary} />
+                </Pressable>
+              </View>
+
+              <Text style={styles.cardSubtitle}>
+                Aiutaci a migliorare Wolly. Descrivi brevemente cosa non funziona in questa schermata.
+              </Text>
+
+              {/* Informazioni Rotta Attiva */}
+              <View style={styles.pageBadge}>
+                <Text style={styles.pageBadgeLabel}>SCHERMATA:</Text>
+                <Text style={styles.pageBadgeValue} numberOfLines={1}>{pathname || '/'}</Text>
+              </View>
+
+              {/* Messaggio Input */}
+              <TextInput
+                style={styles.textInput}
+                placeholder="es. Il grafico delle spese non mostra le colonne corrette..."
+                placeholderTextColor={COLORS.secondary + '60'}
+                value={message}
+                onChangeText={setMessage}
+                multiline={true}
+                numberOfLines={4}
+                maxLength={500}
+                autoFocus={true}
+                textAlignVertical="top"
+              />
+
+              {/* Bottoni d'azione */}
+              <View style={styles.actionsRow}>
+                <Pressable
+                  onPress={handleClose}
+                  disabled={isSending}
+                  style={[styles.btn, styles.btnCancel]}
+                >
+                  <Text style={styles.btnCancelText}>Annulla</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleSend}
+                  disabled={isSending}
+                  style={[styles.btn, styles.btnSend, isSending && { opacity: 0.7 }]}
+                >
+                  {isSending ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.btnSendText}>Invia</Text>
+                  )}
+                </Pressable>
+              </View>
+
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  bugButton: {
+    position: 'absolute',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    ...SHADOWS.soft,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)', // Sfumatura scura delicata premium
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  keyboardAvoid: {
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  card: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: COLORS.surface,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.medium,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+    flex: 1,
+  },
+  closeIcon: {
+    padding: 4,
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  pageBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  pageBadgeLabel: {
+    fontSize: 9,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+    marginRight: 6,
+  },
+  pageBadgeValue: {
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+    flex: 1,
+  },
+  textInput: {
+    height: 100,
+    backgroundColor: COLORS.background,
+    borderRadius: 14,
+    padding: 12,
+    fontSize: 14,
+    color: COLORS.primary,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 18,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  btn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnCancel: {
+    backgroundColor: '#F3F4F6',
+  },
+  btnCancelText: {
+    fontSize: 13,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+  },
+  btnSend: {
+    backgroundColor: COLORS.primary,
+    minWidth: 70,
+    ...SHADOWS.soft,
+  },
+  btnSendText: {
+    fontSize: 13,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: '#FFF',
+  },
+});
