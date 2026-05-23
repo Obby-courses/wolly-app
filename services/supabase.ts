@@ -1,26 +1,44 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL || '').trim();
+const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '').trim();
 
-// Controlla se le chiavi Supabase fornite sono quelle segnaposto o vuote
+// Pulisci le virgolette se presenti per errore
+const cleanUrl = supabaseUrl.replace(/['"]/g, '');
+const cleanKey = supabaseAnonKey.replace(/['"]/g, '');
+
+// Controlla se le chiavi Supabase fornite sono quelle segnaposto o vuote e se l'URL è formalmente valido
 export const isSupabaseConfigured = (): boolean => {
+  const isValidUrl = cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://');
   return (
-    !!supabaseUrl &&
-    supabaseUrl.trim() !== '' &&
-    !supabaseUrl.includes('xyz.supabase.co') &&
-    !!supabaseAnonKey &&
-    supabaseAnonKey.trim() !== '' &&
-    supabaseAnonKey !== 'your_anon_public_key_here'
+    !!cleanUrl &&
+    cleanUrl !== '' &&
+    !cleanUrl.includes('xyz.supabase.co') &&
+    isValidUrl &&
+    !!cleanKey &&
+    cleanKey !== '' &&
+    cleanKey !== 'your_anon_public_key_here'
   );
 };
 
-const actualUrl = isSupabaseConfigured() ? supabaseUrl : 'https://placeholder-url-for-supabase.co';
-const actualKey = isSupabaseConfigured() ? supabaseAnonKey : 'placeholder-key';
+const actualUrl = isSupabaseConfigured() ? cleanUrl : 'https://placeholder-url-for-supabase.co';
+const actualKey = isSupabaseConfigured() ? cleanKey : 'placeholder-key';
 
-// Istanziazione del client Supabase per la gestione delle chiamate cloud
-export const supabase = createClient(actualUrl, actualKey, {
-  auth: {
-    persistSession: false, // Disabilitiamo la persistenza per il log degli eventi analitici anonimi
-  },
-});
+let client: any;
+try {
+  client = createClient(actualUrl, actualKey, {
+    auth: {
+      persistSession: false, // Disabilitiamo la persistenza per il log degli eventi analitici anonimi
+    },
+  });
+} catch (e) {
+  console.warn('[Supabase Init Warning] Errore durante l\'inizializzazione di Supabase:', e);
+  // Fallback sicuro per evitare crash all'avvio dell'applicazione
+  client = createClient('https://placeholder-url-for-supabase.co', 'placeholder-key', {
+    auth: {
+      persistSession: false,
+    },
+  });
+}
+
+export const supabase = client;
