@@ -97,20 +97,42 @@ export default function BottomMenu() {
     toastTimerRef.current = setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const handleCamera = async () => {
+  const handleCamera = () => {
+    Alert.alert(
+      "Carica Scontrino",
+      "Scegli la modalità di inserimento dello scontrino:",
+      [
+        {
+          text: "Scatta Foto",
+          onPress: () => processReceipt(true),
+        },
+        {
+          text: "Scegli dalla Galleria",
+          onPress: () => processReceipt(false),
+        },
+        {
+          text: "Annulla",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const processReceipt = async (useCamera: boolean) => {
     try {
       setIsProcessing(true);
-      const parsed = await parseFromReceipt(true, undefined);
+      const parsed = await parseFromReceipt(useCamera, undefined);
       if (parsed === null) return;
 
       if (parsed && parsed.amount > 0) {
-        // Collapser menu immediately
+        // Collassa il menu immediatamente
         setIsExpanded(false);
         router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
       } else {
         Alert.alert(
           "Scontrino non riconosciuto",
-          "La foto non sembra contenere uno scontrino valido o leggibile. Riprova.",
+          "L'immagine non sembra contenere uno scontrino valido o leggibile. Riprova.",
           [{ text: "OK" }]
         );
       }
@@ -118,7 +140,7 @@ export default function BottomMenu() {
       console.error('Error parsing camera/receipt:', error);
       Alert.alert(
         "Scontrino non riconosciuto",
-        "La foto non sembra contenere uno scontrino valido o leggibile. Riprova.",
+        "L'immagine non sembra contenere uno scontrino valido o leggibile. Riprova.",
         [{ text: "OK" }]
       );
     } finally {
