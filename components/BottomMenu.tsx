@@ -11,6 +11,9 @@ import { voiceStore } from '../services/voiceStore';
 import { Audio } from 'expo-av';
 import { networkStore } from '../services/networkStore';
 import { analytics } from '../services/analytics';
+import Svg, { Circle } from 'react-native-svg';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const CANCEL_THRESHOLD_X = -50;
 const MIN_RECORDING_DURATION = 500;
@@ -97,31 +100,10 @@ export default function BottomMenu() {
     toastTimerRef.current = setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const handleCamera = () => {
-    Alert.alert(
-      "Carica Scontrino",
-      "Scegli da dove acquisire lo scontrino",
-      [
-        {
-          text: "Scatta Foto",
-          onPress: () => executeReceiptParsing(true),
-        },
-        {
-          text: "Scegli dalla Galleria",
-          onPress: () => executeReceiptParsing(false),
-        },
-        {
-          text: "Annulla",
-          style: "cancel",
-        }
-      ]
-    );
-  };
-
-  const executeReceiptParsing = async (useCamera: boolean) => {
+  const handleCamera = async () => {
     try {
       setIsProcessing(true);
-      const parsed = await parseFromReceipt(useCamera, undefined);
+      const parsed = await parseFromReceipt(true, undefined);
       if (parsed === null) return;
 
       if (parsed && parsed.amount > 0) {
@@ -172,6 +154,53 @@ export default function BottomMenu() {
   const holdTimeoutRef = useRef<any>(null);
   const hasStartedRecordingRef = useRef(false);
   const isReleasingRef = useRef(false);
+  
+  const progressAnim = useRef(new Animated.Value(1)).current;
+
+  const handleAutoSend = async () => {
+    if (isReleasingRef.current) return;
+    isReleasingRef.current = true;
+
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current);
+      holdTimeoutRef.current = null;
+    }
+
+    const state = voiceStore.getState();
+    if (!state.isRecording) return;
+
+    // Stop recording and get URI
+    const result = await voiceStore.stopAndGetUri();
+    if (!result || !result.uri) {
+      voiceStore.close();
+      setIsExpanded(false);
+      return;
+    }
+
+    analytics.trackEvent('voice_rec_stop_auto_15s', { screen: pathname });
+    // Process voice input automatically
+    voiceStore.processVoiceInput(result.uri);
+    setIsExpanded(false);
+  };
+
+  useEffect(() => {
+    if (voiceState.isRecording) {
+      progressAnim.setValue(1);
+      // Animate the circle stroke from 1 (full) to 0 (empty) over exactly 15 seconds
+      Animated.timing(progressAnim, {
+        toValue: 0,
+        duration: 15000,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) {
+          handleAutoSend();
+        }
+      });
+    } else {
+      progressAnim.setValue(1);
+      progressAnim.stopAnimation();
+    }
+  }, [voiceState.isRecording]);
 
   const primaryPanResponder = useRef(
     PanResponder.create({
@@ -341,6 +370,16 @@ export default function BottomMenu() {
     outputRange: [0, 0, 1],
   });
 
+  // Circular progress configuration for 15s recording limit
+  const PROGRESS_RADIUS = 16;
+  const PROGRESS_STROKE_WIDTH = 3;
+  const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RADIUS;
+
+  const strokeDashoffset = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [PROGRESS_CIRCUMFERENCE, 0],
+  });
+
   // Nascondiamo il menu sotto la tastiera se attiva
   if (isKeyboardVisible) return null;
 
@@ -349,13 +388,43 @@ export default function BottomMenu() {
       <View style={styles.container}>
         <View style={styles.row}>
           
-          {/* LEFT SIDE: Navigation Icons OR Close button in voice chat / Plus button in text chat */}
+          {/* LEFT SIDE: Navigation Icons OR Close button/Progress in voice chat / Plus button in text chat */}
           <View style={styles.leftContainer}>
             {isVoiceChat ? (
-              // In voice chat, close button X is moved to the far left corner
-              <Pressable onPress={handleVoiceClose} style={styles.closeBtn}>
-                <Ionicons name="close" size={24} color="#1C1C1E" />
-              </Pressable>
+              isRecording ? (
+                // Circular progress ring showing time remaining for the 15-second recording limit (no fill)
+                <View style={styles.progressCircleContainer}>
+                  <Svg width={40} height={40} viewBox="0 0 40 40">
+                    {/* Background track circle (subtle outline, transparent fill) */}
+                    <Circle
+                      cx="20"
+                      cy="20"
+                      r={PROGRESS_RADIUS}
+                      fill="none"
+                      stroke="#E5E5EA"
+                      strokeWidth={PROGRESS_STROKE_WIDTH}
+                    />
+                    {/* Active progress stroke that shrinks as the 15 seconds pass */}
+                    <AnimatedCircle
+                      cx="20"
+                      cy="20"
+                      r={PROGRESS_RADIUS}
+                      fill="none"
+                      stroke={COLORS.brandBlue}
+                      strokeWidth={PROGRESS_STROKE_WIDTH}
+                      strokeDasharray={`${PROGRESS_CIRCUMFERENCE} ${PROGRESS_CIRCUMFERENCE}`}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      transform="rotate(-90 20 20)"
+                    />
+                  </Svg>
+                </View>
+              ) : (
+                // In voice chat idle/response mode, show standard close button
+                <Pressable onPress={handleVoiceClose} style={styles.closeBtn}>
+                  <Ionicons name="close" size={24} color="#1C1C1E" />
+                </Pressable>
+              )
             ) : isTextChat && !isExpanded ? (
               // In text chat active and not expanded, show the plus (+) button in the bottom-left corner
               <Pressable
@@ -578,6 +647,12 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#F2F2F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressCircleContainer: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
