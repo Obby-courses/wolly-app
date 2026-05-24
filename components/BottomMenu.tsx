@@ -97,20 +97,41 @@ export default function BottomMenu() {
     toastTimerRef.current = setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const processReceipt = async (useCamera: boolean) => {
+  const handleCamera = () => {
+    Alert.alert(
+      "Carica Scontrino",
+      "Scegli da dove acquisire lo scontrino",
+      [
+        {
+          text: "Scatta Foto",
+          onPress: () => executeReceiptParsing(true),
+        },
+        {
+          text: "Scegli dalla Galleria",
+          onPress: () => executeReceiptParsing(false),
+        },
+        {
+          text: "Annulla",
+          style: "cancel",
+        }
+      ]
+    );
+  };
+
+  const executeReceiptParsing = async (useCamera: boolean) => {
     try {
       setIsProcessing(true);
       const parsed = await parseFromReceipt(useCamera, undefined);
       if (parsed === null) return;
 
       if (parsed && parsed.amount > 0) {
-        // Collassa il menu immediatamente
+        // Collapser menu immediately
         setIsExpanded(false);
         router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
       } else {
         Alert.alert(
           "Scontrino non riconosciuto",
-          "L'immagine non sembra contenere uno scontrino valido o leggibile. Riprova.",
+          "La foto non sembra contenere uno scontrino valido o leggibile. Riprova.",
           [{ text: "OK" }]
         );
       }
@@ -118,7 +139,7 @@ export default function BottomMenu() {
       console.error('Error parsing camera/receipt:', error);
       Alert.alert(
         "Scontrino non riconosciuto",
-        "L'immagine non sembra contenere uno scontrino valido o leggibile. Riprova.",
+        "La foto non sembra contenere uno scontrino valido o leggibile. Riprova.",
         [{ text: "OK" }]
       );
     } finally {
@@ -301,13 +322,9 @@ export default function BottomMenu() {
     );
   };
 
-  // Interpolations for horizontal slide menu [Back] [Galleria] [Foto] [Chat] [Audio]
+  // Interpolations for horizontal slide menu [Back] [Foto] [Chat] [Audio]
   // Spacing: width 80, gap 8 -> step is 88
   const backTranslateX = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -352],
-  });
-  const galleryTranslateX = expandAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -264],
   });
@@ -442,36 +459,11 @@ export default function BottomMenu() {
                     style={styles.pressable} 
                     onPress={() => {
                       analytics.trackClick('btn_camera_scontrino_open', pathname);
-                      processReceipt(true);
+                      handleCamera();
                     }} 
                     disabled={isProcessing}
                   >
                     <Ionicons name="camera" size={20} color="#FFF" />
-                  </Pressable>
-                </Animated.View>
-
-                {/* Galleria tool button */}
-                <Animated.View
-                  pointerEvents={isExpanded ? 'auto' : 'none'}
-                  style={[
-                    styles.toolBtn,
-                    {
-                      position: 'absolute',
-                      right: 0,
-                      transform: [{ translateX: galleryTranslateX }],
-                      opacity: toolOpacity,
-                    },
-                  ]}
-                >
-                  <Pressable 
-                    style={styles.pressable} 
-                    onPress={() => {
-                      analytics.trackClick('btn_gallery_scontrino_open', pathname);
-                      processReceipt(false);
-                    }} 
-                    disabled={isProcessing}
-                  >
-                    <Ionicons name="image" size={20} color="#FFF" />
                   </Pressable>
                 </Animated.View>
 
