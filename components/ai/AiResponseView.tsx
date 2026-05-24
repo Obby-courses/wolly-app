@@ -13,19 +13,19 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING } from '../../constants/Theme';
 import { AiChatResponse } from '../../services/aiChat';
 import { QueryIntent } from '../../services/aiQueryParser';
 import { Ionicons } from '@expo/vector-icons';
-import { DOMAINS_CONFIG } from '../../constants/categories';
 
 import JitTotal        from './JitTotal';
 import JitDistribution from './JitDistribution';
 import JitList         from './JitList';
 import JitTimeline     from './JitTimeline';
 import JitSubscriptions from './JitSubscriptions';
-import FeedbackBar     from './FeedbackBar';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ interface AiResponseViewProps {
   answer: AiChatResponse;
   /**
    * Callback per rieseguire la query con un intent modificato
-   * (passata a FeedbackBar). Se undefined, FeedbackBar non viene mostrata.
+   * (non più utilizzato per la FeedbackBar in quanto rimossa, mantenuta per firma retrocompatibile).
    */
   onRerun?: (newIntent: QueryIntent) => void;
   /** Stile opzionale per il testo della risposta (es: font size) */
@@ -47,101 +47,50 @@ interface AiResponseViewProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-function renderFormattedText(text: string, queryIntent?: QueryIntent) {
+function renderFormattedText(text: string, queryIntent: QueryIntent | undefined, hasChart: boolean) {
   if (!text) return null;
 
   const escapeRegExp = (str: string) => {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   };
 
-  // 1. Cities (città) -> location pin icon
-  const cities = new Set<string>(['milano', 'roma', 'torino', 'napoli', 'venezia', 'firenze', 'bologna', 'palermo', 'genova', 'bari']);
-  if (queryIntent?.city_filter) cities.add(queryIntent.city_filter.toLowerCase());
-
-  // 2. Tags (tag) -> flag icon
-  const tags = new Set<string>(['vacanza', 'lavoro', 'weekend', 'regalo', 'trasferta', 'impulsivo', 'personale']);
-  if (queryIntent?.tag_filter) tags.add(queryIntent.tag_filter.toLowerCase());
-
-  // 3. Categories & Domains (categorie tutte uguali) -> folder icon
-  const categories = new Set<string>();
-  if (queryIntent?.category_filter) categories.add(queryIntent.category_filter.toLowerCase().replace(/_/g, ' '));
-  if (queryIntent?.domain_filter) categories.add(queryIntent.domain_filter.toLowerCase().replace(/_/g, ' '));
-  DOMAINS_CONFIG.forEach(d => {
-    categories.add(d.label.toLowerCase());
-    d.categories.forEach(c => {
-      categories.add(c.label.toLowerCase());
-      c.label.split(',').forEach(p => {
-        const clean = p.trim().toLowerCase();
-        if (clean.length > 3) categories.add(clean);
-      });
-    });
-  });
-
-  // 4. Merchants / Shops (negozi/merchant) -> cart icon
-  const merchants = new Set<string>(['esselunga', 'coop', 'conad', 'carrefour', 'lidl', 'amazon', 'netflix', 'spotify', 'starbucks', 'mcdonald', 'mcdonalds', 'apple', 'uber', 'shein', 'zara', 'h&m']);
-  if (queryIntent?.merchant_filter) merchants.add(queryIntent.merchant_filter.toLowerCase());
-
-  // 5. Payment Methods (metodi di pagamento) -> card icon
-  const paymentMethods = new Set<string>(['carta', 'bancomat', 'contanti', 'carta di credito', 'apple pay', 'google pay', 'paypal', 'bonifico']);
-
-  // 6. Social Context / People (persone e contesti sociali) -> people icon
-  const socialContexts = new Set<string>(['friends', 'amici', 'family', 'famiglia', 'colleagues', 'colleghi', 'couple', 'coppia', 'alone', 'solo', 'strangers', 'sconosciuti']);
-  if (queryIntent?.social_context_filter) socialContexts.add(queryIntent.social_context_filter.toLowerCase());
-  if (queryIntent?.person_filter) socialContexts.add(queryIntent.person_filter.toLowerCase());
-
-  // 7. Holidays (festività) -> gift icon
-  const holidays = new Set<string>(['natale', 'pasqua', 'capodanno', 'ferragosto', 'halloween', 'compleanno']);
-  if (queryIntent?.holiday_filter) holidays.add(queryIntent.holiday_filter.toLowerCase());
-
-  // 8. Subscriptions / Recurring (abbonamenti e ricorrenti) -> repeat icon
-  const subscriptions = new Set<string>(['abbonamento', 'abbonamenti', 'ricorrente', 'mensile', 'annuale', 'netflix', 'spotify', 'prime', 'disney+']);
-
-  // 9. Amounts / Financial terms (importi e voci finanziarie) -> cash/money icon
-  const amounts = new Set<string>(['euro', 'eur', 'totale', 'totali', 'somma', 'media', 'medie', 'speso', 'spesa', 'spese', 'guadagno', 'guadagni', 'entrate']);
-
-  const allTerms = [
-    ...Array.from(cities).map(t => ({ text: t, type: 'city', icon: 'location-sharp', color: '#0A74FF' })),
-    ...Array.from(tags).map(t => ({ text: t, type: 'tag', icon: 'flag-sharp', color: '#AF52DE' })),
-    ...Array.from(categories).map(t => ({ text: t, type: 'category', icon: 'folder-sharp', color: '#34C759' })),
-    ...Array.from(merchants).map(t => ({ text: t, type: 'merchant', icon: 'cart-sharp', color: '#FF2D55' })),
-    ...Array.from(paymentMethods).map(t => ({ text: t, type: 'payment', icon: 'card-sharp', color: '#FF9500' })),
-    ...Array.from(socialContexts).map(t => ({ text: t, type: 'social', icon: 'people-sharp', color: '#5AC8FA' })),
-    ...Array.from(holidays).map(t => ({ text: t, type: 'holiday', icon: 'gift-sharp', color: '#FF3B30' })),
-    ...Array.from(subscriptions).map(t => ({ text: t, type: 'subscription', icon: 'repeat-sharp', color: '#5856D6' })),
-    ...Array.from(amounts).map(t => ({ text: t, type: 'amount', icon: 'cash-sharp', color: '#FFCC00' }))
-  ]
-    .filter(t => t.text && t.text.trim().length > 1)
-    .sort((a, b) => b.text.length - a.text.length);
-
-  if (allTerms.length === 0) {
-    return <Text style={{ color: '#8E8E93' }}>{text}</Text>;
+  // Mappa dei Merchant (negozi/merchant) -> cart icon
+  const merchantSet = new Set<string>(['eurospin', 'esselunga', 'amazon', 'netflix', 'spotify', 'coop', 'conad', 'carrefour', 'lidl', 'starbucks', 'mcdonald', 'mcdonalds', 'apple', 'uber', 'shein', 'zara', 'h&m']);
+  if (queryIntent?.merchant_filter) {
+    const cleanMerchant = queryIntent.merchant_filter.toLowerCase().trim();
+    if (cleanMerchant.length > 1) {
+      merchantSet.add(cleanMerchant);
+    }
   }
 
-  // Build combined regex using escaped patterns
-  const patterns = allTerms.map(t => escapeRegExp(t.text));
-  const regex = new RegExp('\\b(' + patterns.join('|') + ')\\b', 'gi');
+  const merchantPatterns = Array.from(merchantSet).map(m => escapeRegExp(m));
+  const merchantRegexStr = `\\b(?:${merchantPatterns.join('|')})\\b`;
+
+  // Pattern degli Importi (Metriche e valori monetari) -> cash icon
+  const amountRegexStr = '\\b\\d+(?:[.,]\\d+)?\\s*(?:€|euro|eur|euri)\\b|\\b(?:€|euro|eur)\\s*\\d+(?:[.,]\\d+)?\\b';
+
+  // Costruisce la regex combinata che cattura solo metriche e merchant (escludendo le dimensioni filtrate come città, tag, categorie)
+  const regex = new RegExp(`(${amountRegexStr}|${merchantRegexStr})`, 'gi');
 
   const parts = text.split(regex);
   return (
-    <Text style={{ textAlign: 'left' }}>
+    <Text style={{ textAlign: hasChart ? 'left' : 'center' }}>
       {parts.map((part, index) => {
         if (index % 2 === 0) {
           // Testo naturale (leggermente grigio)
           return <Text key={index} style={{ color: '#8E8E93' }}>{part}</Text>;
         } else {
-          // Voce evidenziata (nero con icona colorata)
-          const lowerPart = part.toLowerCase();
-          const match = allTerms.find(t => t.text === lowerPart || lowerPart.includes(t.text) || t.text.includes(lowerPart));
-          
-          if (match) {
-            return (
-              <Text key={index} style={{ color: '#1C1C1E', fontWeight: 'bold' }}>
-                <Ionicons name={match.icon as any} size={14} color={match.color} />
-                {' '}{part}
-              </Text>
-            );
-          }
-          return <Text key={index} style={{ color: '#8E8E93' }}>{part}</Text>;
+          // Metrica o Merchant evidenziato (nero in grassetto con icona iOS a sinistra)
+          const isAmt = /\d/.test(part) || /€|euro|eur/i.test(part);
+          const iconName = isAmt ? 'cash-sharp' : 'cart-sharp';
+          const iconColor = isAmt ? '#34C759' : '#FF2D55'; // Verde per cash/metriche, Rosa/Rosso per merchant
+
+          return (
+            <Text key={index} style={{ color: '#1C1C1E', fontWeight: 'bold' }}>
+              <Ionicons name={iconName} size={14} color={iconColor} />
+              {' '}{part}
+            </Text>
+          );
         }
       })}
     </Text>
@@ -156,30 +105,43 @@ export default function AiResponseView({
   scrollable = true,
 }: AiResponseViewProps) {
 
-  const isTextOnly = answer.intent === 'text' || answer.intent === 'advice';
+  // Definiamo se sono presenti grafici/visualizzazioni complesse (distribution e timeline sono i grafici principali)
+  const hasChart = ['distribution', 'timeline'].includes(answer.intent);
+
+  // Calcolo dinamico della dimensione del testo per i casi senza grafici (massimo risalto e leggibilità premium)
+  const textLength = answer.text_response?.length || 0;
+  let dynamicFontSize = 20;
+  if (textLength < 40) {
+    dynamicFontSize = 34;
+  } else if (textLength < 80) {
+    dynamicFontSize = 28;
+  } else if (textLength < 150) {
+    dynamicFontSize = 22;
+  } else {
+    dynamicFontSize = 18;
+  }
+  const dynamicLineHeight = dynamicFontSize * 1.38;
 
   const body = (
-    <>
-      {/* Domanda utente — piccola in cima */}
-      <View style={styles.questionContainer}>
-        <Text style={styles.questionText}>{question}</Text>
+    <View style={hasChart ? styles.leftContainer : styles.centeredContainer}>
+      {/* Domanda utente — in grigio, centrata o a sinistra in base al layout */}
+      <View style={hasChart ? styles.questionContainerLeft : styles.questionContainerCenter}>
+        <Text style={hasChart ? styles.questionTextLeft : styles.questionTextCenter}>{question}</Text>
       </View>
 
-      {/* FeedbackBar — solo per intent con dati e se onRerun è disponibile */}
-      {!isTextOnly && onRerun && answer.queryIntent && (
-        <FeedbackBar
-          intent={answer.queryIntent}
-          onUpdate={onRerun}
-        />
-      )}
-
-      {/* Testo risposta principale */}
-      <Text style={[isTextOnly ? styles.bigAnswerText : styles.answerContextText, textStyle]}>
-        {renderFormattedText(answer.text_response, answer.queryIntent)}
+      {/* Testo risposta principale in grassetto, con dimensione e allineamento dinamici */}
+      <Text
+        style={[
+          hasChart ? styles.answerLeft : styles.answerCenter,
+          { fontSize: hasChart ? 18 : dynamicFontSize, lineHeight: hasChart ? 26 : dynamicLineHeight },
+          textStyle,
+        ]}
+      >
+        {renderFormattedText(answer.text_response, answer.queryIntent, hasChart)}
       </Text>
 
       {/* ── JIT Widgets ──────────────────────────────────────────────────── */}
-      <View style={styles.jitWrapper}>
+      <View style={hasChart ? styles.jitWrapperLeft : styles.jitWrapperCenter}>
 
         {answer.intent === 'total' && answer.total_data && (
           <JitTotal
@@ -189,7 +151,7 @@ export default function AiResponseView({
           />
         )}
 
-        {answer.intent === 'distribution' && answer.distribution_data && (
+        {hasChart && answer.intent === 'distribution' && answer.distribution_data && (
           <JitDistribution
             title={answer.distribution_data.title}
             items={answer.distribution_data.items}
@@ -204,7 +166,7 @@ export default function AiResponseView({
           />
         )}
 
-        {answer.intent === 'timeline' && answer.timeline_data && (
+        {hasChart && answer.intent === 'timeline' && answer.timeline_data && (
           <JitTimeline
             type={answer.timeline_data.type}
             title={answer.timeline_data.title}
@@ -221,7 +183,7 @@ export default function AiResponseView({
         )}
 
       </View>
-    </>
+    </View>
   );
 
   if (!scrollable) {
@@ -231,7 +193,7 @@ export default function AiResponseView({
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={hasChart ? styles.scrollContentLeft : styles.scrollContentCenter}
       showsVerticalScrollIndicator={false}
     >
       {body}
@@ -249,42 +211,73 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
-  scrollContent: {
+  scrollContentLeft: {
     flexGrow: 1,
     alignItems: 'flex-start',
     paddingHorizontal: SPACING.lg,
     paddingVertical: 32,
   },
-  questionContainer: {
+  scrollContentCenter: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: 32,
+  },
+  leftContainer: {
+    width: '100%',
+    alignItems: 'flex-start',
+  },
+  centeredContainer: {
+    width: '100%',
+    minHeight: SCREEN_HEIGHT * 0.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  questionContainerLeft: {
     alignItems: 'flex-start',
     marginBottom: 8,
     width: '100%',
   },
-  questionText: {
+  questionContainerCenter: {
+    alignItems: 'center',
+    marginBottom: 12,
+    width: '100%',
+  },
+  questionTextLeft: {
     fontFamily: TYPOGRAPHY.fontFamily,
     fontSize: 13,
     color: COLORS.secondary,
     textAlign: 'left',
     opacity: 0.8,
   },
-  bigAnswerText: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 26,
-    color: COLORS.primary,
-    textAlign: 'left',
-    lineHeight: 36,
-    marginTop: 8,
+  questionTextCenter: {
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: 14,
+    color: COLORS.secondary,
+    textAlign: 'center',
+    opacity: 0.8,
   },
-  answerContextText: {
+  answerLeft: {
     fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 18,
     color: COLORS.secondary,
     textAlign: 'left',
     marginTop: 4,
   },
-  jitWrapper: {
+  answerCenter: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  jitWrapperLeft: {
     marginTop: 32,
     alignItems: 'flex-start',
+    width: '100%',
+  },
+  jitWrapperCenter: {
+    marginTop: 24,
+    alignItems: 'center',
     width: '100%',
   },
 });
