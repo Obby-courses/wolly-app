@@ -57,7 +57,9 @@ export default function AiChatPage() {
     const unsub = aiChatStore.subscribe(() => {
       setIsTyping(aiChatStore.getIsTyping());
     });
-    return () => unsub();
+    return () => {
+      unsub();
+    };
   }, []);
 
   // Auto-send message when navigated with params.message
