@@ -97,28 +97,6 @@ export default function BottomMenu() {
     toastTimerRef.current = setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const handleCamera = () => {
-    Alert.alert(
-      "Carica Scontrino",
-      "Scegli la modalità di inserimento dello scontrino:",
-      [
-        {
-          text: "Scatta Foto",
-          onPress: () => processReceipt(true),
-        },
-        {
-          text: "Scegli dalla Galleria",
-          onPress: () => processReceipt(false),
-        },
-        {
-          text: "Annulla",
-          style: "cancel",
-        },
-      ],
-      { cancelable: true }
-    );
-  };
-
   const processReceipt = async (useCamera: boolean) => {
     try {
       setIsProcessing(true);
@@ -323,9 +301,13 @@ export default function BottomMenu() {
     );
   };
 
-  // Interpolations for horizontal slide menu [Back] [Foto] [Chat] [Audio]
+  // Interpolations for horizontal slide menu [Back] [Galleria] [Foto] [Chat] [Audio]
   // Spacing: width 80, gap 8 -> step is 88
   const backTranslateX = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -352],
+  });
+  const galleryTranslateX = expandAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -264],
   });
@@ -460,11 +442,36 @@ export default function BottomMenu() {
                     style={styles.pressable} 
                     onPress={() => {
                       analytics.trackClick('btn_camera_scontrino_open', pathname);
-                      handleCamera();
+                      processReceipt(true);
                     }} 
                     disabled={isProcessing}
                   >
                     <Ionicons name="camera" size={20} color="#FFF" />
+                  </Pressable>
+                </Animated.View>
+
+                {/* Galleria tool button */}
+                <Animated.View
+                  pointerEvents={isExpanded ? 'auto' : 'none'}
+                  style={[
+                    styles.toolBtn,
+                    {
+                      position: 'absolute',
+                      right: 0,
+                      transform: [{ translateX: galleryTranslateX }],
+                      opacity: toolOpacity,
+                    },
+                  ]}
+                >
+                  <Pressable 
+                    style={styles.pressable} 
+                    onPress={() => {
+                      analytics.trackClick('btn_gallery_scontrino_open', pathname);
+                      processReceipt(false);
+                    }} 
+                    disabled={isProcessing}
+                  >
+                    <Ionicons name="image" size={20} color="#FFF" />
                   </Pressable>
                 </Animated.View>
 
