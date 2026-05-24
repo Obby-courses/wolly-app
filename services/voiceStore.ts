@@ -39,6 +39,9 @@ function notify() {
   listeners.forEach(l => l());
 }
 
+// Module-level lock for active recording promise to handle quick tap/release race conditions
+let activeRecordingPromise: Promise<Audio.Recording | null> | null = null;
+
 export const voiceStore = {
   getState: () => ({ ...state }),
 
@@ -83,39 +86,68 @@ export const voiceStore = {
     state = { 
       ...state, 
       recording: null, 
-      isRecording: false, 
+      isRecording: true, // Set to true immediately for instantaneous UI feedback
+      isOpen: true,
       isLoading: false, 
-      qa: null 
+      qa: null,
+      recordingStartTime: Date.now()
     };
     notify();
 
-    try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+    activeRecordingPromise = (async () => {
+      try {
+        // Essential Safeguard: Ensure microphone permission is requested dynamically
+        const permission = await Audio.requestPermissionsAsync();
+        if (permission.status !== 'granted') {
+          throw new Error('Microphone permission not granted');
+        }
 
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
 
-      state = {
-        ...state,
-        recording,
-        isRecording: true,
-        recordingStartTime: Date.now(),
-        isOpen: true,
-      };
-      notify();
-    } catch (err) {
-      console.error('[voiceStore] startRecording failed:', err);
-      state = { ...state, recording: null, isRecording: false, isOpen: false };
-      notify();
-    }
+        const { recording } = await Audio.Recording.createAsync(
+          Audio.RecordingOptionsPresets.HIGH_QUALITY
+        );
+
+        // If user already released the button or cancelled while we were initializing, cleanup immediately
+        if (!state.isOpen && !state.isRecording) {
+          console.log('[voiceStore] Recording resolved after button release/cancel, unloading...');
+          await recording.stopAndUnloadAsync();
+          return null;
+        }
+
+        state = {
+          ...state,
+          recording,
+          isRecording: true,
+          recordingStartTime: Date.now(),
+        };
+        notify();
+        return recording;
+      } catch (err) {
+        console.error('[voiceStore] startRecording promise failed:', err);
+        state = { ...state, recording: null, isRecording: false, isOpen: false };
+        notify();
+        return null;
+      }
+    })();
+
+    await activeRecordingPromise;
   },
 
   stopAndGetUri: async (): Promise<{ uri: string | null; duration: number } | null> => {
-    if (!state.recording) return null;
+    // Wait for the recording to finish initializing if it's still running
+    if (activeRecordingPromise) {
+      await activeRecordingPromise;
+    }
+
+    if (!state.recording) {
+      console.log('[voiceStore] stopAndGetUri failed: no active recording after initialization');
+      return null;
+    }
+
     const duration = Date.now() - state.recordingStartTime;
     const rec = state.recording;
 
@@ -129,10 +161,17 @@ export const voiceStore = {
     } catch (err) {
       console.error('[voiceStore] stopAndGetUri failed:', err);
       return null;
+    } finally {
+      activeRecordingPromise = null;
     }
   },
 
   cancelRecording: async () => {
+    // Wait for the recording to finish initializing before cancelling
+    if (activeRecordingPromise) {
+      try { await activeRecordingPromise; } catch (_) {}
+    }
+
     const rec = state.recording;
     state = {
       ...state,
@@ -145,6 +184,7 @@ export const voiceStore = {
     if (rec) {
       try { await rec.stopAndUnloadAsync(); } catch (_) {}
     }
+    activeRecordingPromise = null;
   },
 
   /**
