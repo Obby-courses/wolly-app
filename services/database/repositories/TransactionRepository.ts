@@ -253,40 +253,26 @@ export class TransactionRepository {
   static async getStatsForAllTime(): Promise<{ label: string, income: number, expense: number }[]> {
     const db = await getDBConnection();
     
-    // 1. Get total span
-    const spanResult = await db.getFirstAsync(`
-      SELECT 
-        MIN(date) as first_date,
-        MAX(date) as last_date,
-        (julianday(MAX(date)) - julianday(MIN(date))) / 30 as months_span
-      FROM transactions 
-      WHERE is_deleted = 0 AND direction != 'adj'
+    // Retrieve the initial onboarding date from net_worth table
+    const onboardingResult = await db.getFirstAsync<{ updated_at: string }>(`
+      SELECT updated_at FROM net_worth ORDER BY updated_at ASC LIMIT 1
     `);
-
-    if (!spanResult || !(spanResult as any).first_date) return [];
-
-    const monthsSpan = (spanResult as any).months_span || 0;
-
-    if (monthsSpan < 60) {
-      // Group by Month
-      const results = await db.getAllAsync(`
-        SELECT 
-          strftime('%Y-%m', date) as period,
-          SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END) as income,
-          SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END) as expense
-        FROM transactions
-        WHERE is_deleted = 0 AND direction != 'adj'
-        GROUP BY period
-        ORDER BY period ASC
-      `);
-      return results.map((r: any) => ({
-        label: r.period.split('-')[1] + '/' + r.period.split('-')[0].slice(2),
-        income: r.income,
-        expense: r.expense
-      }));
-    } else {
-      // Group by Year
-      const results = await db.getAllAsync(`
+    const onboardingDateStr = onboardingResult?.updated_at ? onboardingResult.updated_at.split('T')[0] : '2026-01-01';
+    
+    const start = new Date(onboardingDateStr);
+    const end = new Date();
+    if (isNaN(start.getTime())) start.setTime(new Date('2026-01-01').getTime());
+    
+    const current = new Date(start.getFullYear(), start.getMonth(), 1);
+    const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
+    
+    const totalMonths = (targetEnd.getFullYear() - current.getFullYear()) * 12 + (targetEnd.getMonth() - current.getMonth());
+    const groupByYear = totalMonths > 60;
+    
+    const stats = [];
+    
+    if (groupByYear) {
+      const results = await db.getAllAsync<any>(`
         SELECT 
           strftime('%Y', date) as period,
           SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END) as income,
@@ -296,12 +282,45 @@ export class TransactionRepository {
         GROUP BY period
         ORDER BY period ASC
       `);
-      return results.map((r: any) => ({
-        label: r.period,
-        income: r.income,
-        expense: r.expense
-      }));
+      
+      const currentYear = current.getFullYear();
+      const targetYear = targetEnd.getFullYear();
+      
+      for (let y = currentYear; y <= targetYear; y++) {
+        const match = results.find(r => r.period === y.toString());
+        stats.push({
+          label: y.toString(),
+          income: match ? match.income : 0,
+          expense: match ? match.expense : 0
+        });
+      }
+    } else {
+      const results = await db.getAllAsync<any>(`
+        SELECT 
+          strftime('%Y-%m', date) as period,
+          SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END) as income,
+          SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END) as expense
+        FROM transactions
+        WHERE is_deleted = 0 AND direction != 'adj'
+        GROUP BY period
+        ORDER BY period ASC
+      `);
+      
+      for (let c = new Date(current); c <= targetEnd; c.setMonth(c.getMonth() + 1)) {
+        const yStr = c.getFullYear();
+        const mStr = (c.getMonth() + 1).toString().padStart(2, '0');
+        const periodStr = `${yStr}-${mStr}`;
+        
+        const match = results.find(r => r.period === periodStr);
+        stats.push({
+          label: `${mStr}/${yStr.toString().slice(2)}`,
+          income: match ? match.income : 0,
+          expense: match ? match.expense : 0
+        });
+      }
     }
+    
+    return stats;
   }
 
   /**
@@ -541,24 +560,15 @@ export class TransactionRepository {
     let timeExpr = "date";
     let periodFilter = "";
     
-    if (timeRange === 'Settimana') periodFilter = `AND date >= date('${baseDate}', '-7 days') AND date <= '${baseDate}'`;
-    else if (timeRange === 'Mese') periodFilter = `AND strftime('%Y-%m', date) = strftime('%Y-%m', '${baseDate}')`;
-    else if (timeRange === 'Anno') {
+    if (timeRange === 'Settimana') {
+      periodFilter = `AND date >= date('${baseDate}', '-6 days') AND date <= '${baseDate}'`;
+    } else if (timeRange === 'Mese') {
+      periodFilter = `AND strftime('%Y-%m', date) = strftime('%Y-%m', '${baseDate}')`;
+    } else if (timeRange === 'Anno') {
       timeExpr = "strftime('%Y-%m', date)";
       periodFilter = `AND strftime('%Y', date) = strftime('%Y', '${baseDate}')`;
     } else {
-      // 'Tutto' view: determine if we should group by month or year based on total span (limit 5 years)
-      const spanResult = await db.getFirstAsync<{ months_span: number }>(`
-        SELECT (julianday(MAX(date)) - julianday(MIN(date))) / 30 as months_span
-        FROM transactions 
-        WHERE is_deleted = 0 AND direction = '${direction}'
-      `);
-      const monthsSpan = spanResult?.months_span || 0;
-      if (monthsSpan < 60) {
-        timeExpr = "strftime('%Y-%m', date)";
-      } else {
-        timeExpr = "strftime('%Y', date)";
-      }
+      timeExpr = "strftime('%Y-%m', date)";
     }
 
     let filterExpr = `AND direction = '${direction}'`;
@@ -573,31 +583,114 @@ export class TransactionRepository {
       ORDER BY period ASC
     `;
 
-    const results = await db.getAllAsync(query);
-    
-    // Transform results to labels
-    return results.map((r: any) => {
-      let label = r.period;
-      if (timeRange === 'Settimana') {
-          const d = new Date(r.period);
-          label = d.toLocaleDateString('it-IT', { weekday: 'short' });
-      } else if (timeRange === 'Mese') {
-          label = r.period.split('-')[2] || r.period;
-      } else if (timeRange === 'Anno') {
-          const m = parseInt(r.period.split('-')[1]);
-          const months = ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'];
-          label = months[m-1] || r.period;
-      } else {
-          // 'Tutto'
-          if (r.period.includes('-')) {
-              const parts = r.period.split('-');
-              label = parts[1] + '/' + parts[0].slice(2);
-          } else {
-              label = r.period;
-          }
+    const results = await db.getAllAsync<any>(query);
+    const parsedBaseDate = new Date(baseDate);
+    const year = parsedBaseDate.getFullYear();
+    const month = parsedBaseDate.getMonth();
+
+    if (timeRange === 'Settimana') {
+      const stats = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(parsedBaseDate);
+        d.setDate(parsedBaseDate.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        
+        const match = results.find(r => r.period === dateStr);
+        stats.push({
+          label: d.toLocaleDateString('it-IT', { weekday: 'short' }),
+          value: match ? match.total : 0
+        });
       }
-      return { label, value: r.total };
-    });
+      return stats;
+    } 
+    
+    if (timeRange === 'Mese') {
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const stats = [];
+      const monthNumStr = (month + 1).toString().padStart(2, '0');
+      
+      for (let dayNum = 1; dayNum <= lastDay; dayNum++) {
+        const dayStr = dayNum.toString().padStart(2, '0');
+        const dateStr = `${year}-${monthNumStr}-${dayStr}`;
+        
+        const match = results.find(r => r.period === dateStr);
+        stats.push({
+          label: dayStr,
+          value: match ? match.total : 0
+        });
+      }
+      return stats;
+    } 
+    
+    if (timeRange === 'Anno') {
+      const stats = [];
+      const months = ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'];
+      
+      for (let m = 1; m <= 12; m++) {
+        const monthPeriodStr = `${year}-${m.toString().padStart(2, '0')}`;
+        const match = results.find(r => r.period === monthPeriodStr);
+        
+        stats.push({
+          label: months[m - 1],
+          value: match ? match.total : 0
+        });
+      }
+      return stats;
+    }
+
+    // timeRange === 'Tutto'
+    // Starts from onboarding date to today
+    const onboardingResult = await db.getFirstAsync<{ updated_at: string }>(`
+      SELECT updated_at FROM net_worth ORDER BY updated_at ASC LIMIT 1
+    `);
+    const onboardingDateStr = onboardingResult?.updated_at ? onboardingResult.updated_at.split('T')[0] : '2026-01-01';
+    
+    const start = new Date(onboardingDateStr);
+    const end = new Date();
+    if (isNaN(start.getTime())) start.setTime(new Date('2026-01-01').getTime());
+    
+    const stats = [];
+    const current = new Date(start.getFullYear(), start.getMonth(), 1);
+    const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
+    
+    const totalMonths = (targetEnd.getFullYear() - current.getFullYear()) * 12 + (targetEnd.getMonth() - current.getMonth());
+    const groupByYear = totalMonths > 60;
+    
+    if (groupByYear) {
+      const yearQuery = `
+        SELECT strftime('%Y', date) as period, SUM(amount) as total
+        FROM transactions
+        WHERE is_deleted = 0 ${filterExpr}
+        GROUP BY period
+        ORDER BY period ASC
+      `;
+      const yearResults = await db.getAllAsync<any>(yearQuery);
+      
+      const currentYear = current.getFullYear();
+      const targetYear = targetEnd.getFullYear();
+      
+      for (let y = currentYear; y <= targetYear; y++) {
+        const match = yearResults.find(r => r.period === y.toString());
+        stats.push({
+          label: y.toString(),
+          value: match ? match.total : 0
+        });
+      }
+    } else {
+      for (let c = new Date(current); c <= targetEnd; c.setMonth(c.getMonth() + 1)) {
+        const yStr = c.getFullYear();
+        const mStr = (c.getMonth() + 1).toString().padStart(2, '0');
+        const periodStr = `${yStr}-${mStr}`;
+        
+        const match = results.find(r => r.period === periodStr);
+        stats.push({
+          label: `${mStr}/${yStr.toString().slice(2)}`,
+          value: match ? match.total : 0
+        });
+      }
+    }
+    
+    return stats;
   }
 
   /**
