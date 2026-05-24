@@ -166,7 +166,7 @@ export default function AiChatPage() {
               <View style={styles.fullScreenInput}>
                 <TextInput
                   autoFocus
-                  multiline
+                  multiline={false}
                   showSoftInputOnFocus={false}
                   style={styles.bigInput}
                   placeholder="Cosa vuoi sapere?"

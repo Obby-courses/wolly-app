@@ -386,203 +386,218 @@ export default function BottomMenu() {
   return (
     <View style={styles.wrapper}>
       <View style={styles.container}>
-        <View style={styles.row}>
-          
-          {/* LEFT SIDE: Navigation Icons OR Close button/Progress in voice chat / Plus button in text chat */}
-          <View style={styles.leftContainer}>
-            {isVoiceChat ? (
-              isRecording ? (
-                // Circular progress ring showing time remaining for the 15-second recording limit (no fill)
-                <View style={styles.progressCircleContainer}>
-                  <Svg width={40} height={40} viewBox="0 0 40 40">
-                    {/* Background track circle (subtle outline, transparent fill) */}
-                    <Circle
-                      cx="20"
-                      cy="20"
-                      r={PROGRESS_RADIUS}
-                      fill="none"
-                      stroke="#E5E5EA"
-                      strokeWidth={PROGRESS_STROKE_WIDTH}
-                    />
-                    {/* Active progress stroke that shrinks as the 15 seconds pass */}
-                    <AnimatedCircle
-                      cx="20"
-                      cy="20"
-                      r={PROGRESS_RADIUS}
-                      fill="none"
-                      stroke={COLORS.brandBlue}
-                      strokeWidth={PROGRESS_STROKE_WIDTH}
-                      strokeDasharray={`${PROGRESS_CIRCUMFERENCE} ${PROGRESS_CIRCUMFERENCE}`}
-                      strokeDashoffset={strokeDashoffset}
-                      strokeLinecap="round"
-                      transform="rotate(-90 20 20)"
-                    />
-                  </Svg>
-                </View>
+        {(isVoiceChat || isTextChat) && !isRecording ? (
+          // Centered flat cancel text, no button background, gray color
+          <Pressable
+            onPress={() => {
+              if (isVoiceChat) {
+                handleVoiceClose();
+              } else {
+                router.back();
+              }
+            }}
+            style={styles.centerCancelBtn}
+          >
+            <Text style={styles.centerCancelText}>Annulla</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.row}>
+            
+            {/* LEFT SIDE: Navigation Icons OR Close button/Progress in voice chat / Plus button in text chat */}
+            <View style={styles.leftContainer}>
+              {isVoiceChat ? (
+                isRecording ? (
+                  // Circular progress ring showing time remaining for the 15-second recording limit (no fill)
+                  <View style={styles.progressCircleContainer}>
+                    <Svg width={40} height={40} viewBox="0 0 40 40">
+                      {/* Background track circle (subtle outline, transparent fill) */}
+                      <Circle
+                        cx="20"
+                        cy="20"
+                        r={PROGRESS_RADIUS}
+                        fill="none"
+                        stroke="#E5E5EA"
+                        strokeWidth={PROGRESS_STROKE_WIDTH}
+                      />
+                      {/* Active progress stroke that shrinks as the 15 seconds pass */}
+                      <AnimatedCircle
+                        cx="20"
+                        cy="20"
+                        r={PROGRESS_RADIUS}
+                        fill="none"
+                        stroke={COLORS.brandBlue}
+                        strokeWidth={PROGRESS_STROKE_WIDTH}
+                        strokeDasharray={`${PROGRESS_CIRCUMFERENCE} ${PROGRESS_CIRCUMFERENCE}`}
+                        strokeDashoffset={strokeDashoffset}
+                        strokeLinecap="round"
+                        transform="rotate(-90 20 20)"
+                      />
+                    </Svg>
+                  </View>
+                ) : (
+                  // Safe fallback, close button X
+                  <Pressable onPress={handleVoiceClose} style={styles.closeBtn}>
+                    <Ionicons name="close" size={24} color="#1C1C1E" />
+                  </Pressable>
+                )
+              ) : isTextChat && !isExpanded ? (
+                // In text chat active and not expanded, show the plus (+) button in the bottom-left corner
+                <Pressable
+                  onPress={() => setIsExpanded(true)}
+                  style={styles.toolBtn}
+                >
+                  <Ionicons name="add" size={24} color="#FFF" />
+                </Pressable>
               ) : (
-                // In voice chat idle/response mode, show standard close button
-                <Pressable onPress={handleVoiceClose} style={styles.closeBtn}>
+                // Standard Navigation Tabs (mostra solo la pagina corrente se espanso per pulizia visiva)
+                <View style={styles.leftNav}>
+                  {NAV_ITEMS.map((item) => {
+                    if (isExpanded) {
+                      return isActive(item.path) ? renderNavItem(item) : null;
+                    }
+                    return renderNavItem(item);
+                  })}
+                </View>
+              )}
+            </View>
+
+            {/* RIGHT SIDE: Dynamic Actions */}
+            <View style={styles.rightContainer}>
+              {isVoiceChat ? (
+                // 1. Voice Chat active state: persistent primary button and cancel text next to it
+                <View style={styles.voiceActionsRow}>
+                  {isRecording && (
+                    // Pulse/Slide arrow with "Wipe per annullare" text when recording (brought close to Rec button)
+                    <View style={styles.cancelContainer}>
+                      <Animated.View style={{ transform: [{ translateX: chevronTranslateX }] }}>
+                        <Ionicons
+                          name="chevron-back"
+                          size={16}
+                          color={isSlidingToCancel ? COLORS.danger : COLORS.secondary}
+                        />
+                      </Animated.View>
+                      <Text style={[styles.cancelText, isSlidingToCancel && { color: COLORS.danger }]}>
+                        {isSlidingToCancel ? 'Rilascia per annullare' : 'Wipe per annullare'}
+                      </Text>
+                    </View>
+                  )}
+                  <Animated.View
+                    key="persistent-primary-btn"
+                    {...primaryPanResponder.panHandlers}
+                    style={[
+                      styles.toolBtn,
+                      isSlidingToCancel && styles.micBtnCancel
+                    ]}
+                  >
+                    <Ionicons name="mic" size={22} color="#FFF" />
+                  </Animated.View>
+                </View>
+              ) : isTextChat && !isExpanded ? (
+                // Safe fallback, close button X
+                <Pressable onPress={() => router.back()} style={styles.closeBtn}>
                   <Ionicons name="close" size={24} color="#1C1C1E" />
                 </Pressable>
-              )
-            ) : isTextChat && !isExpanded ? (
-              // In text chat active and not expanded, show the plus (+) button in the bottom-left corner
-              <Pressable
-                onPress={() => setIsExpanded(true)}
-                style={styles.toolBtn}
-              >
-                <Ionicons name="add" size={24} color="#FFF" />
-              </Pressable>
-            ) : (
-              // Standard Navigation Tabs (mostra solo la pagina corrente se espanso per pulizia visiva)
-              <View style={styles.leftNav}>
-                {NAV_ITEMS.map((item) => {
-                  if (isExpanded) {
-                    return isActive(item.path) ? renderNavItem(item) : null;
-                  }
-                  return renderNavItem(item);
-                })}
-              </View>
-            )}
-          </View>
-
-          {/* RIGHT SIDE: Dynamic Actions */}
-          <View style={styles.rightContainer}>
-            {isVoiceChat ? (
-              // 1. Voice Chat active state: persistent primary button and cancel text next to it
-              <View style={styles.voiceActionsRow}>
-                {isRecording && (
-                  // Pulse/Slide arrow with "Wipe per annullare" text when recording (brought close to Rec button)
-                  <View style={styles.cancelContainer}>
-                    <Animated.View style={{ transform: [{ translateX: chevronTranslateX }] }}>
-                      <Ionicons
-                        name="chevron-back"
-                        size={16}
-                        color={isSlidingToCancel ? COLORS.danger : COLORS.secondary}
-                      />
-                    </Animated.View>
-                    <Text style={[styles.cancelText, isSlidingToCancel && { color: COLORS.danger }]}>
-                      {isSlidingToCancel ? 'Rilascia per annullare' : 'Wipe per annullare'}
-                    </Text>
-                  </View>
-                )}
-                <Animated.View
-                  key="persistent-primary-btn"
-                  {...primaryPanResponder.panHandlers}
-                  style={[
-                    styles.toolBtn,
-                    isSlidingToCancel && styles.micBtnCancel
-                  ]}
-                >
-                  <Ionicons name="mic" size={22} color="#FFF" />
-                </Animated.View>
-              </View>
-            ) : isTextChat && !isExpanded ? (
-              // 2. Text AI Chat active state: just [X]
-              <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-                <Ionicons name="close" size={24} color="#1C1C1E" />
-              </Pressable>
-            ) : isOffline ? (
-              // 3. Offline Idle state: Rounded rectangle "Nuova spesa"
-              <Pressable onPress={handleOfflinePress} style={styles.offlineBtn}>
-                <Ionicons name="add" size={18} color="#FFF" />
-                <Text style={styles.offlineBtnText}>Nuova spesa</Text>
-              </Pressable>
-            ) : (
-              // 4. Online Idle state: Animated Expandable tools and persistent primary button
-              <View style={styles.expandedWrapper}>
-                
-                {/* Back tool button */}
-                <Animated.View
-                  pointerEvents={isExpanded ? 'auto' : 'none'}
-                  style={[
-                    styles.toolBtn,
-                    styles.backBtn,
-                    {
-                      position: 'absolute',
-                      right: 0,
-                      transform: [{ translateX: backTranslateX }],
-                      opacity: toolOpacity,
-                    },
-                  ]}
-                >
-                  <Pressable style={styles.pressable} onPress={() => setIsExpanded(false)}>
-                    <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
-                  </Pressable>
-                </Animated.View>
-
-                {/* Foto tool button */}
-                <Animated.View
-                  pointerEvents={isExpanded ? 'auto' : 'none'}
-                  style={[
-                    styles.toolBtn,
-                    {
-                      position: 'absolute',
-                      right: 0,
-                      transform: [{ translateX: fotoTranslateX }],
-                      opacity: toolOpacity,
-                    },
-                  ]}
-                >
-                  <Pressable 
-                    style={styles.pressable} 
-                    onPress={() => {
-                      analytics.trackClick('btn_camera_scontrino_open', pathname);
-                      handleCamera();
-                    }} 
-                    disabled={isProcessing}
+              ) : isOffline ? (
+                // 3. Offline Idle state: Rounded rectangle "Nuova spesa"
+                <Pressable onPress={handleOfflinePress} style={styles.offlineBtn}>
+                  <Ionicons name="add" size={18} color="#FFF" />
+                  <Text style={styles.offlineBtnText}>Nuova spesa</Text>
+                </Pressable>
+              ) : (
+                // 4. Online Idle state: Animated Expandable tools and persistent primary button
+                <View style={styles.expandedWrapper}>
+                  
+                  {/* Back tool button */}
+                  <Animated.View
+                    pointerEvents={isExpanded ? 'auto' : 'none'}
+                    style={[
+                      styles.toolBtn,
+                      styles.backBtn,
+                      {
+                        position: 'absolute',
+                        right: 0,
+                        transform: [{ translateX: backTranslateX }],
+                        opacity: toolOpacity,
+                      },
+                    ]}
                   >
-                    <Ionicons name="camera" size={20} color="#FFF" />
-                  </Pressable>
-                </Animated.View>
+                    <Pressable style={styles.pressable} onPress={() => setIsExpanded(false)}>
+                      <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+                    </Pressable>
+                  </Animated.View>
 
-                {/* Chat tool button */}
-                <Animated.View
-                  pointerEvents={isExpanded ? 'auto' : 'none'}
-                  style={[
-                    styles.toolBtn,
-                    {
-                      position: 'absolute',
-                      right: 0,
-                      transform: [{ translateX: chatTranslateX }],
-                      opacity: toolOpacity,
-                    },
-                  ]}
-                >
-                  <Pressable 
-                    style={styles.pressable} 
-                    onPress={() => {
-                      analytics.trackClick('btn_ai_chat_open', pathname);
-                      if (pathname === '/ai-chat') return;
-                      router.push('/ai-chat');
-                    }}
+                  {/* Foto tool button */}
+                  <Animated.View
+                    pointerEvents={isExpanded ? 'auto' : 'none'}
+                    style={[
+                      styles.toolBtn,
+                      {
+                        position: 'absolute',
+                        right: 0,
+                        transform: [{ translateX: fotoTranslateX }],
+                        opacity: toolOpacity,
+                      },
+                    ]}
                   >
-                    <Ionicons name="chatbubble-ellipses" size={20} color="#FFF" />
-                  </Pressable>
-                </Animated.View>
+                    <Pressable 
+                      style={styles.pressable} 
+                      onPress={() => {
+                        analytics.trackClick('btn_camera_scontrino_open', pathname);
+                        handleCamera();
+                      }} 
+                      disabled={isProcessing}
+                    >
+                      <Ionicons name="camera" size={20} color="#FFF" />
+                    </Pressable>
+                  </Animated.View>
 
-                {/* Persistent primary button inside expandedWrapper */}
-                <Animated.View
-                  key="persistent-primary-btn"
-                  {...primaryPanResponder.panHandlers}
-                  style={[
-                    styles.toolBtn,
-                    isExpanded && styles.micBtnActive,
-                    isSlidingToCancel && styles.micBtnCancel,
-                  ]}
-                >
-                  <Ionicons
-                    name={isExpanded ? "mic" : "add"}
-                    size={22}
-                    color="#FFF"
-                  />
-                </Animated.View>
+                  {/* Chat tool button */}
+                  <Animated.View
+                    pointerEvents={isExpanded ? 'auto' : 'none'}
+                    style={[
+                      styles.toolBtn,
+                      {
+                        position: 'absolute',
+                        right: 0,
+                        transform: [{ translateX: chatTranslateX }],
+                        opacity: toolOpacity,
+                      },
+                    ]}
+                  >
+                    <Pressable 
+                      style={styles.pressable} 
+                      onPress={() => {
+                        analytics.trackClick('btn_ai_chat_open', pathname);
+                        if (pathname === '/ai-chat') return;
+                        router.push('/ai-chat');
+                      }}
+                    >
+                      <Ionicons name="chatbubble-ellipses" size={20} color="#FFF" />
+                    </Pressable>
+                  </Animated.View>
 
-              </View>
-            )}
+                  {/* Persistent primary button inside expandedWrapper */}
+                  <Animated.View
+                    key="persistent-primary-btn"
+                    {...primaryPanResponder.panHandlers}
+                    style={[
+                      styles.toolBtn,
+                      isExpanded && styles.micBtnActive,
+                      isSlidingToCancel && styles.micBtnCancel,
+                    ]}
+                  >
+                    <Ionicons
+                      name={isExpanded ? "mic" : "add"}
+                      size={22}
+                      color="#FFF"
+                    />
+                  </Animated.View>
+
+                </View>
+              )}
+            </View>
           </View>
-
-        </View>
+        )}
 
         {toastMsg && (
           <View style={styles.toast}>
@@ -655,6 +670,17 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  centerCancelBtn: {
+    height: 48,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerCancelText: {
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: 16,
+    color: '#8E8E93',
   },
   offlineBtn: {
     flexDirection: 'row',
