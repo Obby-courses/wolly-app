@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
-  Modal, View, Text, Pressable, ScrollView, StyleSheet, SafeAreaView, Platform
+  Modal, View, Text, Pressable, ScrollView, StyleSheet, Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { DOMAINS_CONFIG, Domain, Category } from '../constants/categories';
 import { COLORS } from '../constants/Theme';

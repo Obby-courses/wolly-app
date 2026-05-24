@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, Pressable,
-  TextInput, Modal, Alert, ActivityIndicator, SafeAreaView, Keyboard
+  TextInput, Modal, Alert, ActivityIndicator, Keyboard
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';

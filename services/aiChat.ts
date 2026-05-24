@@ -81,6 +81,8 @@ export class AiChatStore {
   public history: ChatMessage[] = [];
   public debugData: string | null = null;
   public showDebug: boolean = false;
+  private isTyping: boolean = true;
+  private listeners = new Set<() => void>();
 
   private constructor() {}
 
@@ -91,10 +93,30 @@ export class AiChatStore {
     return AiChatStore.instance;
   }
 
+  public getIsTyping() {
+    return this.isTyping;
+  }
+
+  public setIsTyping(val: boolean) {
+    this.isTyping = val;
+    this.notify();
+  }
+
+  public subscribe(listener: () => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notify() {
+    this.listeners.forEach(l => l());
+  }
+
   public reset() {
     this.qa = null;
     this.history = [];
     this.debugData = null;
+    this.isTyping = true;
+    this.notify();
   }
 }
 

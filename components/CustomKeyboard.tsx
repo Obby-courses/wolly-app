@@ -27,7 +27,9 @@ export default function CustomKeyboard({
   const [isShiftActive, setIsShiftActive] = useState(false);
 
   const handleKeyPress = (char: string) => {
-    const { start, end } = selection;
+    const safeSelection = selection || { start: value.length, end: value.length };
+    const start = typeof safeSelection.start === 'number' ? safeSelection.start : value.length;
+    const end = typeof safeSelection.end === 'number' ? safeSelection.end : value.length;
     let newValue = '';
     let newCursorPos = 0;
 
@@ -47,7 +49,9 @@ export default function CustomKeyboard({
   };
 
   const handleBackspace = () => {
-    const { start, end } = selection;
+    const safeSelection = selection || { start: value.length, end: value.length };
+    const start = typeof safeSelection.start === 'number' ? safeSelection.start : value.length;
+    const end = typeof safeSelection.end === 'number' ? safeSelection.end : value.length;
     let newValue = '';
     let newCursorPos = 0;
 
@@ -71,7 +75,9 @@ export default function CustomKeyboard({
   };
 
   const handleSpace = () => {
-    const { start, end } = selection;
+    const safeSelection = selection || { start: value.length, end: value.length };
+    const start = typeof safeSelection.start === 'number' ? safeSelection.start : value.length;
+    const end = typeof safeSelection.end === 'number' ? safeSelection.end : value.length;
     let newValue = '';
     let newCursorPos = 0;
 

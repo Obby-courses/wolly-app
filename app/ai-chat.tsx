@@ -38,11 +38,26 @@ export default function AiChatPage() {
   const [autoSentRef] = useState({ done: false });
 
   const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(!aiChatStore.qa);
+  const [isTyping, setIsTyping] = useState(aiChatStore.getIsTyping());
   const [selection, setSelection] = useState({ start: 0, end: 0 });
 
   useEffect(() => {
     analytics.trackScreen(ANALYTICS_SCREENS.AI_CHAT);
+    // Imposta la modalità di digitazione iniziale in base alla presenza di risposte
+    aiChatStore.setIsTyping(!aiChatStore.qa);
+
+    // Reset completo dello stato per far ripartire la chat da zero alla prossima apertura
+    return () => {
+      aiChatStore.reset();
+    };
+  }, []);
+
+  // Sincronizza lo stato di digitazione con il database dell'AI chat
+  useEffect(() => {
+    const unsub = aiChatStore.subscribe(() => {
+      setIsTyping(aiChatStore.getIsTyping());
+    });
+    return () => unsub();
   }, []);
 
   // Auto-send message when navigated with params.message
@@ -67,7 +82,7 @@ export default function AiChatPage() {
     if (route === 'expense') {
       setIsLoading(true);
       setInputText('');
-      setIsTyping(false);
+      aiChatStore.setIsTyping(false);
       try {
         const { parseExpenseWithAI } = require('../services/groqParser');
         const parsed = await parseExpenseWithAI(userMsg, 'text');
@@ -89,7 +104,7 @@ export default function AiChatPage() {
     const newQa = { question: userMsg, answer: null };
     setQa(newQa);
     aiChatStore.qa = newQa;
-    setIsTyping(false);
+    aiChatStore.setIsTyping(false);
     setInputText('');
     
     setDebugData(null);
@@ -151,7 +166,7 @@ export default function AiChatPage() {
     setQa(null);
     setHistory([]);
     setDebugData(null);
-    setIsTyping(true);
+    aiChatStore.setIsTyping(true);
   };
 
   return (
@@ -178,11 +193,6 @@ export default function AiChatPage() {
                   onSubmitEditing={() => sendMessage(inputText)}
                   returnKeyType="send"
                 />
-                {inputText.length > 0 && (
-                  <Pressable onPress={() => sendMessage(inputText)} style={styles.sendFab}>
-                    <Ionicons name="arrow-up" size={32} color="#FFF" />
-                  </Pressable>
-                )}
               </View>
               
               {/* Tastiera virtuale personalizzata posizionata esattamente sopra il BottomMenu */}
@@ -217,15 +227,6 @@ export default function AiChatPage() {
             </View>
           )}
         </View>
-
-        {/* Floating actions if not typing */}
-        {!isTyping && !isLoading && (
-          <View style={styles.bottomActions}>
-            <Pressable style={styles.actionCircle} onPress={() => setIsTyping(true)}>
-              <Ionicons name="chatbubble-outline" size={24} color={COLORS.primary} />
-            </Pressable>
-          </View>
-        )}
       </View>
     </SafeAreaView>
   );

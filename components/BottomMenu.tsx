@@ -11,6 +11,7 @@ import { voiceStore } from '../services/voiceStore';
 import { Audio } from 'expo-av';
 import { networkStore } from '../services/networkStore';
 import { analytics } from '../services/analytics';
+import { aiChatStore } from '../services/aiChat';
 import Svg, { Circle } from 'react-native-svg';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -38,10 +39,12 @@ export default function BottomMenu() {
   const [isOffline, setIsOffline] = useState(networkStore.getState().isOffline);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [aiTyping, setAiTyping] = useState(aiChatStore.getIsTyping());
 
   useEffect(() => {
     const unsubVoice = voiceStore.subscribe(() => setVoiceState(voiceStore.getState()));
     const unsubNet = networkStore.subscribe(() => setIsOffline(networkStore.getState().isOffline));
+    const unsubAi = aiChatStore.subscribe(() => setAiTyping(aiChatStore.getIsTyping()));
     Audio.requestPermissionsAsync().catch(() => {});
 
     // Gestione visibilità tastiera per nascondere il menu
@@ -57,6 +60,7 @@ export default function BottomMenu() {
     return () => {
       unsubVoice();
       unsubNet();
+      unsubAi();
       showSubscription.remove();
       hideSubscription.remove();
     };
@@ -387,19 +391,64 @@ export default function BottomMenu() {
     <View style={styles.wrapper}>
       <View style={styles.container}>
         {(isVoiceChat || isTextChat) && !isRecording ? (
-          // Centered flat cancel text, no button background, gray color
-          <Pressable
-            onPress={() => {
-              if (isVoiceChat) {
-                handleVoiceClose();
-              } else {
-                router.back();
-              }
-            }}
-            style={styles.centerCancelBtn}
-          >
-            <Text style={styles.centerCancelText}>Annulla</Text>
-          </Pressable>
+          isTextChat && aiTyping ? (
+            // Quando la tastiera custom è attiva in chat testo: pulsante "Annulla" centrato
+            <Pressable
+              onPress={() => {
+                if (!aiChatStore.qa) {
+                  router.back();
+                } else {
+                  aiChatStore.setIsTyping(false);
+                }
+              }}
+              style={styles.centerCancelBtn}
+            >
+              <Text style={styles.centerCancelText}>Annulla</Text>
+            </Pressable>
+          ) : (
+            // Layout simmetrico invertito: 'X' a sinistra, pulsante azione primario a destra
+            <View style={styles.row}>
+              {/* LATO SINISTRO: Pulsante 'X' per uscire */}
+              <View style={styles.leftContainer}>
+                <Pressable
+                  onPress={() => {
+                    if (isVoiceChat) {
+                      handleVoiceClose();
+                    } else {
+                      router.back();
+                    }
+                  }}
+                  style={styles.closeBtn}
+                >
+                  <Ionicons name="close" size={24} color="#1C1C1E" />
+                </Pressable>
+              </View>
+
+              {/* LATO DESTRO: Pulsante di azione primario (Mic per voce, Chat per testo) */}
+              <View style={styles.rightContainer}>
+                {isVoiceChat ? (
+                  // Pulsante mic azzurro uguale a quello di registrazione (PanResponder abilitato)
+                  <Animated.View
+                    {...primaryPanResponder.panHandlers}
+                    style={[
+                      styles.toolBtn,
+                      isSlidingToCancel && styles.micBtnCancel
+                    ]}
+                  >
+                    <Ionicons name="mic" size={22} color="#FFF" />
+                  </Animated.View>
+                ) : (
+                  // Pulsante di chat azzurro che attiva la modalità di digitazione
+                  <Pressable
+                    onPress={() => aiChatStore.setIsTyping(true)}
+                    style={styles.toolBtn}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={22} color="#FFF" />
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          )
         ) : (
           <View style={styles.row}>
             

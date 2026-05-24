@@ -114,11 +114,11 @@ class WollyAnalytics {
       });
 
       if (error && this.isDevelopment) {
-        console.warn('[WollyAnalytics Error] Impossibile inviare evento a Supabase:', error.message);
+        // Silenced
       }
     } catch (err) {
       if (this.isDevelopment) {
-        console.warn('[WollyAnalytics Error] Errore di rete Supabase:', err);
+        // Silenced
       }
     }
   }

@@ -7,12 +7,16 @@ import TopNavigation from '../components/TopNavigation';
 import SwipeNavigator from '../components/SwipeNavigator';
 import VoiceChatOverlay from '../components/ai/VoiceChatOverlay';
 import AnomalyReporter from '../components/AnomalyReporter';
-import { View } from 'react-native';
+import { View, LogBox } from 'react-native';
 import { usePathname } from 'expo-router';
 import { voiceStore } from '../services/voiceStore';
 import { networkStore } from '../services/networkStore';
 
 SplashScreen.preventAutoHideAsync();
+
+LogBox.ignoreLogs([
+  '[expo-av]: Expo AV has been deprecated',
+]);
 
 export default function RootLayout() {
   const pathname = usePathname();

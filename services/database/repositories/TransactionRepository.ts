@@ -241,7 +241,7 @@ export class TransactionRepository {
     const result = await db.getFirstAsync(`
       SELECT MIN(date) as first_date
       FROM transactions 
-      WHERE is_deleted = 0 AND direction != 'adj'
+      WHERE is_deleted = 0
     `);
     if (!result || !(result as any).first_date) return null;
     return (result as any).first_date;
@@ -253,27 +253,27 @@ export class TransactionRepository {
   static async getStatsForAllTime(): Promise<{ label: string, income: number, expense: number }[]> {
     const db = await getDBConnection();
     
-    // Get first transaction date
+    // Get first transaction date (including adjustments/onboarding)
     const firstTxResult = await db.getFirstAsync<{ first_date: string }>(`
-      SELECT MIN(date) as first_date FROM transactions WHERE is_deleted = 0 AND direction != 'adj'
+      SELECT MIN(date) as first_date FROM transactions WHERE is_deleted = 0
     `);
     
-    const onboardingResult = await db.getFirstAsync<{ updated_at: string }>(`
-      SELECT updated_at FROM net_worth ORDER BY updated_at ASC LIMIT 1
-    `);
-    const onboardingDateStr = onboardingResult?.updated_at ? onboardingResult.updated_at.split('T')[0] : '2026-01-01';
+    const firstDateStr = firstTxResult?.first_date || new Date().toISOString().split('T')[0];
     
-    let firstDateStr = firstTxResult?.first_date || onboardingDateStr;
-    if (onboardingDateStr < firstDateStr) {
-      firstDateStr = onboardingDateStr;
-    }
-    
-    const start = new Date(firstDateStr);
-    const end = new Date();
-    if (isNaN(start.getTime())) start.setTime(new Date('2026-01-01').getTime());
+    const parseLocalDate = (dateStr: string): Date => {
+      const parts = dateStr.split('T')[0].split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      return new Date(y, m, d);
+    };
+
+    const start = parseLocalDate(firstDateStr);
+    const today = new Date();
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     
     const timeDiff = end.getTime() - start.getTime();
-    const daysSpan = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    const daysSpan = Math.round(timeDiff / (1000 * 3600 * 24));
     
     const stats = [];
     
@@ -293,7 +293,11 @@ export class TransactionRepository {
       for (let i = 0; i <= daysSpan; i++) {
         const d = new Date(start);
         d.setDate(start.getDate() + i);
-        const dateStr = d.toISOString().split('T')[0];
+        
+        const yStr = d.getFullYear();
+        const mStr = (d.getMonth() + 1).toString().padStart(2, '0');
+        const dayStr = d.getDate().toString().padStart(2, '0');
+        const dateStr = `${yStr}-${mStr}-${dayStr}`;
         
         const match = results.find(r => r.period === dateStr);
         stats.push({
@@ -675,27 +679,27 @@ export class TransactionRepository {
     }
 
     // timeRange === 'Tutto'
-    // Starts from onboarding date or first transaction date to today
+    // Starts from first transaction date (including adjustments/onboarding) to today
     const firstTxResult = await db.getFirstAsync<{ first_date: string }>(`
-      SELECT MIN(date) as first_date FROM transactions WHERE is_deleted = 0 AND direction != 'adj'
+      SELECT MIN(date) as first_date FROM transactions WHERE is_deleted = 0
     `);
     
-    const onboardingResult = await db.getFirstAsync<{ updated_at: string }>(`
-      SELECT updated_at FROM net_worth ORDER BY updated_at ASC LIMIT 1
-    `);
-    const onboardingDateStr = onboardingResult?.updated_at ? onboardingResult.updated_at.split('T')[0] : '2026-01-01';
+    const firstDateStr = firstTxResult?.first_date || new Date().toISOString().split('T')[0];
     
-    let firstDateStr = firstTxResult?.first_date || onboardingDateStr;
-    if (onboardingDateStr < firstDateStr) {
-      firstDateStr = onboardingDateStr;
-    }
-    
-    const start = new Date(firstDateStr);
-    const end = new Date();
-    if (isNaN(start.getTime())) start.setTime(new Date('2026-01-01').getTime());
+    const parseLocalDate = (dateStr: string): Date => {
+      const parts = dateStr.split('T')[0].split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      return new Date(y, m, d);
+    };
+
+    const start = parseLocalDate(firstDateStr);
+    const today = new Date();
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     
     const timeDiff = end.getTime() - start.getTime();
-    const daysSpan = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    const daysSpan = Math.round(timeDiff / (1000 * 3600 * 24));
     
     const stats = [];
     
@@ -713,7 +717,11 @@ export class TransactionRepository {
       for (let i = 0; i <= daysSpan; i++) {
         const d = new Date(start);
         d.setDate(start.getDate() + i);
-        const dateStr = d.toISOString().split('T')[0];
+        
+        const yStr = d.getFullYear();
+        const mStr = (d.getMonth() + 1).toString().padStart(2, '0');
+        const dayStr = d.getDate().toString().padStart(2, '0');
+        const dateStr = `${yStr}-${mStr}-${dayStr}`;
         
         const match = dailyResults.find(r => r.period === dateStr);
         stats.push({
