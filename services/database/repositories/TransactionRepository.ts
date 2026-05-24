@@ -253,28 +253,35 @@ export class TransactionRepository {
   static async getStatsForAllTime(): Promise<{ label: string, income: number, expense: number }[]> {
     const db = await getDBConnection();
     
-    // Retrieve the initial onboarding date from net_worth table
+    // Get first transaction date
+    const firstTxResult = await db.getFirstAsync<{ first_date: string }>(`
+      SELECT MIN(date) as first_date FROM transactions WHERE is_deleted = 0 AND direction != 'adj'
+    `);
+    
     const onboardingResult = await db.getFirstAsync<{ updated_at: string }>(`
       SELECT updated_at FROM net_worth ORDER BY updated_at ASC LIMIT 1
     `);
     const onboardingDateStr = onboardingResult?.updated_at ? onboardingResult.updated_at.split('T')[0] : '2026-01-01';
     
-    const start = new Date(onboardingDateStr);
+    let firstDateStr = firstTxResult?.first_date || onboardingDateStr;
+    if (onboardingDateStr < firstDateStr) {
+      firstDateStr = onboardingDateStr;
+    }
+    
+    const start = new Date(firstDateStr);
     const end = new Date();
     if (isNaN(start.getTime())) start.setTime(new Date('2026-01-01').getTime());
     
-    const current = new Date(start.getFullYear(), start.getMonth(), 1);
-    const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
-    
-    const totalMonths = (targetEnd.getFullYear() - current.getFullYear()) * 12 + (targetEnd.getMonth() - current.getMonth());
-    const groupByYear = totalMonths > 60;
+    const timeDiff = end.getTime() - start.getTime();
+    const daysSpan = Math.ceil(timeDiff / (1000 * 3600 * 24));
     
     const stats = [];
     
-    if (groupByYear) {
+    if (daysSpan <= 60) {
+      // Daily Granularity (short history)
       const results = await db.getAllAsync<any>(`
         SELECT 
-          strftime('%Y', date) as period,
+          date as period,
           SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END) as income,
           SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END) as expense
         FROM transactions
@@ -283,18 +290,20 @@ export class TransactionRepository {
         ORDER BY period ASC
       `);
       
-      const currentYear = current.getFullYear();
-      const targetYear = targetEnd.getFullYear();
-      
-      for (let y = currentYear; y <= targetYear; y++) {
-        const match = results.find(r => r.period === y.toString());
+      for (let i = 0; i <= daysSpan; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        
+        const match = results.find(r => r.period === dateStr);
         stats.push({
-          label: y.toString(),
+          label: d.getDate().toString().padStart(2, '0') + ' ' + d.toLocaleDateString('it-IT', { month: 'short' }),
           income: match ? match.income : 0,
           expense: match ? match.expense : 0
         });
       }
-    } else {
+    } else if (daysSpan <= 730) {
+      // Monthly Granularity (mid history)
       const results = await db.getAllAsync<any>(`
         SELECT 
           strftime('%Y-%m', date) as period,
@@ -306,6 +315,9 @@ export class TransactionRepository {
         ORDER BY period ASC
       `);
       
+      const current = new Date(start.getFullYear(), start.getMonth(), 1);
+      const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
+      
       for (let c = new Date(current); c <= targetEnd; c.setMonth(c.getMonth() + 1)) {
         const yStr = c.getFullYear();
         const mStr = (c.getMonth() + 1).toString().padStart(2, '0');
@@ -314,6 +326,30 @@ export class TransactionRepository {
         const match = results.find(r => r.period === periodStr);
         stats.push({
           label: `${mStr}/${yStr.toString().slice(2)}`,
+          income: match ? match.income : 0,
+          expense: match ? match.expense : 0
+        });
+      }
+    } else {
+      // Yearly Granularity (long history)
+      const results = await db.getAllAsync<any>(`
+        SELECT 
+          strftime('%Y', date) as period,
+          SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END) as income,
+          SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END) as expense
+        FROM transactions
+        WHERE is_deleted = 0 AND direction != 'adj'
+        GROUP BY period
+        ORDER BY period ASC
+      `);
+      
+      const startYear = start.getFullYear();
+      const endYear = end.getFullYear();
+      
+      for (let y = startYear; y <= endYear; y++) {
+        const match = results.find(r => r.period === y.toString());
+        stats.push({
+          label: y.toString(),
           income: match ? match.income : 0,
           expense: match ? match.expense : 0
         });
@@ -639,52 +675,97 @@ export class TransactionRepository {
     }
 
     // timeRange === 'Tutto'
-    // Starts from onboarding date to today
+    // Starts from onboarding date or first transaction date to today
+    const firstTxResult = await db.getFirstAsync<{ first_date: string }>(`
+      SELECT MIN(date) as first_date FROM transactions WHERE is_deleted = 0 AND direction != 'adj'
+    `);
+    
     const onboardingResult = await db.getFirstAsync<{ updated_at: string }>(`
       SELECT updated_at FROM net_worth ORDER BY updated_at ASC LIMIT 1
     `);
     const onboardingDateStr = onboardingResult?.updated_at ? onboardingResult.updated_at.split('T')[0] : '2026-01-01';
     
-    const start = new Date(onboardingDateStr);
+    let firstDateStr = firstTxResult?.first_date || onboardingDateStr;
+    if (onboardingDateStr < firstDateStr) {
+      firstDateStr = onboardingDateStr;
+    }
+    
+    const start = new Date(firstDateStr);
     const end = new Date();
     if (isNaN(start.getTime())) start.setTime(new Date('2026-01-01').getTime());
     
+    const timeDiff = end.getTime() - start.getTime();
+    const daysSpan = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    
     const stats = [];
-    const current = new Date(start.getFullYear(), start.getMonth(), 1);
-    const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
     
-    const totalMonths = (targetEnd.getFullYear() - current.getFullYear()) * 12 + (targetEnd.getMonth() - current.getMonth());
-    const groupByYear = totalMonths > 60;
-    
-    if (groupByYear) {
-      const yearQuery = `
+    if (daysSpan <= 60) {
+      // Daily Granularity (short history)
+      const dailyQuery = `
+        SELECT date as period, SUM(amount) as total
+        FROM transactions
+        WHERE is_deleted = 0 ${filterExpr}
+        GROUP BY period
+        ORDER BY period ASC
+      `;
+      const dailyResults = await db.getAllAsync<any>(dailyQuery);
+      
+      for (let i = 0; i <= daysSpan; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        
+        const match = dailyResults.find(r => r.period === dateStr);
+        stats.push({
+          label: d.getDate().toString().padStart(2, '0') + ' ' + d.toLocaleDateString('it-IT', { month: 'short' }),
+          value: match ? match.total : 0
+        });
+      }
+    } else if (daysSpan <= 730) {
+      // Monthly Granularity (mid history)
+      const monthlyQuery = `
+        SELECT strftime('%Y-%m', date) as period, SUM(amount) as total
+        FROM transactions
+        WHERE is_deleted = 0 ${filterExpr}
+        GROUP BY period
+        ORDER BY period ASC
+      `;
+      const monthlyResults = await db.getAllAsync<any>(monthlyQuery);
+      
+      let current = new Date(start.getFullYear(), start.getMonth(), 1);
+      const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
+      
+      while (current <= targetEnd) {
+        const yStr = current.getFullYear();
+        const mStr = (current.getMonth() + 1).toString().padStart(2, '0');
+        const periodStr = `${yStr}-${mStr}`;
+        
+        const match = monthlyResults.find(r => r.period === periodStr);
+        stats.push({
+          label: `${mStr}/${yStr.toString().slice(2)}`,
+          value: match ? match.total : 0
+        });
+        
+        current.setMonth(current.getMonth() + 1);
+      }
+    } else {
+      // Yearly Granularity (long history)
+      const yearlyQuery = `
         SELECT strftime('%Y', date) as period, SUM(amount) as total
         FROM transactions
         WHERE is_deleted = 0 ${filterExpr}
         GROUP BY period
         ORDER BY period ASC
       `;
-      const yearResults = await db.getAllAsync<any>(yearQuery);
+      const yearlyResults = await db.getAllAsync<any>(yearlyQuery);
       
-      const currentYear = current.getFullYear();
-      const targetYear = targetEnd.getFullYear();
+      const startYear = start.getFullYear();
+      const endYear = end.getFullYear();
       
-      for (let y = currentYear; y <= targetYear; y++) {
-        const match = yearResults.find(r => r.period === y.toString());
+      for (let y = startYear; y <= endYear; y++) {
+        const match = yearlyResults.find(r => r.period === y.toString());
         stats.push({
           label: y.toString(),
-          value: match ? match.total : 0
-        });
-      }
-    } else {
-      for (let c = new Date(current); c <= targetEnd; c.setMonth(c.getMonth() + 1)) {
-        const yStr = c.getFullYear();
-        const mStr = (c.getMonth() + 1).toString().padStart(2, '0');
-        const periodStr = `${yStr}-${mStr}`;
-        
-        const match = results.find(r => r.period === periodStr);
-        stats.push({
-          label: `${mStr}/${yStr.toString().slice(2)}`,
           value: match ? match.total : 0
         });
       }

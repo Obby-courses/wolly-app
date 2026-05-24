@@ -140,7 +140,8 @@ export default function NetWorthScreen() {
               <WealthChart data={netWorthTrend} labels={
                 timeRange === 'Settimana' ? netWorthTrend.map(s => s.label || '') : 
                 timeRange === 'Mese' ? netWorthTrend.map(s => s.day?.toString() || '') : 
-                ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D']
+                timeRange === 'Anno' ? ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'] :
+                netWorthTrend.map(s => s.label || '')
               }/>
               
               <View style={styles.currentWealthRow}>
