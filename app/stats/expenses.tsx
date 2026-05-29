@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { G, Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
+import Svg, { G, Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Rect, Text as SvgText } from 'react-native-svg';
 import { TransactionRepository } from '../../services/database/repositories/TransactionRepository';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
 import { CATEGORIES_CONFIG } from '../../constants/categories';
@@ -23,12 +23,13 @@ interface DataPoint {
 interface DistributionCardProps {
   title: string;
   data: DataPoint[];
-  selectedKey: string | null;
-  onSelect: (key: string | null) => void;
+  selectedKeys: string[];
+  onToggleKey: (key: string) => void;
+  onReset: () => void;
   emptyMessage: string;
 }
 
-const CompactDistributionCard = ({ title, data, selectedKey, onSelect, emptyMessage }: DistributionCardProps) => {
+const CompactDistributionCard = ({ title, data, selectedKeys, onToggleKey, onReset, emptyMessage }: DistributionCardProps) => {
   const total = data.reduce((acc, curr) => acc + curr.total, 0);
   let startAngle = 0;
   const radius = 65;
@@ -41,67 +42,73 @@ const CompactDistributionCard = ({ title, data, selectedKey, onSelect, emptyMess
     <View style={[styles.card, { padding: 16, marginBottom: 0 }]}>
       <View style={[styles.cardHeader, { marginBottom: 12 }]}>
         <Text style={[styles.cardTitle, { fontSize: 16 }]}>{title}</Text>
-        {selectedKey && (
-          <Pressable onPress={() => onSelect(null)}>
+        {selectedKeys.length > 0 && (
+          <Pressable onPress={onReset}>
             <Text style={[styles.resetFilterText, { fontSize: 12 }]}>Reset</Text>
           </Pressable>
         )}
       </View>
       
-      <View style={styles.distContentCompact}>
-        <Svg width="100" height="100" viewBox="0 0 160 160">
-          <G transform={`rotate(-90 ${centerX} ${centerY})`}>
-            {!hasData ? (
-              <Circle cx={centerX} cy={centerY} r={radius} fill="none" stroke="#F3F4F6" strokeWidth="25" />
-            ) : data.length === 1 ? (
-              <Circle 
-                cx={centerX} cy={centerY} r={radius} fill="none" 
-                stroke={data[0].color} strokeWidth="25"
-                opacity={!selectedKey || selectedKey === data[0].key ? 1 : 0.3}
-              />
-            ) : (
-              data.map((item, index) => {
-                const percentage = item.total / total;
-                const angle = percentage * 360;
-                const isSelected = selectedKey === item.key;
-                const x1 = centerX + radius * Math.cos((Math.PI * startAngle) / 180);
-                const y1 = centerY + radius * Math.sin((Math.PI * startAngle) / 180);
-                const x2 = centerX + radius * Math.cos((Math.PI * (startAngle + angle)) / 180);
-                const y2 = centerY + radius * Math.sin((Math.PI * (startAngle + angle)) / 180);
-                const largeArcFlag = angle > 180 ? 1 : 0;
-                const d = `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
-                startAngle += angle;
-                return (
-                  <Path key={index} d={d} fill={item.color} stroke={COLORS.surface} strokeWidth="2"
-                    opacity={!selectedKey || isSelected ? 1 : 0.3}
-                  />
-                );
-              })
-            )}
-            <Circle cx={centerX} cy={centerY} r="40" fill={COLORS.surface} />
-          </G>
-        </Svg>
+      <View style={styles.distContentGrid}>
+        <View style={styles.chartContainerCentered}>
+          <Svg width="120" height="120" viewBox="0 0 160 160">
+            <G transform={`rotate(-90 ${centerX} ${centerY})`}>
+              {!hasData ? (
+                <Circle cx={centerX} cy={centerY} r={radius} fill="none" stroke="#F3F4F6" strokeWidth="25" />
+              ) : data.length === 1 ? (
+                <Circle 
+                  cx={centerX} cy={centerY} r={radius} fill="none" 
+                  stroke={data[0].color} strokeWidth="25"
+                  opacity={selectedKeys.length === 0 || selectedKeys.includes(data[0].key) ? 1 : 0.3}
+                />
+              ) : (
+                data.map((item, index) => {
+                  const percentage = item.total / total;
+                  const angle = percentage * 360;
+                  const isSelected = selectedKeys.includes(item.key);
+                  const x1 = centerX + radius * Math.cos((Math.PI * startAngle) / 180);
+                  const y1 = centerY + radius * Math.sin((Math.PI * startAngle) / 180);
+                  const x2 = centerX + radius * Math.cos((Math.PI * (startAngle + angle)) / 180);
+                  const y2 = centerY + radius * Math.sin((Math.PI * (startAngle + angle)) / 180);
+                  const largeArcFlag = angle > 180 ? 1 : 0;
+                  const d = `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+                  startAngle += angle;
+                  return (
+                    <Path key={index} d={d} fill={item.color} stroke={COLORS.surface} strokeWidth="2"
+                      opacity={selectedKeys.length === 0 || isSelected ? 1 : 0.3}
+                    />
+                  );
+                })
+              )}
+              <Circle cx={centerX} cy={centerY} r="40" fill={COLORS.surface} />
+            </G>
+          </Svg>
+        </View>
 
-        <View style={styles.legendSideCompact}>
+        <View style={styles.legendGrid}>
           {!hasData ? (
-            <Text style={[styles.emptyText, { fontSize: 12, marginTop: 0 }]}>{emptyMessage}</Text>
+            <Text style={[styles.emptyText, { fontSize: 12, marginTop: 0, width: '100%' }]}>{emptyMessage}</Text>
           ) : (
             data.map((item, index) => {
-              const isSelected = selectedKey === item.key;
+              const isSelected = selectedKeys.includes(item.key);
               return (
                 <Pressable 
                   key={index} 
-                  style={[styles.legendItemCompact, isSelected && styles.legendItemActive, { paddingVertical: 6, paddingHorizontal: 8, marginVertical: 2, flexDirection: 'row', alignItems: 'center' }]}
-                  onPress={() => onSelect(isSelected ? null : item.key)}
+                  style={[
+                    styles.legendGridItem, 
+                    isSelected && styles.legendGridItemActive
+                  ]}
+                  onPress={() => onToggleKey(item.key)}
                 >
-                  <View style={[styles.legendDot, { backgroundColor: item.color }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.legendText, { fontSize: 13 }]} numberOfLines={1}>{item.label}</Text>
-                    <Text style={[styles.legendPerc, { fontSize: 11 }]}>{((item.total / total) * 100).toFixed(0)}% (€{item.total.toFixed(0)})</Text>
+                  <View style={styles.legendGridItemRow}>
+                    <View style={[styles.legendDot, { backgroundColor: item.color, marginRight: 6 }]} />
+                    <Text style={styles.legendGridText} numberOfLines={1}>
+                      {item.label}
+                    </Text>
                   </View>
-                  {isSelected && (
-                    <Ionicons name="close-circle" size={16} color={COLORS.secondary} style={{ marginLeft: 4 }} />
-                  )}
+                  <Text style={styles.legendGridPerc}>
+                    {((item.total / total) * 100).toFixed(0)}% (€{item.total.toFixed(0)})
+                  </Text>
                 </Pressable>
               );
             })
@@ -140,7 +147,7 @@ const SimpleTrendChart = ({ data, color }: { data: any[], color: string }) => {
 
   return (
     <View style={{ height: 125, marginTop: 10 }}>
-      <Svg width={chartWidth} height={chartHeight}>
+      <Svg width={chartWidth} height={chartHeight + 20}>
         {data.map((d, i) => {
           const x = startX + i * (barWidth + barGap);
           const h = getBarHeight(d.value);
@@ -177,11 +184,33 @@ const SimpleTrendChart = ({ data, color }: { data: any[], color: string }) => {
             </G>
           );
         })}
+
+        {/* Etichetta Estrema Sinistra */}
+        <SvgText
+          x={startX + barWidth / 2}
+          y={chartHeight + 16}
+          fontSize={10}
+          fontFamily={TYPOGRAPHY.fontBold}
+          fill={COLORS.secondary}
+          textAnchor={totalBars === 1 ? 'middle' : (startX < 30 ? 'start' : 'middle')}
+        >
+          {data[0]?.label}
+        </SvgText>
+
+        {/* Etichetta Estrema Destra */}
+        {totalBars > 1 && (
+          <SvgText
+            x={startX + (totalBars - 1) * (barWidth + barGap) + barWidth / 2}
+            y={chartHeight + 16}
+            fontSize={10}
+            fontFamily={TYPOGRAPHY.fontBold}
+            fill={COLORS.secondary}
+            textAnchor={(chartWidth - (startX + totalChartContentWidth)) < 30 ? 'end' : 'middle'}
+          >
+            {data[data.length - 1]?.label}
+          </SvgText>
+        )}
       </Svg>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, paddingHorizontal: 2 }}>
-        <Text style={[styles.chartLabelText, { fontSize: 10, fontFamily: TYPOGRAPHY.fontBold }]}>{data[0]?.label}</Text>
-        <Text style={[styles.chartLabelText, { fontSize: 10, fontFamily: TYPOGRAPHY.fontBold }]}>{data[data.length-1]?.label}</Text>
-      </View>
     </View>
   );
 };
@@ -198,8 +227,8 @@ export default function ExpensesScreen() {
   const [trendPoints, setTrendPoints] = useState<any[]>([]);
   const [sortBy, setSortBy] = useState<'date' | 'amount_asc' | 'amount_desc'>('date');
   
-  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   // Automatic reset when entering the screen
   useFocusEffect(
@@ -207,8 +236,8 @@ export default function ExpensesScreen() {
       analytics.trackScreen(ANALYTICS_SCREENS.STATS_EXPENSES);
       setTimeRange('Mese');
       setBaseDate(new Date().toISOString().split('T')[0]);
-      setSelectedDomain(null);
-      setSelectedCategory(null);
+      setSelectedDomains([]);
+      setSelectedCategories([]);
       setSortBy('date');
     }, [])
   );
@@ -216,7 +245,7 @@ export default function ExpensesScreen() {
   // Load stats when filters change
   useEffect(() => {
     loadStats();
-  }, [timeRange, baseDate, selectedDomain, selectedCategory, sortBy]);
+  }, [timeRange, baseDate, selectedDomains, selectedCategories, sortBy]);
 
   // Track time range changes
   useEffect(() => {
@@ -242,11 +271,11 @@ export default function ExpensesScreen() {
       const cData = await TransactionRepository.getCategoryDistribution(timeRange, 'out', baseDate);
       
       let filteredCats = cData;
-      if (selectedDomain) {
+      if (selectedDomains.length > 0) {
         filteredCats = cData.filter(item => {
           const cat = CATEGORIES_CONFIG.flatMap(d => d.subcategories.map(s => ({...s, domainKey: d.key})))
             .find(s => s.key === item.category_key);
-          return cat?.domainKey === selectedDomain;
+          return cat && selectedDomains.includes(cat.domainKey);
         });
       }
 
@@ -266,14 +295,15 @@ export default function ExpensesScreen() {
       // 3. Transactions
       const txs = await TransactionRepository.getFilteredTransactions(timeRange, {
         direction: 'out',
-        domain_key: selectedDomain || undefined,
-        category_key: selectedCategory || undefined,
+        domain_keys: selectedDomains,
+        category_keys: selectedCategories,
       }, sortBy, baseDate);
       setTransactions(txs);
 
       // 4. Trend
       const trend = await TransactionRepository.getFilteredTrend(timeRange, 'out', {
-        category_key: selectedCategory || undefined,
+        domain_keys: selectedDomains,
+        category_keys: selectedCategories,
       }, baseDate);
       setTrendPoints(trend);
 
@@ -281,12 +311,42 @@ export default function ExpensesScreen() {
     finally { setLoading(false); }
   };
 
-  const handleSelectDomain = (key: string | null) => {
-    setSelectedDomain(key);
+  const handleToggleDomain = (key: string) => {
+    let nextDomains: string[];
+    if (selectedDomains.includes(key)) {
+      nextDomains = selectedDomains.filter(d => d !== key);
+    } else {
+      nextDomains = [...selectedDomains, key];
+    }
+    setSelectedDomains(nextDomains);
+
+    // Clean up category filters that don't belong to selected domains
+    if (nextDomains.length > 0) {
+      setSelectedCategories(prev => prev.filter(catKey => {
+        const cat = CATEGORIES_CONFIG.flatMap(d => d.subcategories.map(s => ({...s, domainKey: d.key})))
+          .find(s => s.key === catKey);
+        return cat && nextDomains.includes(cat.domainKey);
+      }));
+    } else {
+      setSelectedCategories([]);
+    }
   };
 
-  const handleSelectCategory = (key: string | null) => {
-    setSelectedCategory(key);
+  const handleToggleCategory = (key: string) => {
+    if (selectedCategories.includes(key)) {
+      setSelectedCategories(selectedCategories.filter(c => c !== key));
+    } else {
+      setSelectedCategories([...selectedCategories, key]);
+    }
+  };
+
+  const handleResetDomains = () => {
+    setSelectedDomains([]);
+    setSelectedCategories([]);
+  };
+
+  const handleResetCategories = () => {
+    setSelectedCategories([]);
   };
 
   return (
@@ -345,17 +405,19 @@ export default function ExpensesScreen() {
                 <CompactDistributionCard 
                   title="Domini"
                   data={domainDist}
-                  selectedKey={selectedDomain}
-                  onSelect={handleSelectDomain}
+                  selectedKeys={selectedDomains}
+                  onToggleKey={handleToggleDomain}
+                  onReset={handleResetDomains}
                   emptyMessage="Nessun dato"
                 />
 
                 <CompactDistributionCard 
                   title="Categorie"
                   data={catDist}
-                  selectedKey={selectedCategory}
-                  onSelect={handleSelectCategory} 
-                  emptyMessage={selectedDomain ? "Vuoto" : "Seleziona macro"}
+                  selectedKeys={selectedCategories}
+                  onToggleKey={handleToggleCategory}
+                  onReset={handleResetCategories}
+                  emptyMessage={selectedDomains.length > 0 ? "Vuoto" : "Seleziona macro"}
                 />
               </View>
 
@@ -471,39 +533,55 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.xs,
     fontFamily: TYPOGRAPHY.fontBold,
   },
-  distContentCompact: {
+  distContentGrid: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    width: '100%',
+  },
+  chartContainerCentered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 8,
+  },
+  legendGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: '100%',
+    marginTop: 10,
+  },
+  legendGridItem: {
+    width: '33.33%',
+    padding: 6,
+    borderRadius: 10,
+    alignItems: 'flex-start',
+    marginVertical: 4,
+  },
+  legendGridItemActive: {
+    backgroundColor: '#F3F4F6',
+  },
+  legendGridItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    width: '100%',
   },
-  legendSideCompact: {
+  legendGridText: {
+    fontSize: 12,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
     flex: 1,
   },
-  legendItemCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-    borderRadius: 6,
-  },
-  legendItemActive: {
-    backgroundColor: '#F3F4F6',
+  legendGridPerc: {
+    fontSize: 10,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    paddingLeft: 14,
+    marginTop: 1,
   },
   legendDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 8,
-  },
-  legendText: {
-    fontSize: 12,
-    fontFamily: TYPOGRAPHY.fontBold,
-    color: COLORS.primary,
-  },
-  legendPerc: {
-    fontSize: 10,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    color: COLORS.secondary,
   },
   emptyText: {
     textAlign: 'center',

@@ -24,12 +24,12 @@ export class NetWorthRepository {
     await db.runAsync(
       `INSERT INTO transactions (
         id, created_at, date, time, amount, net_amount, currency, direction, 
-        category_key, subcategory_key, description, is_social, is_travel, is_online, 
+        category_key, subcategory_key, description, is_travel, is_online, 
         input_method, raw_input, is_deleted
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         adjId, now, now.split('T')[0], null, diff, diff, 'EUR', 'adj',
-        'system', 'adjustment', 'Aggiustamento manuale patrimonio', 0, 0, 0,
+        'system', 'adjustment', 'Aggiustamento manuale patrimonio', 0, 0,
         'manual', 'ADJ_SYNC', 0
       ]
     );

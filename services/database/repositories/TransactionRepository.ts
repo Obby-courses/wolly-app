@@ -548,7 +548,7 @@ export class TransactionRepository {
    */
   static async getFilteredTransactions(
     timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto',
-    filters: { domain_key?: string, category_key?: string, subcategory_key?: string, direction?: 'in' | 'out', city?: string, social_context?: string, person?: string, merchant_name?: string, holiday?: string, tag?: string },
+    filters: { domain_key?: string, category_key?: string, subcategory_key?: string, direction?: 'in' | 'out', city?: string, social_context?: string, person?: string, merchant_name?: string, holiday?: string, tag?: string, domain_keys?: string[], category_keys?: string[] },
     sortBy: 'date' | 'amount_asc' | 'amount_desc',
     baseDate: string = new Date().toISOString().split('T')[0]
   ): Promise<any[]> {
@@ -569,6 +569,14 @@ export class TransactionRepository {
     if (filters.direction) query += ` AND t.direction = '${filters.direction}'`;
     if (filters.domain_key) query += ` AND t.domain_key = '${filters.domain_key}'`;
     if (filters.category_key) query += ` AND t.category_key = '${filters.category_key}'`;
+    if (filters.domain_keys && filters.domain_keys.length > 0) {
+      const placeholders = filters.domain_keys.map(k => `'${k}'`).join(',');
+      query += ` AND t.domain_key IN (${placeholders})`;
+    }
+    if (filters.category_keys && filters.category_keys.length > 0) {
+      const placeholders = filters.category_keys.map(k => `'${k}'`).join(',');
+      query += ` AND t.category_key IN (${placeholders})`;
+    }
     if (filters.subcategory_key) query += ` AND t.subcategory_key = '${filters.subcategory_key}'`;
     if (filters.merchant_name) query += ` AND t.location_name LIKE '%${filters.merchant_name}%'`;
     if (filters.city) query += ` AND t.city = '${filters.city}'`;
@@ -592,7 +600,7 @@ export class TransactionRepository {
   static async getFilteredTrend(
     timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto',
     direction: 'in' | 'out',
-    filters: { category_key?: string, subcategory_key?: string },
+    filters: { category_key?: string, subcategory_key?: string, domain_keys?: string[], category_keys?: string[] },
     baseDate: string = new Date().toISOString().split('T')[0]
   ): Promise<{ label: string, value: number }[]> {
     const db = await getDBConnection();
@@ -614,6 +622,14 @@ export class TransactionRepository {
     let filterExpr = `AND direction = '${direction}'`;
     if (filters.category_key) filterExpr += ` AND category_key = '${filters.category_key}'`;
     if (filters.subcategory_key) filterExpr += ` AND subcategory_key = '${filters.subcategory_key}'`;
+    if (filters.domain_keys && filters.domain_keys.length > 0) {
+      const placeholders = filters.domain_keys.map(k => `'${k}'`).join(',');
+      filterExpr += ` AND domain_key IN (${placeholders})`;
+    }
+    if (filters.category_keys && filters.category_keys.length > 0) {
+      const placeholders = filters.category_keys.map(k => `'${k}'`).join(',');
+      filterExpr += ` AND category_key IN (${placeholders})`;
+    }
 
     const query = `
       SELECT ${timeExpr} as period, SUM(amount) as total

@@ -78,6 +78,13 @@ export default function Home() {
     AsyncStorage.getItem('wolly_nw_hidden').then(val => {
       if (val !== null) setIsNetWorthHidden(val === 'true');
     });
+
+    // Check if onboarding is completed
+    AsyncStorage.getItem('wolly_onboarding_completed').then(val => {
+      if (val === 'false' || val === null) {
+        router.replace('/onboarding');
+      }
+    });
   }, []);
 
   const toggleNetWorthVisibility = async () => {
@@ -270,13 +277,21 @@ export default function Home() {
                 <Text style={styles.cardValueText} numberOfLines={1}>
                   €{thisMonthExpenses.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </Text>
-                <Text style={styles.cardFooterText} numberOfLines={1}>
-                  {percentageChange !== 0 ? (
-                    `${percentageChange > 0 ? '+' : '-'}${Math.abs(percentageChange).toFixed(0)}% vs mese prec.`
-                  ) : (
-                    'Trend stabile'
-                  )}
-                </Text>
+                <View style={[
+                  styles.trendPill,
+                  percentageChange <= 0 ? styles.trendPillGreen : styles.trendPillRed
+                ]}>
+                  <Text style={[
+                    styles.trendPillText,
+                    percentageChange <= 0 ? styles.trendTextGreen : styles.trendTextRed
+                  ]} numberOfLines={1}>
+                    {percentageChange !== 0 ? (
+                      `${percentageChange > 0 ? '+' : '-'}${Math.abs(percentageChange).toFixed(0)}% vs mese prec.`
+                    ) : (
+                      'Trend stabile'
+                    )}
+                  </Text>
+                </View>
               </View>
 
               {/* Card Spese Programmate (Credit Card Style) */}
@@ -325,7 +340,13 @@ export default function Home() {
               showsVerticalScrollIndicator={false}
               scrollEnabled={false}
               ListEmptyComponent={
-                <Text style={styles.emptyTransactionsText}>Nessuna spesa presente</Text>
+                <View style={styles.emptyContainer}>
+                  <View style={styles.emptyIconBackground}>
+                    <Ionicons name="receipt-outline" size={36} color="#0A74FF" />
+                  </View>
+                  <Text style={styles.emptyTitle}>Non hai spese ancora</Text>
+                  <Text style={styles.emptySubtitle}>Registra la tua prima transazione</Text>
+                </View>
               }
             />
           </View>
@@ -515,11 +536,63 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontBold,
     color: '#0A74FF',
   },
-  emptyTransactionsText: {
-    color: COLORS.secondary,
-    fontSize: 13,
-    fontFamily: TYPOGRAPHY.fontFamily,
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 8,
+    ...SHADOWS.soft,
+  },
+  emptyIconBackground: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#F0F9FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: '#0F172A',
     textAlign: 'center',
-    paddingVertical: SPACING.lg,
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  trendPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  trendPillGreen: {
+    backgroundColor: 'rgba(52, 199, 89, 0.25)',
+  },
+  trendPillRed: {
+    backgroundColor: 'rgba(255, 59, 48, 0.25)',
+  },
+  trendPillText: {
+    fontSize: 10,
+    fontFamily: TYPOGRAPHY.fontBold,
+  },
+  trendTextGreen: {
+    color: '#E8FDF0',
+  },
+  trendTextRed: {
+    color: '#FEE2E2',
   },
 });
