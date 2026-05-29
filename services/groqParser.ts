@@ -52,8 +52,11 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
 - investimenti -> [immobili, veicoli_beni_immobili, investimenti_finanziari, risparmi, collezioni]
 - entrata -> [salario_fatture, interessi_dividendi, vendita, entrate_affitto, quote_sovvenzioni, entrata_prestiti, assegni_buoni, lotteria_azzardo, rimborsi, regali]
 
- REGOLE CRITICHE:
-1. category_key: Scegli SEMPRE la categoria specifica più precisa (es: "cultura_eventi", NON "vita_intrattenimento").
+  REGOLE CRITICHE:
+1. category_key: Scegli la categoria specifica più precisa.
+   - ASSENZA DI INFORMAZIONI: Se l'input dell'utente NON contiene alcun segnale, negozio, brand o contesto che permetta di dedurre la categoria (es. solo "Spesi 10€", "Ho pagato 50 euro", "Registra 15€"), NON inventare una categoria a caso! In questo caso specifico di assenza totale di contesto, devi valorizzare obbligatoriamente:
+     "category_key": "altro_altro",
+     "domain_key": "altro"
 2. domain_key: Inserisci il dominio di appartenenza della categoria scelta (es: "vita_intrattenimento" per "cultura_eventi").
 3. NET_AMOUNT: Deve essere UGUALE ad amount se non ci sono rimborsi (refund) o divisioni (split). NON sottrarre l'IVA.
 4. IMPORTO (amount): Cerca il "TOTALE" finale. Esempio Scontrini: se vedi "Totale 19,00" e "Contanti 20,00", l'amount è 19,00.
@@ -163,23 +166,28 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
         console.log(`📍 LOCATION: ${result.location_name || 'non rilevata'} (${result.location_type || '?'})`);
 
         // Validazione Tassonomia - ora category_key è la voce specifica
-        const validCategory = ALL_CATEGORIES.find(c => c.key === result.category_key);
+        const isAltro = result.category_key === 'altro_altro';
+        const validCategory = isAltro ? null : ALL_CATEGORIES.find(c => c.key === result.category_key);
 
-        if (!validCategory) {
+        if (!validCategory && !isAltro) {
           console.log("⚠️  [VALIDATION WARNING]: category_key non trovata in categories.ts!");
           console.log(`   - Richiesta: ${result.category_key} (dominio atteso: ${(result as any).domain_key})`);
 
-          // Fallback: prova a usare domain_key come categoria generica
-          const fallbackDomain = DOMAINS_CONFIG.find(d => d.key === (result as any).domain_key);
+          // Fallback: prova a usare domain_key come categoria generica o verifica se è solo un dominio generico valido
+          const fallbackDomain = DOMAINS_CONFIG.find(d => d.key === (result as any).domain_key || d.key === result.category_key);
           if (fallbackDomain && fallbackDomain.categories.length > 0) {
             result.category_key = fallbackDomain.categories[0].key;
             console.log(`   - Fallback a: ${result.category_key}`);
           } else {
-            result.category_key = 'tempo_libero';
+            result.category_key = 'altro_altro';
+            console.log(`   - Fallback ad altro_altro (non classificata)`);
           }
+        } else if (isAltro) {
+          (result as any).domain_key = 'altro';
+          console.log("✅ [VALIDATION SUCCESS]: Categoria 'altro_altro' rilevata correttamente.");
         } else {
           // Assicura che domain_key sia sempre corretto (ridondanza)
-          (result as any).domain_key = validCategory.domain_key;
+          (result as any).domain_key = validCategory!.domain_key;
           console.log("✅ [VALIDATION SUCCESS]: Categoria valida.");
         }
         // Manteniamo subcategory_key = category_key per compatibilità DB

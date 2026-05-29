@@ -606,10 +606,18 @@ export default function ExpenseDetail() {
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Classificazione</Text>
               <View style={styles.classificationRow}>
-                <CategoryPill categoryKey={editableExpense.category_key} />
-                {category && <Text style={styles.classificationArrow}>›</Text>}
-                {category && (
-                  <Text style={styles.categoryInlineText}>{category.label}</Text>
+                {editableExpense.category_key && editableExpense.category_key !== 'altro_altro' ? (
+                  <>
+                    <CategoryPill categoryKey={editableExpense.category_key} />
+                    {category && <Text style={styles.classificationArrow}>›</Text>}
+                    {category && (
+                      <Text style={styles.categoryInlineText}>{category.label}</Text>
+                    )}
+                  </>
+                ) : (
+                  <Text style={[styles.categoryInlineText, { color: '#EF4444', fontWeight: '600' }]}>
+                    Tocca per classificare
+                  </Text>
                 )}
               </View>
             </View>
