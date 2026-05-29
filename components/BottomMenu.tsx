@@ -267,7 +267,7 @@ export default function BottomMenu() {
   ).current;
 
   const { isRecording, isOpen, isSlidingToCancel } = voiceState;
-  const isVoiceChat = pathname === '/voice-chat' || isOpen;
+  const isVoiceChat = isOpen;
 
   const isActive = (path?: string) => {
     if (!path) return false;
@@ -447,10 +447,6 @@ const styles = StyleSheet.create({
   },
   micBtnCancel: {
     backgroundColor: COLORS.danger,
-  },
-  cancelContainer: {
-    alignItems: 'center',
-    marginBottom: 8,
   },
   cancelText: {
     fontFamily: TYPOGRAPHY.fontBold,

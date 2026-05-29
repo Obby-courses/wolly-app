@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import { SubscriptionRepository, Subscription, Frequency } from '../services/database/repositories/SubscriptionRepository';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
-import { ALL_CATEGORIES, getDomainForCategory, getCategory } from '../constants/categories';
+import { getDomainForCategory, getCategory } from '../constants/categories';
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
@@ -564,7 +564,7 @@ export default function SubscriptionsScreen() {
                 <View style={styles.emptyState}>
                   <Ionicons name="repeat-outline" size={40} color={COLORS.secondary} />
                   <Text style={styles.emptyText}>Nessuna periodica registrata</Text>
-                  <Text style={styles.emptySubtext}>Tocca + in alto per aggiungerne una</Text>
+                  <Text style={styles.emptySubtext}>Usa il + e la voce per aggiungerne una</Text>
                 </View>
               )}
 

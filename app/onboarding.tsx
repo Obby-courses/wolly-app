@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { NetWorthRepository } from '../services/database/repositories/NetWorthRepository';
+import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,6 +28,11 @@ export default function OnboardingScreen() {
   const inputRef = useRef<TextInput>(null);
 
   const totalSteps = 3;
+
+  React.useEffect(() => {
+    analytics.trackScreen(ANALYTICS_SCREENS.ONBOARDING);
+    analytics.trackEvent('onboarding_started');
+  }, []);
 
   const handleBalanceChange = (newVal: string) => {
     let hasComma = newVal.includes(',');
@@ -91,6 +97,7 @@ export default function OnboardingScreen() {
       })
     ]).start(() => {
       setStep(nextStep);
+      analytics.trackEvent('onboarding_step_completed', { from_step: step, to_step: nextStep });
       slideAnim.setValue(nextStep > step ? 30 : -30);
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -130,6 +137,8 @@ export default function OnboardingScreen() {
         // Mark onboarding completed in storage
         await AsyncStorage.setItem('wolly_onboarding_completed', 'true');
         await AsyncStorage.setItem('wolly_last_nw_sync_date', new Date().toISOString().split('T')[0]);
+
+        analytics.trackEvent('onboarding_completed', { initial_balance: finalBalance });
 
         // Navigate home
         router.replace('/');
@@ -450,22 +459,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     paddingHorizontal: 8,
   },
-  disclaimerBox: {
-    flexDirection: 'row',
-    backgroundColor: '#F0F9FF', // Light azure background
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'flex-start',
-  },
-  disclaimerText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#0369A1', // Darker azure text
-    lineHeight: 18,
-    fontFamily: TYPOGRAPHY.fontFamily,
-  },
   balanceHeader: {
     alignItems: 'center',
     width: '100%',
@@ -553,24 +546,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
     paddingHorizontal: 20,
-  },
-  lockBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F0F9FF', // Light azure background
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginTop: 20,
-    alignSelf: 'center',
-  },
-  lockText: {
-    fontSize: 12,
-    color: '#0369A1', // Darker azure text
-    fontFamily: TYPOGRAPHY.fontBold,
   },
   footer: {
     paddingHorizontal: 24,

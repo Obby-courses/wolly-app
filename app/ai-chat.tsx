@@ -271,100 +271,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 40,
   },
-  sendFab: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 40,
-    ...SHADOWS.medium,
-  },
-
   // ─── QA Container ─────────────────────────────────────────────────────────
   qaContainer: {
     flex: 1,
-  },
-  smallQuestionContainer: {
-    paddingTop: 20,
-    paddingHorizontal: SPACING.xl,
-    alignItems: 'center',
-  },
-  smallQuestionText: {
-    fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.secondary,
-    textAlign: 'center',
-    opacity: 0.8,
   },
   mainAnswerArea: {
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: SPACING.lg,
-  },
-  answerScroll: {
-    flex: 1,
-  },
-  answerScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  bigAnswerText: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 28,
-    color: COLORS.primary,
-    textAlign: 'center',
-    lineHeight: 38,
-  },
-  answerContextText: {
-    fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 18,
-    color: COLORS.secondary,
-    textAlign: 'center',
-    marginBottom: 0,
-  },
-  jitWrapper: {
-    marginTop: 40,
-    alignItems: 'center',
-    width: '100%',
-  },
-
-  // ─── Header & Actions ─────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  backBtn: {
-    padding: 8,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconBtn: {
-    padding: 8,
-  },
-  bottomActions: {
-    position: 'absolute',
-    bottom: 100,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  actionCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.soft,
   },
   loadingWrapper: {
     alignItems: 'center',

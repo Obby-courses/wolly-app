@@ -16,7 +16,6 @@ import { NetWorthRepository } from '../services/database/repositories/NetWorthRe
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { getCategory } from '../constants/categories';
 import { getCategoryColor } from '../components/CategoryPill';
-import AnnualChart from '../components/AnnualChart';
 import TransactionItem from '../components/TransactionItem';
 
 function getNextOccurrenceDate(sub: any): Date {
@@ -72,7 +71,6 @@ export default function Home() {
   const [percentageChange, setPercentageChange] = useState<number>(0);
   const [subMonthlyEstimate, setSubMonthlyEstimate] = useState<number>(0);
   const [isNetWorthHidden, setIsNetWorthHidden] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     AsyncStorage.getItem('wolly_nw_hidden').then(val => {
@@ -235,15 +233,6 @@ export default function Home() {
   const renderTransaction = ({ item }: { item: any }) => (
     <TransactionItem item={item} />
   );
-
-  const filteredTransactions = transactions.filter((t) => {
-    if (!searchQuery) return true;
-    const desc = t.description?.toLowerCase() || '';
-    const cat = t.category_key?.toLowerCase() || '';
-    const subcat = t.subcategory_key?.toLowerCase() || '';
-    const q = searchQuery.toLowerCase();
-    return desc.includes(q) || cat.includes(q) || subcat.includes(q);
-  });
 
   const formattedNetWorth = netWorth.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const commaIndex = formattedNetWorth.lastIndexOf(',');
@@ -525,25 +514,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontStyle: 'italic',
     fontFamily: TYPOGRAPHY.fontFamily,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    height: 46,
-    paddingHorizontal: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    ...SHADOWS.soft,
-  },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    fontSize: 14,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    color: COLORS.primary,
   },
   sectionHeaderCompact: {
     flexDirection: 'row',

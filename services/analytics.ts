@@ -24,6 +24,7 @@ export const ANALYTICS_SCREENS = {
   MANUAL_ENTRY: 'screen_manual_entry',
   AI_CHAT: 'screen_ai_chat',
   VOICE_CHAT: 'screen_voice_chat',
+  ONBOARDING: 'screen_onboarding',
 } as const;
 
 // Tassonomia ufficiale dei pulsanti (Buttons)
