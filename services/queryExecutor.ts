@@ -119,7 +119,20 @@ function buildPeriodLabel(period: QueryPeriod): string {
  * Separare questa responsabilità rende il codice testabile indipendentemente.
  */
 function intentToFilters(intent: QueryIntent, resolvedMerchant: string | null): CommonFilters {
-  const { from, to } = periodToDateRange(intent.period);
+  let { from, to } = periodToDateRange(intent.period);
+
+  if (intent.is_scheduled_filter) {
+    const today = new Date().toISOString().split('T')[0];
+    if (intent.period.type === 'all') {
+      from = today;
+      to = '2099-12-31';
+    } else {
+      if (from < today) {
+        from = today;
+      }
+    }
+  }
+
   return {
     date_from: from,
     date_to: to,
@@ -133,6 +146,7 @@ function intentToFilters(intent: QueryIntent, resolvedMerchant: string | null): 
     holiday: intent.holiday_filter || undefined,
     tag: intent.tag_filter || undefined,
     is_recurring: intent.is_recurring_filter || undefined,
+    is_scheduled: intent.is_scheduled_filter || undefined,
   };
 }
 

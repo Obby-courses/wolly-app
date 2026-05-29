@@ -32,6 +32,7 @@ export interface QueryIntent {
   holiday_filter?: string;        // festività (es: "Natale", "Pasqua")
   tag_filter?: string;            // tag specifico (es: "viaggio", "trasferta")
   is_recurring_filter?: boolean;  // true se si parla di spese ricorrenti o abbonamenti, altrimenti null
+  is_scheduled_filter?: boolean;  // true se si parla di spese programmate una tantum o future, altrimenti null
 }
 
 // ─── Prompt Builder (Dinamico) ───────────────────────────────────────────────
@@ -105,7 +106,8 @@ FORMATO JSON OBBLIGATORIO:
   "sort_by": "date"|"amount_desc"|"amount_asc"|null,
   "limit": number|null,
   "comparison_period": "prev_month"|"prev_year"|null,
-  "is_recurring_filter": boolean|null
+  "is_recurring_filter": boolean|null,
+  "is_scheduled_filter": boolean|null
 }
 
 REGOLE CRITICHE PER DATE E PERIODI:
@@ -143,6 +145,7 @@ ALTRE REGOLE GENERALI:
 - Default automatici se mancano parametri: tutto (null filters) · se l'archetipo è 'list' imposta il periodo a "all" (tutta la storia) per mostrare lo storico completo ed evitare liste vuote, per altri archetipi usa il mese corrente · totale.
 - GESTIONE ABBONAMENTI E RICORRENTI (is_recurring_filter): Se l'utente chiede una statistica storica o un importo speso (es. "Quanto ho speso di abbonamenti nel 2026?", "elenco spese di abbonamenti") → imposta archetype="total" o "list" (a seconda della domanda), is_recurring_filter=true e subject="transactions".
 - Se invece l'utente chiede l'elenco generale o la proiezione/configurazione degli abbonamenti attivi (es. "quali abbonamenti ho?", "mostrami gli abbonamenti attivi", "quanto mi costano gli abbonamenti al mese?") → imposta archetype="subscriptions", is_recurring_filter=true e subject="transactions".
+- GESTIONE SPESE PROGRAMMATE E FUTURE (is_scheduled_filter): Se l'utente chiede informazioni su spese/entrate programmate, pianificate, impegni futuri o transazioni future (es. "quali spese ho programmato?", "cosa ho pianificato di spendere?", "spese future", "impegni di giugno 2026") → imposta is_scheduled_filter=true e subject="transactions". Se chiede una lista imposta archetype="list", se chiede il totale imposta archetype="total".
 - Restituisci SOLO il JSON, nessun testo extra.`;
 }
 

@@ -39,6 +39,7 @@ export interface CommonFilters {
   time_of_day?: 'mattina' | 'pomeriggio' | 'sera' | 'notte';
   is_impulsive?: boolean;
   is_recurring?: boolean;
+  is_scheduled?: boolean;
 }
 
 // ─── Helpers SQL interni ──────────────────────────────────────────────────────
@@ -53,6 +54,17 @@ function buildWhereClause(
 ): { clause: string; params: any[] } {
   const clauses: string[] = [`${tableAlias}.is_deleted = 0`, `${tableAlias}.direction != 'adj'`];
   const params: any[] = [];
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  if (filters.is_scheduled === true) {
+    // Restringe solo alle transazioni nel futuro (spese/entrate programmate)
+    clauses.push(`${tableAlias}.date > ?`);
+    params.push(todayStr);
+  } else {
+    // Esclude di default le transazioni nel futuro per evitare di contaminare i saldi passati
+    clauses.push(`${tableAlias}.date <= ?`);
+    params.push(todayStr);
+  }
 
   if (filters.date_from) {
     clauses.push(`${tableAlias}.date >= ?`);
