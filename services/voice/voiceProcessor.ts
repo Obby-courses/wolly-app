@@ -35,8 +35,22 @@ export async function processVoiceInput(uri: string): Promise<void> {
     transcription = await transcribeAudio(uri);
     console.log(`📝 [${Date.now() - startTime}ms] Trascrizione: "${transcription}"`);
   } catch (err: any) {
-    console.error(`❌ [voiceProcessor] Errore STT: ${err.message}`);
-    voiceStore.close();
+    console.error(`❌ [voiceProcessor] Errore STT: ${err.message || err}`);
+    voiceStore.setIsLoading(false);
+    
+    const isAbort = err.message === 'Aborted' || err.name === 'AbortError';
+    voiceStore.setQa({
+      question: 'Errore di Trascrizione',
+      answer: {
+        intent: 'text',
+        text_response: isAbort
+          ? '⚠️ La trascrizione vocale ha impiegato troppo tempo (timeout). Riprova con una connessione migliore o accorcia il messaggio.'
+          : `❌ Non è stato possibile trascrivere l'audio: ${err.message || 'Errore di connessione'}.`
+      }
+    });
+    
+    // Mostra l'errore per 5 secondi prima di chiudere
+    setTimeout(() => voiceStore.close(), 5000);
     return;
   }
 

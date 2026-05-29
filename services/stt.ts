@@ -25,7 +25,7 @@ export async function transcribeAudio(uri: string): Promise<string> {
     const timeoutId = setTimeout(() => {
       console.warn("⚠️ Groq STT Request timed out!");
       controller.abort();
-    }, 20000); // 20 seconds timeout
+    }, 40000); // 40 seconds timeout
 
     const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
