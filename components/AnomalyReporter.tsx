@@ -3,7 +3,6 @@ import {
   StyleSheet, Text, View, Pressable, TextInput,
   Modal, ActivityIndicator, Alert, Platform, KeyboardAvoidingView, Keyboard
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,9 +24,31 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
   const [modalVisible, setModalVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [section, setSection] = useState('generale');
+  const [showDropdown, setShowDropdown] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(voiceStore.getState().isOpen);
   const appVersion = Constants.expoConfig?.version || '0.2.0';
+
+  const sectionLabels: Record<string, string> = {
+    generale: "Generale / Altro",
+    home: "Schermata Home",
+    transazioni: "Transazioni (Spese/Guadagni)",
+    statistiche: "Statistiche e Grafici",
+    abbonamenti: "Abbonamenti",
+    ai_chat: "Assistente IA (Chat/Voce)",
+    impostazioni: "Impostazioni",
+  };
+
+  const SECTIONS = [
+    { label: "Generale / Altro", value: "generale" },
+    { label: "Schermata Home", value: "home" },
+    { label: "Transazioni (Spese/Guadagni)", value: "transazioni" },
+    { label: "Statistiche e Grafici", value: "statistiche" },
+    { label: "Abbonamenti", value: "abbonamenti" },
+    { label: "Assistente IA (Chat/Voce)", value: "ai_chat" },
+    { label: "Impostazioni", value: "impostazioni" },
+  ];
 
   useEffect(() => {
     const unsub = voiceStore.subscribe(() => {
@@ -68,11 +89,15 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
     }
     setMessage('');
     setSection('generale');
+    setShowDropdown(false);
+    setIsSuccess(false);
     setModalVisible(true);
   };
 
   const handleClose = () => {
     Keyboard.dismiss();
+    setShowDropdown(false);
+    setIsSuccess(false);
     setModalVisible(false);
   };
 
@@ -102,7 +127,7 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
     };
 
     try {
-      const sectionLabels: Record<string, string> = {
+      const sectionDbLabels: Record<string, string> = {
         generale: "Generale",
         home: "Home",
         transazioni: "Transazioni",
@@ -112,7 +137,7 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
         impostazioni: "Impostazioni",
       };
 
-      const sectionLabel = sectionLabels[section] || section;
+      const sectionLabel = sectionDbLabels[section] || section;
 
       const insertData: any = {
         page_route: voiceOpen ? '/voice-chat' : normalizePageRoute(pathname),
@@ -141,11 +166,11 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
         throw new Error(error.message);
       }
 
-      Alert.alert(
-        'Segnalazione Inviata',
-        'Grazie per il supporto! 💙\nLa tua segnalazione aiuterà a migliorare Wolly.',
-        [{ text: 'Ottimo', onPress: () => setModalVisible(false) }]
-      );
+      setIsSuccess(true);
+      setTimeout(() => {
+        setModalVisible(false);
+        setIsSuccess(false);
+      }, 2000);
     } catch (err: any) {
       console.error('[AnomalyReporter Error] Errore di invio:', err);
       Alert.alert(
@@ -214,73 +239,111 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
           >
             {/* Impediamo al tocco sulla card di chiudere il modal */}
             <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
-              
-              {/* Header - Rimosso il pulsante X di chiusura */}
-              <View style={styles.cardHeader}>
-                <Ionicons name="flag" size={22} color={COLORS.danger} style={{ marginRight: 8 }} />
-                <Text style={styles.cardTitle}>Segnala un'Anomalia</Text>
-              </View>
+              {isSuccess ? (
+                <View style={styles.successContainer}>
+                  <Ionicons name="checkmark-circle" size={80} color="#34C759" style={styles.successIcon} />
+                  <Text style={styles.successTitle}>Inviato con successo!</Text>
+                  <Text style={styles.successSubtitle}>Grazie per averci aiutato a migliorare Wolly 💙</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Header - Rimosso il pulsante X di chiusura */}
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="flag" size={22} color={COLORS.danger} style={{ marginRight: 8 }} />
+                    <Text style={styles.cardTitle}>Segnala un'Anomalia</Text>
+                  </View>
 
-              <Text style={styles.cardSubtitle}>
-                Aiutaci a migliorare Wolly. Scegli la sezione dell'app ed inserisci una descrizione.
-              </Text>
+                  <Text style={styles.cardSubtitle}>
+                    Aiutaci a migliorare Wolly. Scegli la sezione dell'app ed inserisci una descrizione.
+                  </Text>
 
-              {/* Menu a tendina nativo iOS/Android per scegliere la sezione */}
-              <Text style={styles.fieldLabel}>Sezione dell'App</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={section}
-                  onValueChange={(itemValue) => setSection(itemValue)}
-                  style={styles.picker}
-                  dropdownIconColor={COLORS.primary}
-                >
-                  <Picker.Item label="Generale / Altro" value="generale" />
-                  <Picker.Item label="Schermata Home" value="home" />
-                  <Picker.Item label="Transazioni (Spese/Guadagni)" value="transazioni" />
-                  <Picker.Item label="Statistiche e Grafici" value="statistiche" />
-                  <Picker.Item label="Abbonamenti" value="abbonamenti" />
-                  <Picker.Item label="Assistente IA (Chat/Voce)" value="ai_chat" />
-                  <Picker.Item label="Impostazioni" value="impostazioni" />
-                </Picker>
-              </View>
+                  {/* Menu a tendina nativo iOS/Android per scegliere la sezione */}
+                  <Text style={styles.fieldLabel}>Sezione dell'App</Text>
+                  
+                  <Pressable 
+                    style={styles.dropdownTrigger} 
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setShowDropdown(!showDropdown);
+                    }}
+                  >
+                    <Text style={styles.dropdownTriggerText}>
+                      {sectionLabels[section] || "Seleziona..."}
+                    </Text>
+                    <Ionicons 
+                      name={showDropdown ? "chevron-up" : "chevron-down"} 
+                      size={16} 
+                      color={COLORS.primary} 
+                    />
+                  </Pressable>
 
-              {/* Messaggio Input */}
-              <Text style={styles.fieldLabel}>Descrizione</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="es. Il grafico delle spese non mostra le colonne corrette..."
-                placeholderTextColor={COLORS.secondary + '60'}
-                value={message}
-                onChangeText={setMessage}
-                multiline={true}
-                numberOfLines={4}
-                maxLength={500}
-                autoFocus={true}
-                textAlignVertical="top"
-              />
-
-              {/* Bottoni d'azione - Grandi uguali, occupano tutto lo spazio orizzontale */}
-              <View style={styles.actionsRow}>
-                <Pressable
-                  onPress={handleClose}
-                  disabled={isSending}
-                  style={[styles.btn, styles.btnCancel]}
-                >
-                  <Text style={styles.btnCancelText}>Annulla</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={handleSend}
-                  disabled={isSending}
-                  style={[styles.btn, styles.btnSend, isSending && { opacity: 0.7 }]}
-                >
-                  {isSending ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.btnSendText}>Invia</Text>
+                  {showDropdown && (
+                    <View style={styles.dropdownMenu}>
+                      {SECTIONS.map((item) => (
+                        <Pressable
+                          key={item.value}
+                          style={[
+                            styles.dropdownItem,
+                            section === item.value && styles.dropdownItemActive
+                          ]}
+                          onPress={() => {
+                            setSection(item.value);
+                            setShowDropdown(false);
+                          }}
+                        >
+                          <Text style={[
+                            styles.dropdownItemText,
+                            section === item.value && styles.dropdownItemTextActive
+                          ]}>
+                            {item.label}
+                          </Text>
+                          {section === item.value && (
+                            <Ionicons name="checkmark" size={16} color={COLORS.primary} />
+                          )}
+                        </Pressable>
+                      ))}
+                    </View>
                   )}
-                </Pressable>
-              </View>
+
+                  {/* Messaggio Input */}
+                  <Text style={styles.fieldLabel}>Descrizione</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="es. Il grafico delle spese non mostra le colonne corrette..."
+                    placeholderTextColor={COLORS.secondary + '60'}
+                    value={message}
+                    onChangeText={setMessage}
+                    multiline={true}
+                    numberOfLines={4}
+                    maxLength={500}
+                    autoFocus={true}
+                    textAlignVertical="top"
+                  />
+
+                  {/* Bottoni d'azione - Grandi uguali, occupano tutto lo spazio orizzontale */}
+                  <View style={styles.actionsRow}>
+                    <Pressable
+                      onPress={handleClose}
+                      disabled={isSending}
+                      style={[styles.btn, styles.btnCancel]}
+                    >
+                      <Text style={styles.btnCancelText}>Annulla</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={handleSend}
+                      disabled={isSending}
+                      style={[styles.btn, styles.btnSend, isSending && { opacity: 0.7 }]}
+                    >
+                      {isSending ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <Text style={styles.btnSendText}>Invia</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </>
+              )}
 
             </Pressable>
           </KeyboardAvoidingView>
@@ -351,17 +414,77 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginLeft: 2,
   },
-  pickerContainer: {
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: COLORS.background,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     marginBottom: 14,
-    overflow: 'hidden',
   },
-  picker: {
+  dropdownTriggerText: {
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontFamily,
     color: COLORS.primary,
-    height: Platform.OS === 'ios' ? 120 : 50,
+  },
+  dropdownMenu: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 6,
+    marginBottom: 14,
+    ...SHADOWS.soft,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  dropdownItemActive: {
+    backgroundColor: '#F3F4F6',
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+  },
+  dropdownItemTextActive: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+  },
+  successContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 30,
+  },
+  successIcon: {
+    marginBottom: 16,
+    shadowColor: '#34C759',
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  successTitle: {
+    fontSize: 19,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 13,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 10,
   },
   textInput: {
     height: 100,
