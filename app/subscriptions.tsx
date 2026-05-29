@@ -510,9 +510,7 @@ export default function SubscriptionsScreen() {
             style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
           >
             <View style={styles.header}>
-              <View style={{ width: 80 }} />
               <Text style={styles.title}>Periodiche e Programmate</Text>
-              <View style={{ width: 32 }} />
             </View>
 
             {/* Summary card inside blue header */}

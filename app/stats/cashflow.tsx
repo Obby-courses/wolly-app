@@ -68,10 +68,10 @@ export default function CashflowScreen() {
         colors={['#0A74FF', '#0857C3']}
         style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
       >
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={{ marginRight: 12, marginLeft: -4, marginTop: 2 }}>
-            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
-          </Pressable>
+        <Pressable onPress={() => router.back()} style={{ marginLeft: -4, marginBottom: 12, alignSelf: 'flex-start' }}>
+          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+        </Pressable>
+        <View style={[styles.header, { marginTop: 0 }]}>
           <Text style={styles.title}>Flusso di Cassa</Text>
         </View>
         <Text style={styles.subtitle}>Confronto diretto tra entrate e uscite</Text>

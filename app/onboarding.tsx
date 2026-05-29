@@ -27,7 +27,7 @@ export default function OnboardingScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const inputRef = useRef<TextInput>(null);
 
-  const totalSteps = 3;
+  const totalSteps = 4;
 
   React.useEffect(() => {
     analytics.trackScreen(ANALYTICS_SCREENS.ONBOARDING);
@@ -284,6 +284,58 @@ export default function OnboardingScreen() {
     </View>
   );
 
+  const renderParsingSlide = () => (
+    <View style={[styles.slideContent, { paddingHorizontal: 24, paddingTop: insets.top + 40 }]}>
+      <View style={styles.securityHeader}>
+        <View style={styles.securityIconBackground}>
+          <Ionicons name="flash-outline" size={32} color="#0A74FF" />
+        </View>
+        <Text style={styles.slideTitleSecurity}>Come registrare le spese</Text>
+        <Text style={styles.slideSubtitleSecurity}>
+          Wolly usa l'Intelligenza Artificiale per farti risparmiare tempo. Usa il pulsante + centrale nel menu.
+        </Text>
+      </View>
+
+      <View style={styles.securityItemsContainer}>
+        <View style={styles.securityItem}>
+          <View style={styles.securityItemIcon}>
+            <Ionicons name="chatbubble-ellipses-outline" size={24} color="#0A74FF" style={{ marginRight: 6 }} />
+          </View>
+          <View style={styles.securityItemContent}>
+            <Text style={styles.securityItemTitle}>1 tocco: Testo</Text>
+            <Text style={styles.securityItemDesc}>
+              Scrivi la tua spesa (es. "Pizza 12 euro") o fai domande sulle tue finanze alla chat AI.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.securityItem}>
+          <View style={styles.securityItemIcon}>
+            <Ionicons name="camera-outline" size={24} color="#0A74FF" style={{ marginRight: 6 }} />
+          </View>
+          <View style={styles.securityItemContent}>
+            <Text style={styles.securityItemTitle}>2 tocchi veloci: Fotocamera</Text>
+            <Text style={styles.securityItemDesc}>
+              Scatta una foto a uno o più scontrini. L'AI estrarrà le voci e compilerà tutto in automatico.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.securityItem}>
+          <View style={styles.securityItemIcon}>
+            <Ionicons name="mic-outline" size={24} color="#0A74FF" style={{ marginRight: 6 }} />
+          </View>
+          <View style={styles.securityItemContent}>
+            <Text style={styles.securityItemTitle}>Tieni premuto: Voce</Text>
+            <Text style={styles.securityItemDesc}>
+              Parla in modo naturale. Wolly capirà importo, categoria e dettagli e preparerà la transazione.
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -320,7 +372,7 @@ export default function OnboardingScreen() {
               }
             ]}
           >
-            {step === 0 ? renderWelcomeSlide() : step === 1 ? renderSecuritySlide() : renderBalanceSlide()}
+            {step === 0 ? renderWelcomeSlide() : step === 1 ? renderSecuritySlide() : step === 2 ? renderBalanceSlide() : renderParsingSlide()}
           </Animated.View>
         </ScrollView>
 
@@ -342,7 +394,7 @@ export default function OnboardingScreen() {
               style={[styles.btn, styles.btnNext]}
             >
               <Text style={styles.btnNextText}>
-                {step === totalSteps - 1 ? 'Completa' : 'Continua'}
+                {step === totalSteps - 1 ? 'Capito' : 'Continua'}
               </Text>
               <Ionicons name="arrow-forward" size={16} color="#FFF" style={{ marginLeft: 6 }} />
             </Pressable>
