@@ -1393,12 +1393,7 @@ export default function ExpenseDetail() {
           ))}
         </View>
 
-        {!isEditingExisting && (
-          <View style={styles.debugSection}>
-            <Text style={styles.debugLabel}>METODO: {(editableExpense.input_method || 'manual').toUpperCase()}</Text>
-            <Text style={styles.debugText}>"{editableExpense.raw_input}"</Text>
-          </View>
-        )}
+
         
       </ScrollView>
     </SafeAreaView>
