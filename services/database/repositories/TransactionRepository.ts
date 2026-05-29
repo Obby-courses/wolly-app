@@ -961,17 +961,18 @@ export class TransactionRepository {
       WHERE t.is_deleted = 0 
         AND t.direction = 'out'
         AND t.date > ?
-      ORDER BY \${orderSql}
+      ORDER BY ${orderSql}
     `, [todayStr]);
     return results;
   }
 
   /**
-   * Deletes all transactions and resets the net worth to baseline 1000.0.
+   * Deletes all transactions, subscriptions, and resets the net worth to baseline 1000.0.
    */
   static async deleteAll(): Promise<void> {
     const db = await getDBConnection();
     await db.runAsync('DELETE FROM transactions');
+    await db.runAsync('DELETE FROM subscriptions');
     await db.runAsync('UPDATE net_worth SET amount = 1000.0');
   }
 }

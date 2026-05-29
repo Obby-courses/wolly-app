@@ -37,8 +37,8 @@ export default function SettingsScreen() {
 
   const handleDeleteAll = () => {
     Alert.alert(
-      "Elimina tutte le transazioni",
-      "Sei sicuro di voler eliminare DEFINITIVAMENTE tutte le transazioni dal database? Questa azione non è reversibile e resetterà anche il tuo patrimonio.",
+      "Elimina tutti i dati",
+      "Sei sicuro di voler eliminare DEFINITIVAMENTE tutti i dati (transazioni, periodiche, abbonamenti e spese programmate) dal database? Questa azione non è reversibile e resetterà anche il tuo patrimonio.",
       [
         { text: "Annulla", style: "cancel" },
         { 
@@ -47,10 +47,10 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               await TransactionRepository.deleteAll();
-              Alert.alert("Completato", "Tutte le transazioni sono state eliminate e il patrimonio è stato resettato.");
+              Alert.alert("Completato", "Tutti i dati (transazioni, periodiche e programmate) sono stati eliminati e il patrimonio è stato resettato.");
             } catch (error) {
               console.error(error);
-              Alert.alert("Errore", "Impossibile eliminare le transazioni.");
+              Alert.alert("Errore", "Impossibile eliminare i dati.");
             }
           }
         }
