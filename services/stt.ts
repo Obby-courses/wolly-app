@@ -9,6 +9,7 @@ export async function transcribeAudio(uri: string): Promise<string> {
 
   console.log("🎙️ Start transcription for:", uri);
 
+  let isTimeout = false;
   try {
     const formData = new FormData();
     // In React Native, per caricare un file dobbiamo passarlo in questo formato
@@ -23,6 +24,7 @@ export async function transcribeAudio(uri: string): Promise<string> {
     console.log("⏳ Sending request to Groq API...");
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
+      isTimeout = true;
       console.warn("⚠️ Groq STT Request timed out!");
       controller.abort();
     }, 40000); // 40 seconds timeout
@@ -48,6 +50,9 @@ export async function transcribeAudio(uri: string): Promise<string> {
     console.log("📝 Transcription result:", data.text);
     return data.text;
   } catch (err: any) {
+    if (isTimeout) {
+      throw new Error('Timeout');
+    }
     console.error('❌ Failed to transcribe audio:', err.message || err);
     throw err;
   }
