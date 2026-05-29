@@ -934,6 +934,7 @@ export class TransactionRepository {
       WHERE t.is_deleted = 0 
         AND t.direction != 'adj'
         AND t.date > ?
+        AND t.subscription_id IS NULL
       ORDER BY t.date ASC, t.time ASC
       LIMIT ?
     `, [todayStr, limit]);
@@ -961,6 +962,7 @@ export class TransactionRepository {
       WHERE t.is_deleted = 0 
         AND t.direction = 'out'
         AND t.date > ?
+        AND t.subscription_id IS NULL
       ORDER BY ${orderSql}
     `, [todayStr]);
     return results;
