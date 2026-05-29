@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView,
-  Platform, Pressable, ActivityIndicator,
+  Platform, Pressable, ActivityIndicator, Keyboard, TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -24,7 +24,6 @@ interface QAState {
  * Non è una cronologia: ogni nuova domanda sostituisce la coppia precedente.
  * Layout: [domanda utente] → [risposta AI] → [grafico JIT se presente]
  */
-import { TextInput } from 'react-native';
 
 export default function AiChatPage() {
   const router = useRouter();
@@ -214,7 +213,8 @@ export default function AiChatPage() {
             <View style={[styles.inputBoxRound, isLoading && { opacity: 0.6 }]}>
               <TextInput
                 autoFocus={isTyping}
-                multiline={true}
+                multiline={false}
+                maxLength={500}
                 style={styles.bottomInput}
                 placeholder="Chiedi a Wolly..."
                 placeholderTextColor={COLORS.secondary + '80'}
@@ -226,20 +226,14 @@ export default function AiChatPage() {
                     aiChatStore.setIsTyping(true);
                   }
                 }}
-              />
-              <Pressable 
-                style={[
-                  styles.sendBtn, 
-                  (isLoading || inputText.trim().length === 0) && { backgroundColor: COLORS.secondary }
-                ]}
-                disabled={isLoading || inputText.trim().length === 0}
-                onPress={() => {
-                  Keyboard.dismiss();
-                  sendMessage(inputText);
+                returnKeyType="send"
+                onSubmitEditing={() => {
+                  if (inputText.trim().length > 0) {
+                    Keyboard.dismiss();
+                    sendMessage(inputText);
+                  }
                 }}
-              >
-                <Ionicons name="arrow-up" size={20} color="#FFF" />
-              </Pressable>
+              />
             </View>
           </View>
         </View>
@@ -297,13 +291,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   inputBoxRound: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
     backgroundColor: '#F3F4F6',
     borderRadius: 24,
-    paddingLeft: 20,
-    paddingRight: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    justifyContent: 'center',
   },
   bottomInput: {
     flex: 1,
