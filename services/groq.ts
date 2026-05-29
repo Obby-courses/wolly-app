@@ -5,47 +5,69 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
     return '';
   }
 
-  try {
-    console.log(`[GroqWhisper] Transcribing audio from URI: ${audioUri.substring(0, 50)}...`);
-    
-    const formData = new FormData();
-    formData.append('file', {
-      uri: audioUri,
-      type: 'audio/m4a',
-      name: 'audio.m4a',
-    } as any);
-    
-    formData.append('model', 'whisper-large-v3-turbo');
-    formData.append('language', 'it');
-    formData.append('response_format', 'text');
+  const MAX_RETRIES = 3;
+  let attempt = 0;
 
+  while (attempt < MAX_RETRIES) {
+    attempt++;
+    let isTimeout = false;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondi di timeout
+    const timeoutId = setTimeout(() => {
+      isTimeout = true;
+      console.warn(`[GroqWhisper] Request timed out on attempt ${attempt}!`);
+      controller.abort();
+    }, 15000); // 15 seconds timeout per attempt
 
-    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        // NON impostare Content-Type quando si usa FormData, lo fa fetch automaticamente con il boundary corretto
-      },
-      body: formData,
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeoutId);
+    try {
+      console.log(`[GroqWhisper] Transcribing audio from URI (Attempt ${attempt}/${MAX_RETRIES}): ${audioUri.substring(0, 50)}...`);
+      
+      const formData = new FormData();
+      formData.append('file', {
+        uri: audioUri,
+        type: 'audio/x-m4a', // Standard M4A MIME type
+        name: 'audio.m4a',
+      } as any);
+      
+      formData.append('model', 'whisper-large-v3-turbo');
+      formData.append('language', 'it');
+      formData.append('response_format', 'text');
 
-    console.log(`[GroqWhisper] Response status: ${response.status} ${response.statusText}`);
+      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: formData,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      console.error(`Groq API Error: ${response.status} ${response.statusText}`);
-      return '';
+      console.log(`[GroqWhisper] Response status: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        console.error(`Groq API Error: ${response.status} ${response.statusText}`);
+        throw new Error(`Groq API Error status ${response.status}`);
+      }
+
+      const text = await response.text();
+      console.log(`[GroqWhisper] Transcription result: "${text.trim()}"`);
+      return text.trim();
+
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      console.error(`[GroqWhisper] Attempt ${attempt}/${MAX_RETRIES} failed:`, error.message || error);
+
+      if (attempt >= MAX_RETRIES) {
+        return '';
+      }
+      
+      // Wait before retrying (exponential backoff: 1s, 2s)
+      const delay = attempt * 1000;
+      console.log(`[GroqWhisper] Waiting ${delay}ms before next attempt...`);
+      await new Promise(res => setTimeout(res, delay));
     }
-
-    const text = await response.text();
-    console.log(`[GroqWhisper] Transcription result: "${text.trim()}"`);
-    return text.trim();
-  } catch (error) {
-    console.error('Error transcribing audio:', error);
-    return '';
   }
+
+  return '';
 }
