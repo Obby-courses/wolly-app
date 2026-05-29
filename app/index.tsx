@@ -99,7 +99,7 @@ export default function Home() {
       try {
         await initDatabase();
         await SubscriptionManager.processDueSubscriptions();
-        
+        await NetWorthRepository.syncScheduledTransactions(); // Sincronizza le transazioni programmate maturate
         
         setIsDbReady(true);
       } catch (error) {
@@ -159,10 +159,31 @@ export default function Home() {
       // Load upcoming subscriptions
       const allSubs = await SubscriptionRepository.getAll();
       const activeSubs = allSubs.filter((s: any) => s.is_active);
-      const sortedSubs = activeSubs
-        .map((s: any) => ({ ...s, nextDate: getNextOccurrenceDate(s) }))
+      const upcomingSubsList = activeSubs.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        amount: s.amount,
+        category_key: s.category_key,
+        nextDate: getNextOccurrenceDate(s),
+        isSubscription: true,
+      }));
+
+      // Load upcoming scheduled transactions
+      const upcomingScheduled = await TransactionRepository.getUpcomingScheduled(10);
+      const upcomingScheduledList = upcomingScheduled.map((t: any) => ({
+        id: t.id,
+        name: t.description || 'Spesa programmata',
+        amount: t.amount,
+        category_key: t.category_key,
+        nextDate: new Date(t.date),
+        isSubscription: false,
+      }));
+
+      // Merge and sort them chronologically
+      const mergedUpcoming = [...upcomingSubsList, ...upcomingScheduledList]
         .sort((a: any, b: any) => a.nextDate.getTime() - b.nextDate.getTime());
-      setUpcomingSubs(sortedSubs.slice(0, 3));
+
+      setUpcomingSubs(mergedUpcoming.slice(0, 3));
 
       // 1. Spese di questo mese
       const today = new Date();
@@ -309,9 +330,14 @@ export default function Home() {
                           <Text style={styles.upcomingAmount}>
                             €{sub.amount.toFixed(0)}
                           </Text>
-                          <Text style={styles.upcomingName} numberOfLines={1}>
-                            {sub.name}
-                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
+                            {!sub.isSubscription && (
+                              <Ionicons name="time-outline" size={13} color="#FFFFFF" style={{ marginRight: 4, opacity: 0.85 }} />
+                            )}
+                            <Text style={styles.upcomingName} numberOfLines={1}>
+                              {sub.name}
+                            </Text>
+                          </View>
                         </View>
                       );
                     })

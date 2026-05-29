@@ -62,9 +62,13 @@ export class TransactionRepository {
       finalTags.length > 0 ? finalTags.join(',') : null,
     ]);
 
-    // Sincronizzazione Patrimonio: Incrementa o Decrementa
-    const delta = expense.direction === 'in' ? expense.amount : -expense.amount;
-    await NetWorthRepository.incrementTotal(delta);
+    // Sincronizzazione Patrimonio: Incrementa o Decrementa solo se NON è nel futuro
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isFuture = expense.date > todayStr;
+    if (!isFuture) {
+      const delta = expense.direction === 'in' ? expense.amount : -expense.amount;
+      await NetWorthRepository.incrementTotal(delta);
+    }
     return expense.id;
   }
 
@@ -106,9 +110,13 @@ export class TransactionRepository {
     `, [id]);
 
     if (tx) {
-      // Calcolo Inverso: Se elimino una spesa (-), aggiungo al patrimonio (+). Se elimino un'entrata (+), tolgo al patrimonio (-).
-      const inverseDelta = tx.direction === 'in' ? -tx.amount : tx.amount;
-      await NetWorthRepository.incrementTotal(inverseDelta);
+      // Calcolo Inverso: Se elimino una spesa (-), aggiungo al patrimonio (+). Se elimino un'entrata (+), tolgo al patrimonio (-). Solo se NON era nel futuro.
+      const todayStr = new Date().toISOString().split('T')[0];
+      const isFuture = tx.date > todayStr;
+      if (!isFuture) {
+        const inverseDelta = tx.direction === 'in' ? -tx.amount : tx.amount;
+        await NetWorthRepository.incrementTotal(inverseDelta);
+      }
     }
   }
 
@@ -557,7 +565,7 @@ export class TransactionRepository {
       SELECT t.*, s.name as subscription_name 
       FROM transactions t
       LEFT JOIN subscriptions s ON t.subscription_id = s.id
-      WHERE t.is_deleted = 0 AND t.direction != 'adj'
+      WHERE t.is_deleted = 0 AND t.direction != 'adj' AND t.date <= '${baseDate}'
     `;
 
     // Time Filter
@@ -818,9 +826,13 @@ export class TransactionRepository {
     const newAmount = updates.amount !== undefined ? updates.amount : oldTx.amount;
     const newDirection = updates.direction !== undefined ? updates.direction : oldTx.direction;
 
-    // Calculate Net Worth adjustment
-    const oldImpact = oldTx.direction === 'in' ? oldTx.amount : -oldTx.amount;
-    const newImpact = newDirection === 'in' ? newAmount : -newAmount;
+    // Calculate Net Worth adjustment (taking past vs future transition into account)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const oldIsFuture = oldTx.date > todayStr;
+    const newIsFuture = (updates.date || oldTx.date) > todayStr;
+
+    const oldImpact = oldIsFuture ? 0 : (oldTx.direction === 'in' ? oldTx.amount : -oldTx.amount);
+    const newImpact = newIsFuture ? 0 : (newDirection === 'in' ? newAmount : -newAmount);
     const adjustment = newImpact - oldImpact;
 
     let finalTags: string[] = [];
@@ -907,6 +919,25 @@ export class TransactionRepository {
       WHERE is_deleted = 0 AND direction = 'out' AND date >= ? AND date <= ?
     `, [startDate, endDate]);
     return result?.sum ?? 0;
+  }
+
+  /**
+   * Retrieves active scheduled transactions with date in the future.
+   */
+  static async getUpcomingScheduled(limit: number = 10): Promise<any[]> {
+    const db = await getDBConnection();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const results = await db.getAllAsync(`
+      SELECT t.*, s.name as subscription_name
+      FROM transactions t
+      LEFT JOIN subscriptions s ON t.subscription_id = s.id
+      WHERE t.is_deleted = 0 
+        AND t.direction != 'adj'
+        AND t.date > ?
+      ORDER BY t.date ASC, t.time ASC
+      LIMIT ?
+    `, [todayStr, limit]);
+    return results;
   }
 
   /**

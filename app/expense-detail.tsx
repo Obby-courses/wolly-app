@@ -82,6 +82,9 @@ export default function ExpenseDetail() {
   // City Search State
   const [citySearch, setCitySearch] = useState('');
   const [amountInputText, setAmountInputText] = useState('');
+  
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isFuture = !!editableExpense?.date && editableExpense.date > todayStr;
 
   // Custom Tag Creation State
   const [newTagInput, setNewTagInput] = useState('');
@@ -596,6 +599,12 @@ export default function ExpenseDetail() {
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {isFuture && (
+                <View style={styles.scheduledBadge}>
+                  <Ionicons name="calendar-outline" size={12} color="#0A74FF" style={{ marginRight: 4 }} />
+                  <Text style={styles.scheduledBadgeText}>(programmato)</Text>
+                </View>
+              )}
               {!!editableExpense.date && (
                 <Pressable
                   onPress={(e) => {
@@ -1488,6 +1497,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     marginBottom: 10,
+  },
+  scheduledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  scheduledBadgeText: {
+    color: '#0A74FF',
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontBold,
   },
   calendarHeader: {
     flexDirection: 'row',
