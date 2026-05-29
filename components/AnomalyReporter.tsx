@@ -15,9 +15,10 @@ interface AnomalyReporterProps {
   forcePosition?: 'left' | 'right';
   inline?: boolean;
   isWhite?: boolean;
+  renderTrigger?: (open: () => void) => React.ReactNode;
 }
 
-export default function AnomalyReporter({ forcePosition, inline = false, isWhite = false }: AnomalyReporterProps = {}) {
+export default function AnomalyReporter({ forcePosition, inline = false, isWhite = false, renderTrigger }: AnomalyReporterProps = {}) {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
@@ -43,7 +44,7 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
   // Se siamo in una delle schermate con pulsante integrato in linea (testata),
   // nascondiamo il pulsante fluttuante globale.
   const isSubscriptionsScreen = pathname === '/subscriptions';
-  if (!inline && (isDetailScreen || isSubscriptionsScreen)) {
+  if (!renderTrigger && !inline && (isDetailScreen || isSubscriptionsScreen)) {
     return null;
   }
 
@@ -124,6 +125,84 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
       setIsSending(false);
     }
   };
+
+  if (renderTrigger) {
+    return (
+      <>
+        {renderTrigger(handleOpen)}
+
+        {/* Banner / Modal di segnalazione */}
+        <Modal
+          visible={modalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={handleClose}
+        >
+          <Pressable style={styles.overlay} onPress={handleClose}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.keyboardAvoid}
+            >
+              {/* Impediamo al tocco sulla card di chiudere il modal */}
+              <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
+                
+                {/* Header */}
+                <View style={styles.cardHeader}>
+                  <Ionicons name="flag" size={22} color={COLORS.danger} style={{ marginRight: 8 }} />
+                  <Text style={styles.cardTitle}>Segnala un'Anomalia</Text>
+                  <Pressable onPress={handleClose} style={styles.closeIcon}>
+                    <Ionicons name="close" size={20} color={COLORS.secondary} />
+                  </Pressable>
+                </View>
+
+                <Text style={styles.cardSubtitle}>
+                  Aiutaci a migliorare Wolly. Descrivi brevemente cosa non funziona.
+                </Text>
+
+                {/* Messaggio Input */}
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="es. Il grafico delle spese non mostra le colonne corrette..."
+                  placeholderTextColor={COLORS.secondary + '60'}
+                  value={message}
+                  onChangeText={setMessage}
+                  multiline={true}
+                  numberOfLines={4}
+                  maxLength={500}
+                  autoFocus={true}
+                  textAlignVertical="top"
+                />
+
+                {/* Bottoni d'azione */}
+                <View style={styles.actionsRow}>
+                  <Pressable
+                    onPress={handleClose}
+                    disabled={isSending}
+                    style={[styles.btn, styles.btnCancel]}
+                  >
+                    <Text style={styles.btnCancelText}>Annulla</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleSend}
+                    disabled={isSending}
+                    style={[styles.btn, styles.btnSend, isSending && { opacity: 0.7 }]}
+                  >
+                    {isSending ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.btnSendText}>Invia</Text>
+                    )}
+                  </Pressable>
+                </View>
+
+              </Pressable>
+            </KeyboardAvoidingView>
+          </Pressable>
+        </Modal>
+      </>
+    );
+  }
 
   if (inline) {
     return (

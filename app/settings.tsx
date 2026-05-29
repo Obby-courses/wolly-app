@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 import { networkStore } from '../services/networkStore';
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
+import AnomalyReporter from '../components/AnomalyReporter';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -78,6 +79,22 @@ export default function SettingsScreen() {
               <Text style={[styles.itemText, styles.dangerText]}>Elimina tutte le transazioni</Text>
               <Ionicons name="chevron-forward" size={18} color="#EF4444" />
             </Pressable>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Supporto & Feedback</Text>
+            
+            <AnomalyReporter
+              renderTrigger={(open) => (
+                <Pressable style={styles.item} onPress={open}>
+                  <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+                    <Ionicons name="flag" size={20} color="#EF4444" />
+                  </View>
+                  <Text style={styles.itemText}>Segnala un'Anomalia</Text>
+                  <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                </Pressable>
+              )}
+            />
           </View>
 
           <View style={styles.section}>

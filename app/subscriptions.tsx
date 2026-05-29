@@ -13,7 +13,6 @@ import { ALL_CATEGORIES, getDomainForCategory, getCategory } from '../constants/
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
-import AnomalyReporter from '../components/AnomalyReporter';
 
 const FREQUENCIES: { key: Frequency; label: string }[] = [
   { key: 'monthly',       label: 'Mensile' },
@@ -154,7 +153,6 @@ function SubModal({
           <Pressable onPress={handleClose}><Ionicons name="close" size={26} color={COLORS.primary} /></Pressable>
           <Text style={modal.title}>{initial ? 'Gestisci Abbonamento' : 'Nuovo Abbonamento'}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <AnomalyReporter inline={true} />
             <Pressable onPress={handleSave} disabled={saving}>
               <Text style={[modal.save, saving && { opacity: 0.5 }]}>{saving ? '...' : 'Salva'}</Text>
             </Pressable>
@@ -432,7 +430,6 @@ export default function SubscriptionsScreen() {
                 <Pressable onPress={() => setShowModal(true)} style={styles.addButton}>
                   <Ionicons name="add" size={22} color="#FFFFFF" />
                 </Pressable>
-                <AnomalyReporter inline={true} isWhite={true} />
               </View>
             </View>
 

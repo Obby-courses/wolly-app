@@ -6,7 +6,6 @@ import BottomMenu from '../components/BottomMenu';
 import TopNavigation from '../components/TopNavigation';
 import SwipeNavigator from '../components/SwipeNavigator';
 import VoiceChatOverlay from '../components/ai/VoiceChatOverlay';
-import AnomalyReporter from '../components/AnomalyReporter';
 import { View, LogBox } from 'react-native';
 import { usePathname } from 'expo-router';
 import { voiceStore } from '../services/voiceStore';
@@ -65,9 +64,6 @@ export default function RootLayout() {
 
       {/* Voice overlay — always mounted, animates in/out */}
       <VoiceChatOverlay />
-
-      {/* Centralized Anomaly/Bug reporter button & modal */}
-      <AnomalyReporter />
 
       {/* Bottom menu: sempre visibile sulle schede principali e sulle chat AI */}
       {(showBottomMenu || voiceOpen) && <BottomMenu />}
