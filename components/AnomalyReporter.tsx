@@ -3,6 +3,7 @@ import {
   StyleSheet, Text, View, Pressable, TextInput,
   Modal, ActivityIndicator, Alert, Platform, KeyboardAvoidingView, Keyboard
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +24,7 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
   const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
   const [message, setMessage] = useState('');
+  const [section, setSection] = useState('generale');
   const [isSending, setIsSending] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(voiceStore.getState().isOpen);
   const appVersion = Constants.expoConfig?.version || '0.2.0';
@@ -65,6 +67,7 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
       return;
     }
     setMessage('');
+    setSection('generale');
     setModalVisible(true);
   };
 
@@ -99,12 +102,40 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
     };
 
     try {
-      const { error } = await supabase.from('anomaly_reports').insert({
+      const sectionLabels: Record<string, string> = {
+        generale: "Generale",
+        home: "Home",
+        transazioni: "Transazioni",
+        statistiche: "Statistiche",
+        abbonamenti: "Abbonamenti",
+        ai_chat: "Assistente IA",
+        impostazioni: "Impostazioni",
+      };
+
+      const sectionLabel = sectionLabels[section] || section;
+
+      const insertData: any = {
         page_route: voiceOpen ? '/voice-chat' : normalizePageRoute(pathname),
-        message: cleanMsg,
+        message: `[Sezione: ${sectionLabel}] ${cleanMsg}`,
         device_os: Platform.OS,
         app_version: appVersion,
-      });
+        section: section,
+      };
+
+      let { error } = await supabase.from('anomaly_reports').insert(insertData);
+
+      // Fallback: se la colonna "section" non esiste su Supabase, rimuovila e riprova
+      if (error && (
+        error.message.includes('column') || 
+        error.message.includes('find the table') || 
+        error.message.includes('schema cache') || 
+        error.message.includes('does not exist')
+      )) {
+        console.warn('[AnomalyReporter] Fallback: Riprovo l\'inserimento senza colonna "section"...');
+        delete insertData.section;
+        const retry = await supabase.from('anomaly_reports').insert(insertData);
+        error = retry.error;
+      }
 
       if (error) {
         throw new Error(error.message);
@@ -126,178 +157,28 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
     }
   };
 
+  let triggerElement: React.ReactNode = null;
+
   if (renderTrigger) {
-    return (
-      <>
-        {renderTrigger(handleOpen)}
-
-        {/* Banner / Modal di segnalazione */}
-        <Modal
-          visible={modalVisible}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={handleClose}
-        >
-          <Pressable style={styles.overlay} onPress={handleClose}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.keyboardAvoid}
-            >
-              {/* Impediamo al tocco sulla card di chiudere il modal */}
-              <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
-                
-                {/* Header */}
-                <View style={styles.cardHeader}>
-                  <Ionicons name="flag" size={22} color={COLORS.danger} style={{ marginRight: 8 }} />
-                  <Text style={styles.cardTitle}>Segnala un'Anomalia</Text>
-                  <Pressable onPress={handleClose} style={styles.closeIcon}>
-                    <Ionicons name="close" size={20} color={COLORS.secondary} />
-                  </Pressable>
-                </View>
-
-                <Text style={styles.cardSubtitle}>
-                  Aiutaci a migliorare Wolly. Descrivi brevemente cosa non funziona.
-                </Text>
-
-                {/* Messaggio Input */}
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="es. Il grafico delle spese non mostra le colonne corrette..."
-                  placeholderTextColor={COLORS.secondary + '60'}
-                  value={message}
-                  onChangeText={setMessage}
-                  multiline={true}
-                  numberOfLines={4}
-                  maxLength={500}
-                  autoFocus={true}
-                  textAlignVertical="top"
-                />
-
-                {/* Bottoni d'azione */}
-                <View style={styles.actionsRow}>
-                  <Pressable
-                    onPress={handleClose}
-                    disabled={isSending}
-                    style={[styles.btn, styles.btnCancel]}
-                  >
-                    <Text style={styles.btnCancelText}>Annulla</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={handleSend}
-                    disabled={isSending}
-                    style={[styles.btn, styles.btnSend, isSending && { opacity: 0.7 }]}
-                  >
-                    {isSending ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <Text style={styles.btnSendText}>Invia</Text>
-                    )}
-                  </Pressable>
-                </View>
-
-              </Pressable>
-            </KeyboardAvoidingView>
-          </Pressable>
-        </Modal>
-      </>
+    triggerElement = renderTrigger(handleOpen);
+  } else if (inline) {
+    triggerElement = (
+      <Pressable
+        onPress={handleOpen}
+        style={{
+          padding: 8,
+          borderRadius: 10,
+          backgroundColor: isWhite ? 'rgba(255, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.1)', // sfumato bianco o rosso opaco premium
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 6,
+        }}
+      >
+        <Ionicons name="flag" size={18} color={isWhite ? '#FFFFFF' : '#EF4444'} />
+      </Pressable>
     );
-  }
-
-  if (inline) {
-    return (
-      <>
-        {/* Pulsante in linea per Header */}
-        <Pressable
-          onPress={handleOpen}
-          style={{
-            padding: 8,
-            borderRadius: 10,
-            backgroundColor: isWhite ? 'rgba(255, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.1)', // sfumato bianco o rosso opaco premium
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 6,
-          }}
-        >
-          <Ionicons name="flag" size={18} color={isWhite ? '#FFFFFF' : '#EF4444'} />
-        </Pressable>
-
-        {/* Banner / Modal di segnalazione */}
-        <Modal
-          visible={modalVisible}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={handleClose}
-        >
-          <Pressable style={styles.overlay} onPress={handleClose}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.keyboardAvoid}
-            >
-              {/* Impediamo al tocco sulla card di chiudere il modal */}
-              <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
-                
-                {/* Header */}
-                <View style={styles.cardHeader}>
-                  <Ionicons name="flag" size={22} color={COLORS.danger} style={{ marginRight: 8 }} />
-                  <Text style={styles.cardTitle}>Segnala un'Anomalia</Text>
-                  <Pressable onPress={handleClose} style={styles.closeIcon}>
-                    <Ionicons name="close" size={20} color={COLORS.secondary} />
-                  </Pressable>
-                </View>
-
-                <Text style={styles.cardSubtitle}>
-                  Aiutaci a migliorare Wolly. Descrivi brevemente cosa non funziona.
-                </Text>
-
-                {/* Messaggio Input */}
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="es. Il grafico delle spese non mostra le colonne corrette..."
-                  placeholderTextColor={COLORS.secondary + '60'}
-                  value={message}
-                  onChangeText={setMessage}
-                  multiline={true}
-                  numberOfLines={4}
-                  maxLength={500}
-                  autoFocus={true}
-                  textAlignVertical="top"
-                />
-
-                {/* Bottoni d'azione */}
-                <View style={styles.actionsRow}>
-                  <Pressable
-                    onPress={handleClose}
-                    disabled={isSending}
-                    style={[styles.btn, styles.btnCancel]}
-                  >
-                    <Text style={styles.btnCancelText}>Annulla</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={handleSend}
-                    disabled={isSending}
-                    style={[styles.btn, styles.btnSend, isSending && { opacity: 0.7 }]}
-                  >
-                    {isSending ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <Text style={styles.btnSendText}>Invia</Text>
-                    )}
-                  </Pressable>
-                </View>
-
-              </Pressable>
-            </KeyboardAvoidingView>
-          </Pressable>
-        </Modal>
-      </>
-    );
-  }
-
-  return (
-    <>
-      {/* Pulsante Bug Fluttuante Centralizzato ed Elegante */}
+  } else {
+    triggerElement = (
       <Pressable
         onPress={handleOpen}
         style={[
@@ -312,8 +193,14 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
       >
         <Ionicons name="flag" size={16} color="#FFF" />
       </Pressable>
+    );
+  }
 
-      {/* Banner / Modal di segnalazione */}
+  return (
+    <>
+      {triggerElement}
+
+      {/* Unified Banner / Modal di segnalazione */}
       <Modal
         visible={modalVisible}
         animationType="fade"
@@ -328,20 +215,37 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
             {/* Impediamo al tocco sulla card di chiudere il modal */}
             <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
               
-              {/* Header */}
+              {/* Header - Rimosso il pulsante X di chiusura */}
               <View style={styles.cardHeader}>
                 <Ionicons name="flag" size={22} color={COLORS.danger} style={{ marginRight: 8 }} />
                 <Text style={styles.cardTitle}>Segnala un'Anomalia</Text>
-                <Pressable onPress={handleClose} style={styles.closeIcon}>
-                  <Ionicons name="close" size={20} color={COLORS.secondary} />
-                </Pressable>
               </View>
 
               <Text style={styles.cardSubtitle}>
-                Aiutaci a migliorare Wolly. Descrivi brevemente cosa non funziona.
+                Aiutaci a migliorare Wolly. Scegli la sezione dell'app ed inserisci una descrizione.
               </Text>
 
+              {/* Menu a tendina nativo iOS/Android per scegliere la sezione */}
+              <Text style={styles.fieldLabel}>Sezione dell'App</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={section}
+                  onValueChange={(itemValue) => setSection(itemValue)}
+                  style={styles.picker}
+                  dropdownIconColor={COLORS.primary}
+                >
+                  <Picker.Item label="Generale / Altro" value="generale" />
+                  <Picker.Item label="Schermata Home" value="home" />
+                  <Picker.Item label="Transazioni (Spese/Guadagni)" value="transazioni" />
+                  <Picker.Item label="Statistiche e Grafici" value="statistiche" />
+                  <Picker.Item label="Abbonamenti" value="abbonamenti" />
+                  <Picker.Item label="Assistente IA (Chat/Voce)" value="ai_chat" />
+                  <Picker.Item label="Impostazioni" value="impostazioni" />
+                </Picker>
+              </View>
+
               {/* Messaggio Input */}
+              <Text style={styles.fieldLabel}>Descrizione</Text>
               <TextInput
                 style={styles.textInput}
                 placeholder="es. Il grafico delle spese non mostra le colonne corrette..."
@@ -355,7 +259,7 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
                 textAlignVertical="top"
               />
 
-              {/* Bottoni d'azione */}
+              {/* Bottoni d'azione - Grandi uguali, occupano tutto lo spazio orizzontale */}
               <View style={styles.actionsRow}>
                 <Pressable
                   onPress={handleClose}
@@ -433,9 +337,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     flex: 1,
   },
-  closeIcon: {
-    padding: 4,
-  },
   cardSubtitle: {
     fontSize: 12,
     fontFamily: TYPOGRAPHY.fontFamily,
@@ -443,7 +344,25 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 14,
   },
-
+  fieldLabel: {
+    fontSize: 13,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+    marginBottom: 6,
+    marginLeft: 2,
+  },
+  pickerContainer: {
+    backgroundColor: COLORS.background,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  picker: {
+    color: COLORS.primary,
+    height: Platform.OS === 'ios' ? 120 : 50,
+  },
   textInput: {
     height: 100,
     backgroundColor: COLORS.background,
@@ -458,13 +377,14 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
+    width: '100%',
+    gap: 12,
+    marginTop: 6,
   },
   btn: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 12,
+    flex: 1, // fa sì che i bottoni siano grandi uguali occupando tutto orizzontalmente
+    paddingVertical: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -472,17 +392,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   btnCancelText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.secondary,
   },
   btnSend: {
     backgroundColor: COLORS.primary,
-    minWidth: 70,
     ...SHADOWS.soft,
   },
   btnSendText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: TYPOGRAPHY.fontBold,
     color: '#FFF',
   },
