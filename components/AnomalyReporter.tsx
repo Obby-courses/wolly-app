@@ -10,6 +10,7 @@ import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { voiceStore } from '../services/voiceStore';
 import Constants from 'expo-constants';
+import * as Menu from 'expo/ui/menu';
 
 interface AnomalyReporterProps {
   forcePosition?: 'left' | 'right';
@@ -24,7 +25,6 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
   const [modalVisible, setModalVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [section, setSection] = useState('generale');
-  const [showDropdown, setShowDropdown] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(voiceStore.getState().isOpen);
@@ -39,16 +39,6 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
     ai_chat: "Assistente IA (Chat/Voce)",
     impostazioni: "Impostazioni",
   };
-
-  const SECTIONS = [
-    { label: "Generale / Altro", value: "generale" },
-    { label: "Schermata Home", value: "home" },
-    { label: "Transazioni (Spese/Guadagni)", value: "transazioni" },
-    { label: "Statistiche e Grafici", value: "statistiche" },
-    { label: "Abbonamenti", value: "abbonamenti" },
-    { label: "Assistente IA (Chat/Voce)", value: "ai_chat" },
-    { label: "Impostazioni", value: "impostazioni" },
-  ];
 
   useEffect(() => {
     const unsub = voiceStore.subscribe(() => {
@@ -89,14 +79,12 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
     }
     setMessage('');
     setSection('generale');
-    setShowDropdown(false);
     setIsSuccess(false);
     setModalVisible(true);
   };
 
   const handleClose = () => {
     Keyboard.dismiss();
-    setShowDropdown(false);
     setIsSuccess(false);
     setModalVisible(false);
   };
@@ -260,50 +248,26 @@ export default function AnomalyReporter({ forcePosition, inline = false, isWhite
                   {/* Menu a tendina nativo iOS/Android per scegliere la sezione */}
                   <Text style={styles.fieldLabel}>Sezione dell'App</Text>
                   
-                  <Pressable 
-                    style={styles.dropdownTrigger} 
-                    onPress={() => {
-                      Keyboard.dismiss();
-                      setShowDropdown(!showDropdown);
-                    }}
-                  >
-                    <Text style={styles.dropdownTriggerText}>
-                      {sectionLabels[section] || "Seleziona..."}
-                    </Text>
-                    <Ionicons 
-                      name={showDropdown ? "chevron-up" : "chevron-down"} 
-                      size={16} 
-                      color={COLORS.primary} 
-                    />
-                  </Pressable>
+                  <Menu.Root>
+                    <Menu.Trigger>
+                      <Pressable style={styles.dropdownTrigger} onPress={() => Keyboard.dismiss()}>
+                        <Text style={styles.dropdownTriggerText}>
+                          {sectionLabels[section] || "Seleziona..."}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color={COLORS.primary} />
+                      </Pressable>
+                    </Menu.Trigger>
 
-                  {showDropdown && (
-                    <View style={styles.dropdownMenu}>
-                      {SECTIONS.map((item) => (
-                        <Pressable
-                          key={item.value}
-                          style={[
-                            styles.dropdownItem,
-                            section === item.value && styles.dropdownItemActive
-                          ]}
-                          onPress={() => {
-                            setSection(item.value);
-                            setShowDropdown(false);
-                          }}
-                        >
-                          <Text style={[
-                            styles.dropdownItemText,
-                            section === item.value && styles.dropdownItemTextActive
-                          ]}>
-                            {item.label}
-                          </Text>
-                          {section === item.value && (
-                            <Ionicons name="checkmark" size={16} color={COLORS.primary} />
-                          )}
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
+                    <Menu.Content>
+                      <Menu.Item id="generale" title="Generale / Altro" onSelect={() => setSection('generale')} />
+                      <Menu.Item id="home" title="Schermata Home" onSelect={() => setSection('home')} />
+                      <Menu.Item id="transazioni" title="Transazioni (Spese/Guadagni)" onSelect={() => setSection('transazioni')} />
+                      <Menu.Item id="statistiche" title="Statistiche e Grafici" onSelect={() => setSection('statistiche')} />
+                      <Menu.Item id="abbonamenti" title="Abbonamenti" onSelect={() => setSection('abbonamenti')} />
+                      <Menu.Item id="ai_chat" title="Assistente IA (Chat/Voce)" onSelect={() => setSection('ai_chat')} />
+                      <Menu.Item id="impostazioni" title="Impostazioni" onSelect={() => setSection('impostazioni')} />
+                    </Menu.Content>
+                  </Menu.Root>
 
                   {/* Messaggio Input */}
                   <Text style={styles.fieldLabel}>Descrizione</Text>
@@ -429,34 +393,6 @@ const styles = StyleSheet.create({
   dropdownTriggerText: {
     fontSize: 14,
     fontFamily: TYPOGRAPHY.fontFamily,
-    color: COLORS.primary,
-  },
-  dropdownMenu: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingVertical: 6,
-    marginBottom: 14,
-    ...SHADOWS.soft,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  dropdownItemActive: {
-    backgroundColor: '#F3F4F6',
-  },
-  dropdownItemText: {
-    fontSize: 14,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    color: COLORS.secondary,
-  },
-  dropdownItemTextActive: {
-    fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.primary,
   },
   successContainer: {
