@@ -56,7 +56,7 @@ const DEFAULT_EXPENSE = {
 
 export default function ExpenseDetail() {
   const router = useRouter();
-  const { data, id } = useLocalSearchParams<{ data?: string; id?: string }>();
+  const { data, id, returnTo } = useLocalSearchParams<{ data?: string; id?: string; returnTo?: string }>();
   
   const isEditingExisting = !!id;
 
@@ -104,6 +104,14 @@ export default function ExpenseDetail() {
 
   // Dynamic People List State
   const [availablePeople, setAvailablePeople] = useState<string[]>(['mamma', 'papà']);
+
+  const handleBack = () => {
+    if (!isEditingExisting && returnTo) {
+      router.replace(returnTo as any);
+    } else {
+      router.back();
+    }
+  };
 
   // Fetch distinct tags and people on mount
   useEffect(() => {
@@ -351,7 +359,11 @@ export default function ExpenseDetail() {
         }
       }
 
-      router.back();
+      if (!isEditingExisting && returnTo) {
+        router.replace(returnTo as any);
+      } else {
+        router.back();
+      }
     } catch (error) {
       console.error(error);
       Alert.alert('Errore', 'Impossibile salvare sul database.');
@@ -518,7 +530,7 @@ export default function ExpenseDetail() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backIcon}>
+        <Pressable onPress={handleBack} style={styles.backIcon}>
           <Ionicons name="chevron-back" size={28} color={COLORS.primary} />
         </Pressable>
         <Text style={styles.headerTitle}>

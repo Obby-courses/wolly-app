@@ -35,10 +35,14 @@ export async function handleExpenseVoice(text: string): Promise<void> {
     console.log(`[expenseHandler] ✅ Parsing completato → €${parsed.amount} in ${parsed.category_key}`);
 
     // 2. Chiude l'overlay e naviga
+    const triggerScreen = voiceStore.getState().triggerScreen || '/';
     voiceStore.close();
     router.push({
       pathname: '/expense-detail',
-      params: { data: JSON.stringify(parsed) },
+      params: { 
+        data: JSON.stringify(parsed),
+        returnTo: triggerScreen
+      },
     });
   } catch (err: any) {
     console.error('[expenseHandler] ❌ Errore:', err.message);

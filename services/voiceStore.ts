@@ -21,6 +21,7 @@ interface VoiceState {
   recording: Audio.Recording | null;
   recordingStartTime: number;
   qa: QaResult | null;
+  triggerScreen?: string;
 }
 
 let state: VoiceState = {
@@ -75,7 +76,7 @@ export const voiceStore = {
     notify();
   },
 
-  startRecording: async () => {
+  startRecording: async (triggerScreen?: string) => {
     // Reset state before starting
     if (state.isRecording || state.recording) {
       try {
@@ -90,7 +91,8 @@ export const voiceStore = {
       isOpen: true,
       isLoading: false, 
       qa: null,
-      recordingStartTime: Date.now()
+      recordingStartTime: Date.now(),
+      triggerScreen: triggerScreen || '/'
     };
     notify();
 

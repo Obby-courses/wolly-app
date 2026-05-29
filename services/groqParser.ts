@@ -211,7 +211,7 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
 
         // --- LOGICA PASTO (MEAL TYPE) ---
         // Una transazione in un bar o ristorante tra 07:00–10:30 è colazione. 
-        // Tra 12:00–14:30 è pranzo. Tra 19:00–22:30 è cena.
+        // Tra 12:00–14:30 è pranzo.
         if (result.category_key === 'ristorante_fast_food' || result.category_key === 'bar_caffe') {
           const time = result.time || (result.date === currentDateISO ? now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') : null);
           
@@ -224,8 +224,6 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
               mealTypeLabel = 'Colazione';
             } else if (totalMinutes >= 12 * 60 && totalMinutes <= 14 * 60 + 30) {
               mealTypeLabel = 'Pranzo';
-            } else if (totalMinutes >= 19 * 60 && totalMinutes <= 22 * 60 + 30) {
-              mealTypeLabel = 'Cena';
             }
 
             if (mealTypeLabel) {

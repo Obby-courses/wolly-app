@@ -91,7 +91,13 @@ export default function BottomMenu() {
       if (parsed === null) return;
 
       if (parsed && parsed.amount > 0) {
-        router.push({ pathname: '/expense-detail', params: { data: JSON.stringify(parsed) } });
+        router.push({ 
+          pathname: '/expense-detail', 
+          params: { 
+            data: JSON.stringify(parsed),
+            returnTo: pathname
+          } 
+        });
       } else {
         Alert.alert("Scontrino non riconosciuto", "La foto non sembra contenere uno scontrino valido o leggibile. Riprova.", [{ text: "OK" }]);
       }
@@ -114,7 +120,8 @@ export default function BottomMenu() {
           direction: 'out',
           tags: [],
           input_method: 'manual'
-        })
+        }),
+        returnTo: pathname
       }
     });
   };
@@ -189,7 +196,7 @@ export default function BottomMenu() {
         holdTimeoutRef.current = setTimeout(() => {
           if (isDoubleTapRef.current) return;
           hasStartedRecordingRef.current = true;
-          voiceStore.startRecording();
+          voiceStore.startRecording(pathname);
           analytics.trackClick('btn_voice_rec_start', pathname);
         }, 300);
       },
@@ -203,7 +210,7 @@ export default function BottomMenu() {
             holdTimeoutRef.current = null;
           }
           hasStartedRecordingRef.current = true;
-          voiceStore.startRecording();
+          voiceStore.startRecording(pathname);
           voiceStore.setIsSlidingToCancel(true);
         }
       },
@@ -223,7 +230,10 @@ export default function BottomMenu() {
            tapTimeoutRef.current = setTimeout(() => {
               analytics.trackClick('btn_ai_chat_open', pathname);
               if (pathname !== '/ai-chat') {
-                router.push('/ai-chat');
+                router.push({
+                  pathname: '/ai-chat',
+                  params: { returnTo: pathname }
+                });
               }
            }, 300);
            return;

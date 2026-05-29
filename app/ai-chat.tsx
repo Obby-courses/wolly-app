@@ -27,7 +27,7 @@ interface QAState {
 
 export default function AiChatPage() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ message?: string }>();
+  const params = useLocalSearchParams<{ message?: string; returnTo?: string }>();
   const [qa, setQa] = useState<QAState | null>(aiChatStore.qa);
   const [history, setHistory] = useState<ChatMessage[]>(aiChatStore.history);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,7 +87,10 @@ export default function AiChatPage() {
         const parsed = await parseExpenseWithAI(userMsg, 'text');
         router.push({
           pathname: '/expense-detail',
-          params: { data: JSON.stringify(parsed) },
+          params: { 
+            data: JSON.stringify(parsed),
+            returnTo: params.returnTo || '/'
+          },
         });
         // Resettiamo lo stato QA se l'utente esce dalla chat per inserire la spesa
         setQa(null);
