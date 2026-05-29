@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, FlatList } from 'react-native';
+import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, FlatList, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -148,7 +148,31 @@ export default function Home() {
         'date',
         now.toISOString().split('T')[0]
       );
-      setTransactions(filteredTrans.slice(0, 4));
+
+      // Calcolo dinamico del limite di transazioni visibili in Home per riempire lo schermo senza scroll o spazi vuoti
+      const insetsTop = insets.top || 44;
+      const insetsBottom = insets.bottom || 34;
+      const screenHeight = Dimensions.get('window').height;
+
+      // Spazio inizio lista: paddingTop topSection (insetsTop + 16) + netWorth (85) + cardsRow (126) + topSection paddingBottom (36)
+      // - overlapping marginTop (20) + bottomSection paddingTop (20) + header compact (28)
+      const listStartOffset = insetsTop + 16 + 85 + 126 + 36 - 20 + 20 + 28; // = insetsTop + 291px
+      
+      // Spazio inizio bottom menu: insetsBottom + altezza menu (48) + margine bottomSection (12)
+      const bottomMenuOffset = insetsBottom + 48 + 12; // = insetsBottom + 60px
+
+      // Distanza fissa utile tra inizio lista e inizio bottom menu:
+      const availableListHeight = screenHeight - listStartOffset - bottomMenuOffset;
+
+      // Altezza esatta di ciascun TransactionItem (70px card + 8px marginBottom)
+      const itemHeight = 78;
+
+      // Limite preciso di elementi che possono starci
+      const maxPossibleItems = Math.max(1, Math.floor(availableListHeight / itemHeight));
+
+      console.log(`📊 [Home Layout] ScreenHeight: ${screenHeight}px, ListStartOffset: ${listStartOffset}px, BottomMenuOffset: ${bottomMenuOffset}px, AvailableListHeight: ${availableListHeight}px, MaxItems: ${maxPossibleItems}`);
+
+      setTransactions(filteredTrans.slice(0, maxPossibleItems));
 
       // Load Net Worth
       const currentNw = await NetWorthRepository.getCurrentTotal();
@@ -156,7 +180,8 @@ export default function Home() {
 
       // Load upcoming subscriptions
       const allSubs = await SubscriptionRepository.getAll();
-      const activeSubs = allSubs.filter((s: any) => s.is_active);
+      // Filtriamo solo gli abbonamenti di tipo SPESA (direction = 'out' o default) per PROSSIME SPESE
+      const activeSubs = allSubs.filter((s: any) => s.is_active && (s.direction || 'out') === 'out');
       const upcomingSubsList = activeSubs.map((s: any) => ({
         id: s.id,
         name: s.name,
@@ -168,14 +193,17 @@ export default function Home() {
 
       // Load upcoming scheduled transactions
       const upcomingScheduled = await TransactionRepository.getUpcomingScheduled(10);
-      const upcomingScheduledList = upcomingScheduled.map((t: any) => ({
-        id: t.id,
-        name: t.description || 'Spesa programmata',
-        amount: t.amount,
-        category_key: t.category_key,
-        nextDate: new Date(t.date),
-        isSubscription: false,
-      }));
+      // Filtriamo solo le spese programmate (direction = 'out') per PROSSIME SPESE
+      const upcomingScheduledList = upcomingScheduled
+        .filter((t: any) => (t.direction || 'out') === 'out')
+        .map((t: any) => ({
+          id: t.id,
+          name: t.description || 'Spesa programmata',
+          amount: t.amount,
+          category_key: t.category_key,
+          nextDate: new Date(t.date),
+          isSubscription: false,
+        }));
 
       // Merge and sort them chronologically
       const mergedUpcoming = [...upcomingSubsList, ...upcomingScheduledList]

@@ -12,6 +12,7 @@ import { translateSocialContext, translateLocationType } from '../constants/i18n
 import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 import { SubscriptionRepository } from '../services/database/repositories/SubscriptionRepository';
 import { SubscriptionSuggestion } from '../services/groqParser';
+import { supabase } from '../services/supabase';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../services/analytics';
 import { COMUNI_ITALIANI, ComuneItem } from '../constants/comuni';
@@ -89,7 +90,8 @@ export default function ExpenseDetail() {
   const [amountInputText, setAmountInputText] = useState('');
   
   const todayStr = new Date().toISOString().split('T')[0];
-  const isFuture = !!editableExpense?.date && editableExpense.date > todayStr;
+  const expenseDateOnly = editableExpense?.date ? editableExpense.date.split('T')[0] : todayStr;
+  const isFuture = expenseDateOnly > todayStr;
 
   // Custom Tag Creation State
   const [newTagInput, setNewTagInput] = useState('');
@@ -217,6 +219,7 @@ export default function ExpenseDetail() {
       // MODE: Nuova transazione da parsing
       try {
         const parsed = JSON.parse(data);
+        console.log('👀 [Tracking] Dati parsing caricati in Detail:', JSON.stringify(parsed, null, 2));
         
         const merged: ParsedExpense = {
           ...DEFAULT_EXPENSE,
@@ -357,6 +360,8 @@ export default function ExpenseDetail() {
         if (subscription_id) {
           await TransactionRepository.update(txId, { subscription_id });
         }
+
+
       }
 
       if (!isEditingExisting && returnTo) {
@@ -615,8 +620,8 @@ export default function ExpenseDetail() {
                     )}
                   </>
                 ) : (
-                  <Text style={[styles.categoryInlineText, { color: '#EF4444', fontWeight: '600' }]}>
-                    Tocca per classificare
+                  <Text style={styles.detailValue}>
+                    ----
                   </Text>
                 )}
               </View>

@@ -2,6 +2,8 @@ import { ParsedExpense, RawParsingResult } from '../modules/registration/types';
 import uuid from 'react-native-uuid';
 import { parseFromManual } from '../modules/registration/manualParser';
 import { DOMAINS_CONFIG, ALL_CATEGORIES, getDomainForCategory } from '../constants/categories';
+import { COMUNI_ITALIANI } from '../constants/comuni';
+import { supabase } from '../services/supabase';
 
 export interface SubscriptionSuggestion {
   suggest_subscription: boolean;
@@ -217,6 +219,30 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
           result.group_size = null;
         }
 
+        // --- VALIDAZIONE CITTÀ (COMUNI ITALIANI) ---
+        if (result.city && typeof result.city === 'string' && result.city.trim() !== '') {
+          const cleanCity = result.city.trim().toLowerCase();
+          const exactMatch = COMUNI_ITALIANI.find(c => c.n.toLowerCase() === cleanCity);
+          if (exactMatch) {
+            console.log(`📍 [City Match] Trovata corrispondenza esatta per: ${result.city} -> ${exactMatch.n}`);
+            result.city = exactMatch.n;
+            if (!result.address || result.address.trim() === '') {
+              result.address = `${exactMatch.r}, Italia`;
+            }
+          } else {
+            const partialMatch = COMUNI_ITALIANI.find(c => 
+              c.n.toLowerCase().includes(cleanCity) || cleanCity.includes(c.n.toLowerCase())
+            );
+            if (partialMatch) {
+              console.log(`📍 [City Match] Trovata corrispondenza parziale per: ${result.city} -> ${partialMatch.n}`);
+              result.city = partialMatch.n;
+              if (!result.address || result.address.trim() === '') {
+                result.address = `${partialMatch.r}, Italia`;
+              }
+            }
+          }
+        }
+
         // --- LOGICA PASTO (MEAL TYPE) ---
         // Una transazione in un bar o ristorante tra 07:00–10:30 è colazione. 
         // Tra 12:00–14:30 è pranzo.
@@ -255,6 +281,44 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
           console.log(`📅 [SUBSCRIPTION SUGGESTION]: ${subscriptionSuggestion.subscription_name} ${subscriptionSuggestion.subscription_frequency}`);
         }
 
+        // --- TRACKING: PARSING_LOGS ---
+        const endTime = new Date();
+        let logId: string | undefined;
+        let statusCode = '200';
+        
+        const tokenUsage = data.usage ? {
+          prompt: data.usage.prompt_tokens,
+          completion: data.usage.completion_tokens,
+          total: data.usage.total_tokens
+        } : null;
+
+        let computedCost = 0.0;
+        if (tokenUsage) {
+          // Llama 3.3 70b Versatile Groq Pricing: $0.59 / 1M prompt, $0.79 / 1M completion
+          computedCost = (tokenUsage.prompt * 0.59 + tokenUsage.completion * 0.79) / 1000000;
+        }
+        if (context === 'receipt') computedCost += 0.0015; // Stimiamo 0.0015 per OCR esterno eventuale
+
+        try {
+          const { data: logData, error: logError } = await supabase.from('parsing_logs').insert({
+            method_used: context === 'receipt' ? 'photo' : context,
+            start_time: currentTimestamp,
+            end_time: endTime.toISOString(),
+            status_code: statusCode,
+            tokens: tokenUsage,
+            cost_usd: computedCost,
+            app_version: '0.0.1'
+          }).select('id').single();
+          
+          if (logError) {
+            console.error('❌ [Tracking] Errore inserimento Supabase:', JSON.stringify(logError, null, 2));
+          }
+          
+          if (logData) logId = logData.id;
+        } catch (e) {
+          console.warn('❌ [Tracking] Failed to write parsing_log to Supabase', e);
+        }
+
         return {
           id: uuid.v4().toString(),
           created_at: currentTimestamp,
@@ -268,6 +332,7 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
           is_recurring_pattern: false,
           synced_at: null,
           subscription: subscriptionSuggestion,
+          log_id: logId,
         };
       } catch (error: any) {
         lastError = error;
@@ -283,8 +348,32 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
     }
 
     throw lastError; // Se finiamo i tentativi, andiamo al catch esterno
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error parsing with semantic AI, falling back:', error);
+    
+    // Track Fallback / Error
+    const endTime = new Date();
+    let logId: string | undefined;
+    try {
+      const { data: logData, error: logError } = await supabase.from('parsing_logs').insert({
+        method_used: context === 'receipt' ? 'photo' : context,
+        start_time: currentTimestamp,
+        end_time: endTime.toISOString(),
+        status_code: error.name === 'AbortError' ? 'timeout' : '500',
+        tokens: null,
+        cost_usd: 0,
+        app_version: '0.0.1'
+      }).select('id').single();
+      
+      if (logError) {
+        console.error('❌ [Tracking] Errore inserimento Supabase Fallback:', JSON.stringify(logError, null, 2));
+      }
+
+      if (logData) logId = logData.id;
+    } catch (e) {
+      console.warn('❌ [Tracking] Failed to write fallback parsing_log', e);
+    }
+
     const isAmount = text.match(/[\d,.]+/);
     const amount = isAmount ? parseFloat(isAmount[0].replace(',', '.')) : 0;
 
@@ -324,7 +413,8 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
       refund: null,
       split: null,
       holiday: null,
-      tags: null
+      tags: null,
+      log_id: logId
     };
   }
 }

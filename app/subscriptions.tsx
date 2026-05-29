@@ -507,23 +507,10 @@ export default function SubscriptionsScreen() {
           {/* Header Sfumato Blu Premium */}
           <LinearGradient
             colors={['#0A74FF', '#0857C3']}
-            style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
+            style={[styles.headerGradient, { paddingTop: insets.top + 16, paddingBottom: 20 }]}
           >
             <View style={styles.header}>
               <Text style={styles.title}>Periodiche e Programmate</Text>
-            </View>
-
-            {/* Summary card inside blue header */}
-            <View style={styles.netWorthHeaderContainer}>
-              <Text style={styles.netWorthLabel}>STIMA MENSILE NETTA</Text>
-              <View style={styles.netWorthValueContainer}>
-                <Text style={styles.netWorthValue}>
-                  € {(totalMonthlyIncome - totalMonthly).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </Text>
-              </View>
-              <Text style={styles.netWorthSub}>
-                {totalActive} periodiche attive · Uscite €{totalMonthly.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} · Entrate +€{totalMonthlyIncome.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </Text>
             </View>
           </LinearGradient>
 

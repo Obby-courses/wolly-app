@@ -115,7 +115,7 @@ export default function BottomMenu() {
       params: {
         data: JSON.stringify({
           amount: 0,
-          date: new Date().toISOString(),
+          date: new Date().toISOString().split('T')[0],
           category_key: 'default',
           direction: 'out',
           tags: [],

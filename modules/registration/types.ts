@@ -68,6 +68,9 @@ export interface ParsedExpense {
   // Sync
   is_deleted: boolean;
   synced_at: string | null;
+  
+  // Tracking
+  log_id?: string;
 }
 
 export interface RawParsingResult {

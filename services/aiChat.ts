@@ -407,9 +407,16 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
     const count = result.transaction_count ?? tx.length;
     const formattedLabel = formatLabelItalian(label);
 
+    let text_response = '';
+    if (count === 0) {
+      text_response = `Per quanto riguarda ${formattedLabel}, non ho trovato nessuna transazione.`;
+    } else {
+      text_response = `Per quanto riguarda ${formattedLabel}, ho trovato ${count} transazioni in totale. Ecco le più rilevanti:`;
+    }
+
     return {
       intent: 'list',
-      text_response: `Per quanto riguarda ${formattedLabel}, ho trovato ${count} transazioni in totale. Ecco le più rilevanti:`,
+      text_response,
       analysis_steps: buildAnalysisSteps(intent, [
         `${count} transazioni trovate`,
       ]),
@@ -501,6 +508,53 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
   };
 }
 
+// ─── AI Rephraser (Per rendere le risposte più flessibili e umane) ─────────────
+async function rephraseWithAI(draft: string, userMessage: string): Promise<string> {
+  const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
+  if (!apiKey) return draft;
+
+  const prompt = `Sei Wolly, un assistente finanziario.
+Il tuo compito è prendere una risposta generata automaticamente (il "Draft tecnico") e riformularla in modo più naturale e fluido, rispondendo direttamente e in modo conciso all'utente.
+Se il draft riporta 0 transazioni o nessun dato, dillo chiaramente.
+NON aggiungere considerazioni personali, consigli non richiesti o chiacchiere inutili. Rispondi in modo diretto alla domanda.
+NON inventare dati o cifre che non sono nel draft tecnico. Mantieni i numeri e i concetti esatti.
+
+Draft tecnico: "${draft}"
+Domanda utente: "${userMessage}"
+
+Scrivi solo la risposta finale, senza preamboli o commenti.`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'system', content: prompt }],
+        max_tokens: 150,
+        temperature: 0.1, // Molto bassa per garantire precisione ed evitare considerazioni superflue
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      const rephrased = data.choices[0].message.content.trim();
+      return rephrased || draft;
+    }
+  } catch (error) {
+    console.warn('[aiChat] AI rephrase timeout/error, usando draft di fallback');
+  }
+  return draft;
+}
+
 // ─── Text-only AI response (per domande conversazionali) ─────────────────────
 
 
@@ -563,6 +617,11 @@ export async function askAiChat(
       console.log('🧠 [RAGIONAMENTO]:');
       finalResponse.analysis_steps.forEach(step => console.log(`   • ${step}`));
     }
+
+    console.log(`📝 [ORCHESTRATOR] Draft testuale: "${finalResponse.text_response}"`);
+    
+    // Riformulazione AI per rendere la risposta più calda e flessibile
+    finalResponse.text_response = await rephraseWithAI(finalResponse.text_response, userMessage);
 
     console.log(`📤 RISPOSTA FINALE: "${finalResponse.text_response}"`);
     console.log('='.repeat(60) + '\n');
