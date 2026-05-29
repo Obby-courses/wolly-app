@@ -30,13 +30,12 @@ const AMOUNT_PATTERNS = [
   /\b(uno|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|venti|trenta|quaranta|cinquanta|sessanta|settanta|ottanta|novanta|cento)\s*(euro|€)/i,
 ];
 
-// Verbi di spesa/acquisto che implicano una registrazione
+// Verbi di spesa/acquisto che implicano una registrazione (inclusi tempi futuri, presenti ed infiniti)
 const EXPENSE_VERB_PATTERNS = [
-  /\bho\s+(speso|pagato|comprato|acquistato|preso|mangiato|bevuto|preso)\b/i,
-  /\b(speso|pagato|comprato|acquistato)\b/i,
-  /\bricevuto\s+\d+/i,
-  /\bguadagnato\s+\d+/i,
-  /\bentrata\s+di\s+\d+/i,
+  /\bho\s+(speso|pagato|comprato|acquistato|preso|mangiato|bevuto|ricevuto|guadagnato)\b/i,
+  /\b(speso|pagato|comprato|acquistato|spendere|pagare|comprare|acquistare|spenderò|pagherò|comprerò|acquisterò|spendo|pago|compro|acquisto)\b/i,
+  /\b(ricevuto|guadagnato|ricevere|guadagnare|riceverò|guadagnerò|ricevo|guadagno)\b/i,
+  /\bentrata\s+di\b/i,
 ];
 
 // ─── Pattern per QUERY (analisi AI) ───────────────────────────────────────────
@@ -75,17 +74,17 @@ export function routeInput(text: string): RouteResult {
   const hasQuery = QUERY_PATTERNS.some(p => p.test(t));
   const hasStrictQuery = STRICT_QUERY_PATTERNS.some(p => p.test(t));
 
-  // Regola 1: se c'è un importo e NON c'è un intento interrogativo/analitico stretto, è SEMPRE una spesa (registrazione)
-  if (hasAmount && !hasStrictQuery) return 'expense';
+  // Regola 1: Se c'è un intento interrogativo/analitico stretto, è SEMPRE una query (precedenza per domande esplicite)
+  if (hasStrictQuery) return 'query';
 
-  // Regola 2: importo + verbo di spesa (precedenza massima)
-  if (hasAmount && hasExpenseVerb) return 'expense';
+  // Regola 2: Se c'è un importo o un verbo di spesa esplicito, e NON è una query stretta, è una registrazione (spesa)
+  if ((hasAmount || hasExpenseVerb) && !hasStrictQuery) return 'expense';
 
-  // Regola 3: keyword interrogativa/analitica
+  // Regola 3: Se ha keyword di query generiche (es. abbonamenti, spese) ma nessun segnale di registrazione esplicito
   if (hasQuery) return 'query';
 
-  // Regola 4: solo verbo di spesa senza importo → query (per sicurezza, non expense)
-  if (hasExpenseVerb && !hasAmount) return 'query';
+  // Regola 4: Se c'è solo un verbo di spesa registrato (es. "comprato" senza importo)
+  if (hasExpenseVerb) return 'expense';
 
   // Regola 5: nessun segnale → unknown
   return 'unknown';
