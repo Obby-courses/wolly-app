@@ -175,6 +175,7 @@ export default function AiChatPage() {
         <Pressable
           onPress={() => {
             if (isTyping && qa) {
+              Keyboard.dismiss();
               aiChatStore.setIsTyping(false);
             } else {
               router.back();
@@ -186,49 +187,63 @@ export default function AiChatPage() {
         </Pressable>
       </View>
 
-      <View style={styles.flex}>
-        <View style={styles.flex}>
-          {isTyping ? (
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={styles.fullScreenInputContainer}
-            >
-              <View style={styles.fullScreenInput}>
-                <TextInput
-                  autoFocus
-                  multiline={false}
-                  style={styles.bigInput}
-                  placeholder="Cosa vuoi sapere?"
-                  placeholderTextColor={COLORS.secondary + '40'}
-                  value={inputText}
-                  onChangeText={setInputText}
-                  onSubmitEditing={() => sendMessage(inputText)}
-                  returnKeyType="send"
-                />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}
+      >
+        <View style={styles.qaContainer}>
+          {/* Answer area */}
+          <View style={styles.mainAnswerArea}>
+            {isLoading ? (
+              <View style={styles.loadingWrapper}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.loadingText}>Wolly sta analizzando...</Text>
               </View>
-            </KeyboardAvoidingView>
-          ) : (
-            <View style={styles.qaContainer}>
-              {/* Answer area */}
-              <View style={styles.mainAnswerArea}>
-                {isLoading ? (
-                  <View style={styles.loadingWrapper}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
-                    <Text style={styles.loadingText}>Wolly sta analizzando...</Text>
-                  </View>
-                ) : qa?.answer && (
-                  <AiResponseView
-                    question={qa.question}
-                    answer={qa.answer}
-                    onRerun={reRunQuery}
-                    scrollable={true}
-                  />
-                )}
-              </View>
+            ) : qa?.answer ? (
+              <AiResponseView
+                question={qa.question}
+                answer={qa.answer}
+                onRerun={reRunQuery}
+                scrollable={true}
+              />
+            ) : null}
+          </View>
+
+          {/* Bottom Bar Input */}
+          <View style={styles.bottomBarContainer}>
+            <View style={[styles.inputBoxRound, isLoading && { opacity: 0.6 }]}>
+              <TextInput
+                autoFocus={isTyping}
+                multiline={true}
+                style={styles.bottomInput}
+                placeholder="Chiedi a Wolly..."
+                placeholderTextColor={COLORS.secondary + '80'}
+                value={inputText}
+                onChangeText={setInputText}
+                editable={!isLoading}
+                onFocus={() => {
+                  if (!isLoading) {
+                    aiChatStore.setIsTyping(true);
+                  }
+                }}
+              />
+              <Pressable 
+                style={[
+                  styles.sendBtn, 
+                  (isLoading || inputText.trim().length === 0) && { backgroundColor: COLORS.secondary }
+                ]}
+                disabled={isLoading || inputText.trim().length === 0}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  sendMessage(inputText);
+                }}
+              >
+                <Ionicons name="arrow-up" size={20} color="#FFF" />
+              </Pressable>
             </View>
-          )}
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -271,10 +286,46 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 40,
   },
-  // ─── QA Container ─────────────────────────────────────────────────────────
+  // ─── QA Container & Bottom Bar ──────────────────────────────────────────
   qaContainer: {
     flex: 1,
+    justifyContent: 'space-between',
   },
+  bottomBarContainer: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.background,
+  },
+  inputBoxRound: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 24,
+    paddingLeft: 20,
+    paddingRight: 8,
+    paddingVertical: 8,
+  },
+  bottomInput: {
+    flex: 1,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: 16,
+    color: COLORS.primary,
+    maxHeight: 120,
+    minHeight: 32,
+    paddingTop: Platform.OS === 'ios' ? 8 : 4,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 4,
+  },
+  sendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+    marginBottom: 2,
+  },
+
   mainAnswerArea: {
     flex: 1,
     justifyContent: 'center',
