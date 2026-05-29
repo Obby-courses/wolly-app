@@ -26,7 +26,7 @@ export default function OnboardingScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const inputRef = useRef<TextInput>(null);
 
-  const totalSteps = 2;
+  const totalSteps = 3;
 
   const handleBalanceChange = (newVal: string) => {
     let hasComma = newVal.includes(',');
@@ -104,7 +104,7 @@ export default function OnboardingScreen() {
           useNativeDriver: true,
         })
       ]).start(() => {
-        if (nextStep === 1) {
+        if (nextStep === 2) {
           setTimeout(() => {
             inputRef.current?.focus();
           }, 100);
@@ -169,15 +169,60 @@ export default function OnboardingScreen() {
           </View>
         </View>
         
-        <Text style={styles.slideSubtitle}>
+        <Text style={[styles.slideSubtitle, { paddingHorizontal: 16 }]}>
           Questa è la versione beta di Wolly, monitora le tue spese in modo facile e veloce.
         </Text>
+      </View>
+    </View>
+  );
 
-        <View style={styles.disclaimerBox}>
-          <Ionicons name="shield-checkmark" size={20} color="#0A74FF" style={{ marginRight: 10, marginTop: 2 }} />
-          <Text style={styles.disclaimerText}>
-            In questa versione di Wolly, tutti i tuoi dati finanziari, il patrimonio e le transazioni registrate rimangono salvati esclusivamente al sicuro all'interno del tuo telefono. Raccogliamo dati statistici in modo totalmente anonimo solo per analizzare le performance e migliorare l'esperienza d'uso dell'applicazione.
-          </Text>
+  const renderSecuritySlide = () => (
+    <View style={[styles.slideContent, { paddingHorizontal: 24, paddingTop: insets.top + 40 }]}>
+      <View style={styles.securityHeader}>
+        <View style={styles.securityIconBackground}>
+          <Ionicons name="shield-checkmark" size={32} color="#0A74FF" />
+        </View>
+        <Text style={styles.slideTitleSecurity}>Sicurezza e Privacy</Text>
+        <Text style={styles.slideSubtitleSecurity}>
+          Wolly è progettato per garantire il controllo assoluto e la riservatezza delle tue finanze.
+        </Text>
+      </View>
+
+      <View style={styles.securityItemsContainer}>
+        <View style={styles.securityItem}>
+          <View style={styles.securityItemIcon}>
+            <Ionicons name="phone-portrait-outline" size={24} color="#0A74FF" style={{ marginRight: 6 }} />
+          </View>
+          <View style={styles.securityItemContent}>
+            <Text style={styles.securityItemTitle}>Dati locali e protetti</Text>
+            <Text style={styles.securityItemDesc}>
+              Tutte le tue transazioni e il tuo patrimonio iniziale sono salvati esclusivamente sul tuo telefono. Nessun database esterno o cloud.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.securityItem}>
+          <View style={styles.securityItemIcon}>
+            <Ionicons name="key-outline" size={24} color="#0A74FF" style={{ marginRight: 6 }} />
+          </View>
+          <View style={styles.securityItemContent}>
+            <Text style={styles.securityItemTitle}>Nessun account richiesto</Text>
+            <Text style={styles.securityItemDesc}>
+              Non chiediamo email, password o collegamenti a conti bancari. Utilizzi l'app in totale anonimato fin dal primo avvio.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.securityItem}>
+          <View style={styles.securityItemIcon}>
+            <Ionicons name="bar-chart-outline" size={24} color="#0A74FF" style={{ marginRight: 6 }} />
+          </View>
+          <View style={styles.securityItemContent}>
+            <Text style={styles.securityItemTitle}>Statistiche anonime</Text>
+            <Text style={styles.securityItemDesc}>
+              Raccogliamo dati statistici in modo totalmente anonimo solo per monitorare le performance dell'applicazione e migliorarne l'esperienza.
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -227,13 +272,6 @@ export default function OnboardingScreen() {
       <Text style={styles.helpText}>
         Questo importo iniziale imposterà il tuo patrimonio e potrà essere modificato o sincronizzato in qualsiasi momento.
       </Text>
-
-      <View style={styles.lockBox}>
-        <Ionicons name="lock-closed" size={14} color="#0A74FF" style={{ marginRight: 6 }} />
-        <Text style={styles.lockText}>
-          Dato riservato: salvato esclusivamente sul tuo telefono
-        </Text>
-      </View>
     </View>
   );
 
@@ -273,7 +311,7 @@ export default function OnboardingScreen() {
               }
             ]}
           >
-            {step === 0 ? renderWelcomeSlide() : renderBalanceSlide()}
+            {step === 0 ? renderWelcomeSlide() : step === 1 ? renderSecuritySlide() : renderBalanceSlide()}
           </Animated.View>
         </ScrollView>
 
@@ -569,5 +607,69 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: TYPOGRAPHY.fontBold,
     color: '#FFFFFF',
+  },
+  securityHeader: {
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 24,
+  },
+  securityIconBackground: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#F0F9FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+  },
+  slideTitleSecurity: {
+    fontSize: 22,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: '#0F172A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  slideSubtitleSecurity: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    paddingHorizontal: 12,
+  },
+  securityItemsContainer: {
+    width: '100%',
+    gap: 12,
+    marginTop: 8,
+  },
+  securityItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    borderRadius: 16,
+    padding: 14,
+  },
+  securityItemIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  securityItemContent: {
+    flex: 1,
+  },
+  securityItemTitle: {
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  securityItemDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 18,
+    fontFamily: TYPOGRAPHY.fontFamily,
   },
 });
