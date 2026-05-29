@@ -94,6 +94,14 @@ export default function VoiceChatOverlay() {
       {/* Spacer per respiro visivo in alto */}
       <View style={{ height: insets.top + 16 }} />
 
+      {qa && (
+        <View style={{ alignItems: 'center', width: '100%', marginBottom: 16 }}>
+          <Pressable onPress={handleClose} style={styles.topCloseBtn}>
+            <Ionicons name="close" size={28} color={COLORS.secondary} />
+          </Pressable>
+        </View>
+      )}
+
       {/* Content area — bottom padding for mic button */}
       <View style={styles.content}>
         {qa ? (
@@ -141,6 +149,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   closeBtn: { padding: 8 },
+  topCloseBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F2F2F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   content: {
     flex: 1,
     // Spazio inferiore per il pulsante microfono

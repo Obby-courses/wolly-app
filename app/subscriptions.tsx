@@ -330,7 +330,6 @@ export default function SubscriptionsScreen() {
   const [loading, setLoading] = useState(true);
   const [totalMonthly, setTotalMonthly] = useState(0);
   const [totalMonthlyIncome, setTotalMonthlyIncome] = useState(0);
-  const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Subscription | null>(null);
 
   const load = async (orderBy = scheduledSortBy) => {
@@ -361,20 +360,6 @@ export default function SubscriptionsScreen() {
   const activeIn = subs.filter(s => s.is_active && s.direction === 'in');
   const inactive = subs.filter(s => !s.is_active);
   const totalActive = activeOut.length + activeIn.length;
-
-  const handleAdd = async (form: SubFormState) => {
-    await SubscriptionRepository.insert({
-      name: form.name.trim(),
-      amount: parseFloat(form.amount.replace(',', '.')),
-      direction: form.direction,
-      category_key: form.category_key,
-      frequency: form.frequency,
-      recurrence_day: parseInt(form.recurrence_day) || null,
-      start_date: form.start_date,
-    });
-    setShowModal(false);
-    load(scheduledSortBy);
-  };
 
   const handleEdit = async (form: SubFormState) => {
     if (!editTarget?.id) return;
@@ -527,11 +512,7 @@ export default function SubscriptionsScreen() {
             <View style={styles.header}>
               <View style={{ width: 80 }} />
               <Text style={styles.title}>Periodiche e Programmate</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Pressable onPress={() => setShowModal(true)} style={styles.addButton}>
-                  <Ionicons name="add" size={22} color="#FFFFFF" />
-                </Pressable>
-              </View>
+              <View style={{ width: 32 }} />
             </View>
 
             {/* Summary card inside blue header */}
@@ -630,13 +611,6 @@ export default function SubscriptionsScreen() {
           </View>
         </View>
       )}
-
-      {/* Add Modal */}
-      <SubModal
-        visible={showModal}
-        onClose={() => setShowModal(false)}
-        onSave={handleAdd}
-      />
 
       {/* Edit Modal */}
       <SubModal

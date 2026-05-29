@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import AiResponseView from '../components/ai/AiResponseView';
 import { askAiChat, AiChatResponse, ChatMessage, aiChatStore } from '../services/aiChat';
-import CustomKeyboard from '../components/CustomKeyboard';
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import { routeInput } from '../services/inputRouter';
 
@@ -39,7 +38,6 @@ export default function AiChatPage() {
 
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(aiChatStore.getIsTyping());
-  const [selection, setSelection] = useState({ start: 0, end: 0 });
 
   useEffect(() => {
     analytics.trackScreen(ANALYTICS_SCREENS.AI_CHAT);
@@ -173,41 +171,42 @@ export default function AiChatPage() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Spacer per respiro visivo in alto */}
-      <View style={{ height: 16 }} />
+      <View style={styles.headerTop}>
+        <Pressable
+          onPress={() => {
+            if (isTyping && qa) {
+              aiChatStore.setIsTyping(false);
+            } else {
+              router.back();
+            }
+          }}
+          style={styles.closeBtnTop}
+        >
+          <Ionicons name="close" size={28} color={COLORS.secondary} />
+        </Pressable>
+      </View>
 
       <View style={styles.flex}>
         <View style={styles.flex}>
           {isTyping ? (
-            <View style={styles.fullScreenInputContainer}>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={styles.fullScreenInputContainer}
+            >
               <View style={styles.fullScreenInput}>
                 <TextInput
                   autoFocus
                   multiline={false}
-                  showSoftInputOnFocus={false}
                   style={styles.bigInput}
                   placeholder="Cosa vuoi sapere?"
                   placeholderTextColor={COLORS.secondary + '40'}
                   value={inputText}
                   onChangeText={setInputText}
-                  onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
-                  selection={selection}
                   onSubmitEditing={() => sendMessage(inputText)}
                   returnKeyType="send"
                 />
               </View>
-              
-              {/* Tastiera virtuale personalizzata posizionata esattamente sopra il BottomMenu */}
-              <View style={{ paddingBottom: Platform.OS === 'ios' ? 74 : 60 }}>
-                <CustomKeyboard
-                  value={inputText}
-                  onChangeText={setInputText}
-                  selection={selection}
-                  onSelectionChange={setSelection}
-                  onSubmit={() => sendMessage(inputText)}
-                />
-              </View>
-            </View>
+            </KeyboardAvoidingView>
           ) : (
             <View style={styles.qaContainer}>
               {/* Answer area */}
@@ -241,6 +240,20 @@ const styles = StyleSheet.create({
   fullScreenInputContainer: {
     flex: 1,
     width: '100%',
+    justifyContent: 'center',
+  },
+  headerTop: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  closeBtnTop: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F2F2F7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ─── Full Screen Input ──────────────────────────────────────────────────
