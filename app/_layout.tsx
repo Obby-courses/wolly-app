@@ -48,7 +48,7 @@ export default function RootLayout() {
 
   // Pagine principali (Root tabs) su cui il menu inferiore è visibile
   const tabPaths = ['/', '/stats', '/subscriptions', '/settings'];
-  const showBottomMenu = [...tabPaths, '/ai-chat'].includes(pathname) || pathname.startsWith('/stats/');
+  const showBottomMenu = tabPaths.includes(pathname) || pathname.startsWith('/stats/');
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
