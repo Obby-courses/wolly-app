@@ -107,8 +107,8 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
 
 REGOLE AGGIUNTIVE:
 12. HOLIDAY: Estrai il nome della festività (es: "Natale", "Pasqua", "Ferragosto") SOLO se menzionata esplicitamente. Altrimenti null.
-13. TAGS: Estrai tag come "viaggio", "trasferta" o altri termini qualificanti SOLO se esplicitati. Restituisci un array di stringhe o null.
-14. AMBIGUITÀ VIAGGIO: Se l'utente dice "viaggio di lavoro" o "viaggio" senza specificare cosa ha comprato (es: "5€ viaggio"), NON usare categorie di trasporto. Usa category_key: "tempo_libero" e inserisci "viaggio" o "viaggio di lavoro" nel campo tags.
+13. TAGS: Non inventare o dedurre mai dei tag. Inserisci dei tag in "tags" SOLO ed esclusivamente se l'utente ha esplicitamente richiesto di usare un tag (es. "aggiungi tag lavoro", "tag trasferta", o l'uso esplicito del termine "tag" o "#"). NON inserire mai tag che fanno riferimento a categorie, brand, negozi, metodi di pagamento, città o festività che sono già rappresentati in altri campi del JSON (es. NO tag "abbonamento", NO tag "netflix", NO tag "milano", NO tag "ristorante", NO tag "spesa"). Se non ci sono tag richiesti esplicitamente dall'utente, imposta "tags" a null o array vuoto.
+14. AMBIGUITÀ VIAGGIO: Se l'utente dice "viaggio di lavoro" o "viaggio" senza specificare cosa ha comprato (es: "5€ viaggio"), NON usare categorie di trasporto. Usa category_key: "tempo_libero". Inserisci "viaggio" o "viaggio di lavoro" nel campo tags SOLO se l'utente ha usato esplicitamente la parola "tag viaggio" o "#viaggio".
 15. VALIDITÀ SCONTRINO (receipt): Se l'input (sotto forma di testo estratto da scontrino) non contiene alcuna informazione riconducibile ad acquisti, spese, transazioni finanziarie o importi monetari validi, imposta sempre "amount": 0.
 
 REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern da pagamento periodico/ricorrente. Questo include:

@@ -45,9 +45,10 @@ const QUERY_PATTERNS = [
   /\b(come\s+ho\s+speso|dove\s+spendo|cosa\s+ho\s+speso)\b/i,
   /\b(mostrami|dimmi|analizza|fammi\s+vedere|mostra)\b/i,
   /\b(media|totale|somma|conteggio|confronta|comparazione)\b/i,
-  /\b(abbonament[io]|spese?|entrate?|uscite?)\b/i,
+  /\b(abbonament[io]|spes[ae]|entrat[ae]|uscit[ae]|prevision[ei]|prossim[oaei]|futur[oaei]|programmat[oaei])\b/i,
   /\b(questo\s+mese|quest'anno|questa\s+settimana|nel\s+mese|nell'anno)\b/i,
   /\b(categoria|categorie|distribuzione|grafico|andamento)\b/i,
+  /\bqual[ei]?\b/i,
   /\bwolly\b/i,
 ];
 
@@ -57,6 +58,7 @@ const STRICT_QUERY_PATTERNS = [
   /\b(come\s+ho\s+speso|dove\s+spendo|cosa\s+ho\s+speso)\b/i,
   /\b(mostrami|dimmi|analizza|fammi\s+vedere|mostra)\b/i,
   /\b(media|somma|conteggio|confronta|comparazione|grafico|andamento|distribuzione)\b/i,
+  /\bqual[ei]?\b/i,
 ];
 
 // ─── Router ───────────────────────────────────────────────────────────────────
