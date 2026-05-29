@@ -67,6 +67,11 @@ export default function ExpenseDetail() {
   const [subscription, setSubscription] = useState<SubscriptionSuggestion | null>(null);
   const [isSubscriptionActive, setIsSubscriptionActive] = useState(false);
 
+  const [dateMode, setDateMode] = useState<'single' | 'periodic'>('single');
+  const [periodicName, setPeriodicName] = useState('');
+  const [periodicFrequency, setPeriodicFrequency] = useState<'monthly' | 'weekly' | 'biweekly' | 'yearly'>('monthly');
+  const [periodicDay, setPeriodicDay] = useState(String(new Date().getDate()));
+
   // Accordion active state
   const [activeField, setActiveField] = useState<string | null>(null);
   
@@ -225,7 +230,12 @@ export default function ExpenseDetail() {
         // Rileva suggerimenti abbonamento
         if (parsed.subscription?.suggest_subscription) {
           setSubscription(parsed.subscription);
-          setIsSubscriptionActive(true); 
+          setIsSubscriptionActive(true);
+          // Pre-fill periodic mode
+          setDateMode('periodic');
+          setPeriodicName(parsed.subscription.subscription_name || '');
+          setPeriodicFrequency(parsed.subscription.subscription_frequency || 'monthly');
+          setPeriodicDay(String(parsed.subscription.subscription_day || new Date().getDate()));
         }
       } catch (e) {
         console.error('Errore parsing dati in ingresso');
@@ -305,22 +315,39 @@ export default function ExpenseDetail() {
 
         const txId = await TransactionRepository.insert(expenseToSave);
 
-        // Se il toggle abbonamento è attivo, salva anche l'abbonamento e collegalo
-        if (isSubscriptionActive && subscription) {
-          const today = new Date().toISOString().split('T')[0];
+        // Gestione abbonamento: periodic mode o AI-detected
+        let subscription_id: string | null = null;
+
+        if (dateMode === 'periodic' && periodicName.trim()) {
           const subId = await SubscriptionRepository.insert({
-            name: subscription.subscription_name || expenseToSave.description || 'Subscription',
-            amount: subscription.subscription_amount || expenseToSave.amount,
-            currency: expenseToSave.currency,
+            name: periodicName.trim(),
+            amount: expenseToSave.amount,
+            currency: 'EUR',
+            direction: expenseToSave.direction as 'in' | 'out',
+            category_key: expenseToSave.category_key,
+            frequency: periodicFrequency,
+            recurrence_day: parseInt(periodicDay) || null,
+            start_date: expenseToSave.date,
+            auto_detected: false,
+          });
+          subscription_id = subId;
+        } else if (isSubscriptionActive && subscription?.suggest_subscription) {
+          const subId = await SubscriptionRepository.insert({
+            name: subscription.subscription_name || expenseToSave.description || 'Abbonamento',
+            amount: expenseToSave.amount,
+            currency: 'EUR',
             direction: expenseToSave.direction as 'in' | 'out',
             category_key: expenseToSave.category_key,
             frequency: subscription.subscription_frequency || 'monthly',
-            recurrence_day: subscription.subscription_day ?? new Date().getDate(),
-            start_date: today,
+            recurrence_day: subscription.subscription_day || null,
+            start_date: expenseToSave.date,
             auto_detected: true,
           });
-          // Collega la transazione appena creata all'abbonamento
-          await TransactionRepository.update(txId, { subscription_id: subId });
+          subscription_id = subId;
+        }
+
+        if (subscription_id) {
+          await TransactionRepository.update(txId, { subscription_id });
         }
       }
 
@@ -599,10 +626,18 @@ export default function ExpenseDetail() {
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {isFuture && (
+              {isFuture && dateMode === 'single' && (
                 <View style={styles.scheduledBadge}>
                   <Ionicons name="calendar-outline" size={12} color="#0A74FF" style={{ marginRight: 4 }} />
                   <Text style={styles.scheduledBadgeText}>(programmato)</Text>
+                </View>
+              )}
+              {dateMode === 'periodic' && (
+                <View style={[styles.scheduledBadge, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]}>
+                  <Ionicons name="repeat" size={12} color="#16A34A" style={{ marginRight: 4 }} />
+                  <Text style={[styles.scheduledBadgeText, { color: '#16A34A' }]}>
+                    (periodica · {periodicFrequency === 'monthly' ? 'mensile' : periodicFrequency === 'weekly' ? 'settimanale' : periodicFrequency === 'yearly' ? 'annuale' : 'bisettimanale'})
+                  </Text>
                 </View>
               )}
               {!!editableExpense.date && (
@@ -625,49 +660,109 @@ export default function ExpenseDetail() {
 
           {activeField === 'date' && (
             <View style={styles.calendarContainer}>
-              <View style={styles.calendarHeader}>
-                <Pressable onPress={() => changeMonth('prev')} style={styles.calNavBtn}>
-                  <Ionicons name="chevron-back" size={20} color={COLORS.primary} />
+              {/* Tab selector: Una tantum / Periodica */}
+              <View style={styles.dateModeTabs}>
+                <Pressable 
+                  style={[styles.dateModeTab, dateMode === 'single' && styles.dateModeTabActive]}
+                  onPress={() => setDateMode('single')}
+                >
+                  <Ionicons name="calendar-outline" size={14} color={dateMode === 'single' ? '#FFFFFF' : COLORS.secondary} style={{ marginRight: 4 }} />
+                  <Text style={[styles.dateModeTabText, dateMode === 'single' && styles.dateModeTabTextActive]}>Una tantum</Text>
                 </Pressable>
-                <Text style={styles.calendarHeaderTitle}>
-                  {MONTHS_IT[calendarDate.month]} {calendarDate.year}
-                </Text>
-                <Pressable onPress={() => changeMonth('next')} style={styles.calNavBtn}>
-                  <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                <Pressable 
+                  style={[styles.dateModeTab, dateMode === 'periodic' && styles.dateModeTabActive, dateMode === 'periodic' && { backgroundColor: '#16A34A' }]}
+                  onPress={() => setDateMode('periodic')}
+                >
+                  <Ionicons name="repeat" size={14} color={dateMode === 'periodic' ? '#FFFFFF' : COLORS.secondary} style={{ marginRight: 4 }} />
+                  <Text style={[styles.dateModeTabText, dateMode === 'periodic' && styles.dateModeTabTextActive]}>Periodica</Text>
                 </Pressable>
-              </View>
-              
-              <View style={styles.weekdaysRow}>
-                {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => (
-                  <Text key={i} style={styles.weekdayText}>{d}</Text>
-                ))}
               </View>
 
-              <View style={styles.daysGrid}>
-                {(() => {
-                  const days = getDaysInMonth(calendarDate.year, calendarDate.month);
-                  const firstDay = getFirstDayOfMonth(calendarDate.year, calendarDate.month);
-                  const grid = [];
-                  for (let i = 0; i < firstDay; i++) {
-                    grid.push(<View key={`empty-${i}`} style={styles.dayCellEmpty} />);
-                  }
-                  for (let i = 1; i <= days; i++) {
-                    const isSelected = editableExpense.date === `${calendarDate.year}-${String(calendarDate.month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                    grid.push(
-                      <Pressable 
-                        key={`day-${i}`} 
-                        onPress={() => handleDaySelect(i)}
-                        style={[styles.dayCell, isSelected && styles.dayCellSelected]}
+              {dateMode === 'single' ? (
+                <>
+                  <View style={styles.calendarHeader}>
+                    <Pressable onPress={() => changeMonth('prev')} style={styles.calNavBtn}>
+                      <Ionicons name="chevron-back" size={20} color={COLORS.primary} />
+                    </Pressable>
+                    <Text style={styles.calendarHeaderTitle}>
+                      {MONTHS_IT[calendarDate.month]} {calendarDate.year}
+                    </Text>
+                    <Pressable onPress={() => changeMonth('next')} style={styles.calNavBtn}>
+                      <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                    </Pressable>
+                  </View>
+                  
+                  <View style={styles.weekdaysRow}>
+                    {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => (
+                      <Text key={i} style={styles.weekdayText}>{d}</Text>
+                    ))}
+                  </View>
+
+                  <View style={styles.daysGrid}>
+                    {(() => {
+                      const days = getDaysInMonth(calendarDate.year, calendarDate.month);
+                      const firstDay = getFirstDayOfMonth(calendarDate.year, calendarDate.month);
+                      const grid = [];
+                      for (let i = 0; i < firstDay; i++) {
+                        grid.push(<View key={`empty-${i}`} style={styles.dayCellEmpty} />);
+                      }
+                      for (let i = 1; i <= days; i++) {
+                        const isSelected = editableExpense.date === `${calendarDate.year}-${String(calendarDate.month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                        grid.push(
+                          <Pressable 
+                            key={`day-${i}`} 
+                            onPress={() => handleDaySelect(i)}
+                            style={[styles.dayCell, isSelected && styles.dayCellSelected]}
+                          >
+                            <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>
+                              {i}
+                            </Text>
+                          </Pressable>
+                        );
+                      }
+                      return grid;
+                    })()}
+                  </View>
+                </>
+              ) : (
+                <View style={styles.periodicForm}>
+                  <Text style={styles.periodicLabel}>Nome</Text>
+                  <TextInput
+                    style={styles.periodicInput}
+                    placeholder="es. Netflix, Stipendio, Affitto"
+                    placeholderTextColor={COLORS.secondary}
+                    value={periodicName}
+                    onChangeText={setPeriodicName}
+                  />
+
+                  <Text style={[styles.periodicLabel, { marginTop: 14 }]}>Frequenza</Text>
+                  <View style={styles.periodicChipRow}>
+                    {([['weekly', 'Sett.'], ['biweekly', 'Bisett.'], ['monthly', 'Mensile'], ['yearly', 'Annuale']] as const).map(([key, label]) => (
+                      <Pressable
+                        key={key}
+                        style={[styles.periodicChip, periodicFrequency === key && styles.periodicChipActive]}
+                        onPress={() => setPeriodicFrequency(key as any)}
                       >
-                        <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>
-                          {i}
-                        </Text>
+                        <Text style={[styles.periodicChipText, periodicFrequency === key && styles.periodicChipTextActive]}>{label}</Text>
                       </Pressable>
-                    );
-                  }
-                  return grid;
-                })()}
-              </View>
+                    ))}
+                  </View>
+
+                  <Text style={[styles.periodicLabel, { marginTop: 14 }]}>
+                    {periodicFrequency === 'weekly' || periodicFrequency === 'biweekly' 
+                      ? 'Giorno della settimana (0=Lun…6=Dom)' 
+                      : 'Giorno del mese (1–31)'}
+                  </Text>
+                  <TextInput
+                    style={styles.periodicInput}
+                    keyboardType="number-pad"
+                    placeholder={periodicFrequency === 'weekly' || periodicFrequency === 'biweekly' ? '0' : '1'}
+                    placeholderTextColor={COLORS.secondary}
+                    value={periodicDay}
+                    onChangeText={setPeriodicDay}
+                  />
+                </View>
+              )}
             </View>
           )}
 
@@ -831,29 +926,7 @@ export default function ExpenseDetail() {
           )}
         </View>
 
-        {/* SECTION: ABBONAMENTO (Only shown if suggested during new parsing) */}
-        {!isEditingExisting && subscription?.suggest_subscription && (
-          <>
-            <Text style={styles.sectionTitle}>ABBONAMENTO</Text>
-            <View style={[styles.card, styles.subscriptionCard]}>
-              <View style={styles.subscriptionHeader}>
-                <View style={styles.subscriptionIcon}>
-                  <Ionicons name="repeat" size={20} color="#7C3AED" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.subscriptionTitle}>Salva come abbonamento</Text>
-                  <Text style={styles.subscriptionSub}>Verrà generato automaticamente ogni {subscription.subscription_frequency === 'monthly' ? 'mese' : subscription.subscription_frequency}</Text>
-                </View>
-                <Switch
-                  value={isSubscriptionActive}
-                  onValueChange={setIsSubscriptionActive}
-                  trackColor={{ false: '#E5E7EB', true: '#DDD6FE' }}
-                  thumbColor={isSubscriptionActive ? '#7C3AED' : '#F9FAFB'}
-                />
-              </View>
-            </View>
-          </>
-        )}
+
 
         {/* SECTION: DETTAGLI */}
         <Text style={styles.sectionTitle}>DETTAGLI</Text>
@@ -1567,6 +1640,80 @@ const styles = StyleSheet.create({
   dayTextSelected: {
     color: '#FFF',
     fontWeight: '700',
+  },
+
+  // Date Mode Tabs
+  dateModeTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 14,
+    gap: 3,
+  },
+  dateModeTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+  },
+  dateModeTabActive: {
+    backgroundColor: '#0A74FF',
+  },
+  dateModeTabText: {
+    fontSize: 13,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+  },
+  dateModeTabTextActive: {
+    color: '#FFFFFF',
+  },
+  periodicForm: {
+    paddingTop: 4,
+  },
+  periodicLabel: {
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  periodicInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  periodicChipRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  periodicChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+  },
+  periodicChipActive: {
+    backgroundColor: '#16A34A',
+  },
+  periodicChipText: {
+    fontSize: 12,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+  },
+  periodicChipTextActive: {
+    color: '#FFFFFF',
   },
 
   // Vertical Alarm Clock Scroll Wheel Styling

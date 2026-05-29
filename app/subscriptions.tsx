@@ -101,6 +101,7 @@ function daysRemainingLabel(dateStr: string): string {
 interface SubFormState {
   name: string;
   amount: string;
+  direction: 'in' | 'out';
   category_key: string;
   frequency: Frequency;
   recurrence_day: string;
@@ -111,6 +112,7 @@ interface SubFormState {
 const EMPTY_FORM: SubFormState = {
   name: '',
   amount: '',
+  direction: 'out',
   category_key: 'libri_audio_abbonamenti',
   frequency: 'monthly',
   recurrence_day: String(new Date().getDate()),
@@ -167,7 +169,7 @@ function SubModal({
       <SafeAreaView style={modal.container}>
         <View style={modal.header}>
           <Pressable onPress={handleClose}><Ionicons name="close" size={26} color={COLORS.primary} /></Pressable>
-          <Text style={modal.title}>{initial ? 'Gestisci Abbonamento' : 'Nuovo Abbonamento'}</Text>
+          <Text style={modal.title}>{initial ? 'Gestisci Periodica' : 'Nuova Periodica'}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Pressable onPress={handleSave} disabled={saving}>
               <Text style={[modal.save, saving && { opacity: 0.5 }]}>{saving ? '...' : 'Salva'}</Text>
@@ -176,10 +178,27 @@ function SubModal({
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={modal.content}>
+          {/* Direction toggle */}
+          <Text style={modal.label}>Tipo</Text>
+          <View style={modal.chipRow}>
+            <Pressable
+              style={[modal.chip, form.direction === 'out' && { backgroundColor: '#FEE2E2', borderColor: '#F87171', borderWidth: 1 }]}
+              onPress={() => set('direction', 'out')}
+            >
+              <Text style={[modal.chipText, form.direction === 'out' && { color: '#991B1B', fontWeight: '900' }]}>Spesa</Text>
+            </Pressable>
+            <Pressable
+              style={[modal.chip, form.direction === 'in' && { backgroundColor: '#D1FAE5', borderColor: '#34D399', borderWidth: 1 }]}
+              onPress={() => set('direction', 'in')}
+            >
+              <Text style={[modal.chipText, form.direction === 'in' && { color: '#065F46', fontWeight: '900' }]}>Entrata</Text>
+            </Pressable>
+          </View>
+
           <Text style={modal.label}>Nome</Text>
           <TextInput
             style={modal.input}
-            placeholder="es. Netflix, Affitto"
+            placeholder="es. Netflix, Stipendio, Affitto"
             placeholderTextColor={COLORS.secondary}
             value={form.name}
             onChangeText={v => set('name', v)}
@@ -195,10 +214,10 @@ function SubModal({
             onChangeText={v => set('amount', v)}
           />
 
-          {/* STATO ABBONAMENTO */}
+          {/* STATO PERIODICA */}
           {!!initial && (
             <>
-              <Text style={modal.label}>Stato Abbonamento</Text>
+              <Text style={modal.label}>Stato Periodica</Text>
               <View style={modal.chipRow}>
                 <Pressable
                   style={[
@@ -284,14 +303,14 @@ function SubModal({
             onChangeText={v => set('start_date', v)}
           />
 
-          {/* PULSANTE ELIMINA ABBONAMENTO */}
+          {/* PULSANTE ELIMINA PERIODICA */}
           {!!initial && onDelete && (
             <Pressable 
               style={modal.deleteButton} 
               onPress={handleDeleteClick}
             >
               <Ionicons name="trash-outline" size={18} color="#FFF" style={{ marginRight: 8 }} />
-              <Text style={modal.deleteButtonText}>Elimina Abbonamento</Text>
+              <Text style={modal.deleteButtonText}>Elimina Periodica</Text>
             </Pressable>
           )}
         </ScrollView>
@@ -310,6 +329,7 @@ export default function SubscriptionsScreen() {
   const [scheduledSortBy, setScheduledSortBy] = useState<'date' | 'amount_asc' | 'amount_desc'>('date');
   const [loading, setLoading] = useState(true);
   const [totalMonthly, setTotalMonthly] = useState(0);
+  const [totalMonthlyIncome, setTotalMonthlyIncome] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Subscription | null>(null);
 
@@ -320,6 +340,8 @@ export default function SubscriptionsScreen() {
       setSubs(all);
       const total = await SubscriptionRepository.getTotalMonthly();
       setTotalMonthly(total);
+      const totalIn = await SubscriptionRepository.getTotalMonthlyIncome();
+      setTotalMonthlyIncome(totalIn);
       
       const sched = await TransactionRepository.getScheduledExpenses(orderBy);
       setScheduledExpenses(sched);
@@ -335,13 +357,16 @@ export default function SubscriptionsScreen() {
     load(scheduledSortBy);
   }, [scheduledSortBy]));
 
-  const active = subs.filter(s => s.is_active);
+  const activeOut = subs.filter(s => s.is_active && (s.direction || 'out') === 'out');
+  const activeIn = subs.filter(s => s.is_active && s.direction === 'in');
   const inactive = subs.filter(s => !s.is_active);
+  const totalActive = activeOut.length + activeIn.length;
 
   const handleAdd = async (form: SubFormState) => {
     await SubscriptionRepository.insert({
       name: form.name.trim(),
       amount: parseFloat(form.amount.replace(',', '.')),
+      direction: form.direction,
       category_key: form.category_key,
       frequency: form.frequency,
       recurrence_day: parseInt(form.recurrence_day) || null,
@@ -356,6 +381,7 @@ export default function SubscriptionsScreen() {
     await SubscriptionRepository.update(editTarget.id, {
       name: form.name.trim(),
       amount: parseFloat(form.amount.replace(',', '.')),
+      direction: form.direction,
       category_key: form.category_key,
       frequency: form.frequency,
       recurrence_day: parseInt(form.recurrence_day) || null,
@@ -374,7 +400,7 @@ export default function SubscriptionsScreen() {
 
   const handleDelete = (sub: Subscription) => {
     Alert.alert(
-      'Elimina abbonamento',
+      'Elimina periodica',
       `Vuoi eliminare "${sub.name}"? Le transazioni già generate resteranno invariate.`,
       [
         { text: 'Annulla', style: 'cancel' },
@@ -396,6 +422,7 @@ export default function SubscriptionsScreen() {
   const editForm: SubFormState | undefined = editTarget ? {
     name: editTarget.name,
     amount: String(editTarget.amount),
+    direction: (editTarget.direction || 'out') as 'in' | 'out',
     category_key: editTarget.category_key,
     frequency: editTarget.frequency,
     recurrence_day: String(editTarget.recurrence_day ?? ''),
@@ -407,6 +434,8 @@ export default function SubscriptionsScreen() {
     const color = getCategoryColor(sub.category_key);
     const freqLabel = FREQUENCIES.find(f => f.key === sub.frequency)?.label || sub.frequency;
     const isActive = sub.is_active !== false;
+    const isIncome = sub.direction === 'in';
+    const accentColor = isIncome ? '#059669' : color;
 
     return (
       <Pressable 
@@ -414,10 +443,15 @@ export default function SubscriptionsScreen() {
         style={[styles.card, !isActive && { opacity: 0.55 }]}
         onPress={() => openEdit(sub)}
       >
-        <View style={[styles.cardAccent, { backgroundColor: isActive ? color : '#9CA3AF' }]} />
+        <View style={[styles.cardAccent, { backgroundColor: isActive ? accentColor : '#9CA3AF' }]} />
         <View style={styles.cardBody}>
           <View style={styles.cardTop}>
             <Text style={[styles.cardName, !isActive && { color: COLORS.secondary }]}>{sub.name}</Text>
+            {isIncome && isActive && (
+              <View style={[styles.autoPill, { backgroundColor: '#D1FAE5', marginLeft: 8 }]}>
+                <Text style={[styles.autoPillText, { color: '#065F46' }]}>Entrata</Text>
+              </View>
+            )}
             {!isActive && (
               <View style={[styles.autoPill, { backgroundColor: '#E5E7EB', marginLeft: 8 }]}>
                 <Text style={[styles.autoPillText, { color: COLORS.secondary }]}>Inattivo</Text>
@@ -425,7 +459,9 @@ export default function SubscriptionsScreen() {
             )}
           </View>
           <View style={styles.cardMeta}>
-            <Text style={[styles.cardAmount, !isActive && { color: COLORS.secondary }]}>€{sub.amount.toFixed(2)}</Text>
+            <Text style={[styles.cardAmount, !isActive && { color: COLORS.secondary }, isIncome && isActive && { color: '#059669' }]}>
+              {isIncome ? '+' : ''}€{sub.amount.toFixed(2)}
+            </Text>
             <Text style={styles.cardSep}>·</Text>
             <Text style={styles.cardFrequency}>{freqLabel}</Text>
           </View>
@@ -490,7 +526,7 @@ export default function SubscriptionsScreen() {
           >
             <View style={styles.header}>
               <View style={{ width: 80 }} />
-              <Text style={styles.title}>Abbonamenti e Spese</Text>
+              <Text style={styles.title}>Periodiche e Programmate</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Pressable onPress={() => setShowModal(true)} style={styles.addButton}>
                   <Ionicons name="add" size={22} color="#FFFFFF" />
@@ -500,13 +536,15 @@ export default function SubscriptionsScreen() {
 
             {/* Summary card inside blue header */}
             <View style={styles.netWorthHeaderContainer}>
-              <Text style={styles.netWorthLabel}>STIMA MENSILE TOTALE</Text>
+              <Text style={styles.netWorthLabel}>STIMA MENSILE NETTA</Text>
               <View style={styles.netWorthValueContainer}>
                 <Text style={styles.netWorthValue}>
-                  € {totalMonthly.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  € {(totalMonthlyIncome - totalMonthly).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
-              <Text style={styles.netWorthSub}>{active.length} abbonamenti attivi</Text>
+              <Text style={styles.netWorthSub}>
+                {totalActive} periodiche attive · Uscite €{totalMonthly.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} · Entrate +€{totalMonthlyIncome.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </Text>
             </View>
           </LinearGradient>
 
@@ -515,21 +553,28 @@ export default function SubscriptionsScreen() {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
               
-              {/* SEZIONE: ABBONAMENTI */}
+              {/* SEZIONE: PERIODICHE */}
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.macroSectionLabel}>ABBONAMENTI</Text>
+                <Text style={styles.macroSectionLabel}>PERIODICHE</Text>
               </View>
 
-              {active.length > 0 && (
+              {activeOut.length > 0 && (
                 <>
-                  <Text style={styles.subSectionLabel}>Attivi ({active.length})</Text>
-                  {active.map(renderCard)}
+                  <Text style={styles.subSectionLabel}>Uscite ({activeOut.length})</Text>
+                  {activeOut.map(renderCard)}
+                </>
+              )}
+
+              {activeIn.length > 0 && (
+                <>
+                  <Text style={[styles.subSectionLabel, { marginTop: SPACING.md }]}>Entrate ({activeIn.length})</Text>
+                  {activeIn.map(renderCard)}
                 </>
               )}
 
               {inactive.length > 0 && (
                 <>
-                  <Text style={[styles.subSectionLabel, { marginTop: SPACING.md }]}>Disattivati ({inactive.length})</Text>
+                  <Text style={[styles.subSectionLabel, { marginTop: SPACING.md }]}>Disattivate ({inactive.length})</Text>
                   {inactive.map(renderCard)}
                 </>
               )}
@@ -537,8 +582,8 @@ export default function SubscriptionsScreen() {
               {subs.length === 0 && (
                 <View style={styles.emptyState}>
                   <Ionicons name="repeat-outline" size={40} color={COLORS.secondary} />
-                  <Text style={styles.emptyText}>Nessun abbonamento registrato</Text>
-                  <Text style={styles.emptySubtext}>Tocca + in alto per aggiungerne uno</Text>
+                  <Text style={styles.emptyText}>Nessuna periodica registrata</Text>
+                  <Text style={styles.emptySubtext}>Tocca + in alto per aggiungerne una</Text>
                 </View>
               )}
 

@@ -111,7 +111,10 @@ REGOLE AGGIUNTIVE:
 14. AMBIGUITÀ VIAGGIO: Se l'utente dice "viaggio di lavoro" o "viaggio" senza specificare cosa ha comprato (es: "5€ viaggio"), NON usare categorie di trasporto. Usa category_key: "tempo_libero" e inserisci "viaggio" o "viaggio di lavoro" nel campo tags.
 15. VALIDITÀ SCONTRINO (receipt): Se l'input (sotto forma di testo estratto da scontrino) non contiene alcuna informazione riconducibile ad acquisti, spese, transazioni finanziarie o importi monetari validi, imposta sempre "amount": 0.
 
-REGOLA ABBONAMENTO: Imposta "suggest_subscription": true SOLO se l'importo ha pattern da servizio in abbonamento (es. importi fissi come 9.99, 15.99, nomi noti come Netflix, Spotify, Amazon Prime, Adobe, palestra, affitto, assicurazione, etc.). In tutti gli altri casi imposta false e gli altri campi abbonamento a null.
+REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern da pagamento periodico/ricorrente. Questo include:
+  - USCITE periodiche: abbonamenti (Netflix, Spotify, Amazon Prime, Adobe, palestra), affitto pagato, assicurazione, bollette, rate, importi fissi ricorrenti (9.99, 15.99, etc.)
+  - ENTRATE periodiche: stipendio, salario, rendita, affitto ricevuto, pensione, borsa di studio mensile, entrate fisse ricorrenti
+  In tutti gli altri casi imposta false e gli altri campi abbonamento a null.
 `;
 
   try {

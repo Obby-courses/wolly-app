@@ -60,6 +60,7 @@ export class SubscriptionRepository {
 
     if (fields.name !== undefined)              { updates.push('name = ?');              values.push(fields.name); }
     if (fields.amount !== undefined)            { updates.push('amount = ?');            values.push(fields.amount); }
+    if (fields.direction !== undefined)         { updates.push('direction = ?');         values.push(fields.direction); }
     if (fields.category_key !== undefined)     { updates.push('category_key = ?');     values.push(fields.category_key); }
     if (fields.frequency !== undefined)         { updates.push('frequency = ?');         values.push(fields.frequency); }
     if (fields.recurrence_day !== undefined) { updates.push('recurrence_day = ?'); values.push(fields.recurrence_day); }
@@ -145,13 +146,30 @@ export class SubscriptionRepository {
    */
   static async getTotalMonthly(): Promise<number> {
     const active = await this.getActive();
-    return active.reduce((sum, sub) => {
+    return active.filter(s => (s.direction || 'out') === 'out').reduce((sum, sub) => {
       let monthly = sub.amount;
       switch (sub.frequency) {
         case 'weekly':    monthly = sub.amount * 4.33; break;
         case 'biweekly':  monthly = sub.amount * 2.17; break;
         case 'yearly':        monthly = sub.amount / 12;   break;
         default:               monthly = sub.amount;        break; // monthly
+      }
+      return sum + monthly;
+    }, 0);
+  }
+
+  /**
+   * Total monthly income across all active periodic incomes (normalized to monthly).
+   */
+  static async getTotalMonthlyIncome(): Promise<number> {
+    const active = await this.getActive();
+    return active.filter(s => s.direction === 'in').reduce((sum, sub) => {
+      let monthly = sub.amount;
+      switch (sub.frequency) {
+        case 'weekly':    monthly = sub.amount * 4.33; break;
+        case 'biweekly':  monthly = sub.amount * 2.17; break;
+        case 'yearly':        monthly = sub.amount / 12;   break;
+        default:               monthly = sub.amount;        break;
       }
       return sum + monthly;
     }, 0);
