@@ -304,15 +304,7 @@ export default function BottomMenu() {
       )}
 
       <View style={styles.container}>
-        {isOffline ? (
-          <View style={styles.rowCenter}>
-            <Pressable onPress={handleOfflinePress} style={styles.offlineBtn}>
-              <Ionicons name="add" size={18} color="#FFF" />
-              <Text style={styles.offlineBtnText}>Nuova spesa offline</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.navRow}>
+        <View style={styles.navRow}>
             {NAV_ITEMS.map((item) => {
               if (item.isPlus) {
                 return (
@@ -326,20 +318,29 @@ export default function BottomMenu() {
                           </Svg>
                         </View>
                       )}
-                      <Animated.View
-                        {...primaryPanResponder.panHandlers}
-                        style={[
-                          styles.toolBtn,
-                          isVoiceChat ? styles.toolBtnBig : styles.toolBtnNormal,
-                          isSlidingToCancel && styles.micBtnCancel
-                        ]}
-                      >
-                        <Ionicons 
-                          name={isVoiceChat ? "mic" : "add"} 
-                          size={isVoiceChat ? 28 : 28} 
-                          color="#FFF" 
-                        />
-                      </Animated.View>
+                      {isOffline ? (
+                        <Pressable
+                          onPress={handleOfflinePress}
+                          style={[styles.toolBtn, styles.toolBtnNormal]}
+                        >
+                          <Ionicons name="add" size={28} color="#FFF" />
+                        </Pressable>
+                      ) : (
+                        <Animated.View
+                          {...primaryPanResponder.panHandlers}
+                          style={[
+                            styles.toolBtn,
+                            isVoiceChat ? styles.toolBtnBig : styles.toolBtnNormal,
+                            isSlidingToCancel && styles.micBtnCancel
+                          ]}
+                        >
+                          <Ionicons 
+                            name={isVoiceChat ? "mic" : "add"} 
+                            size={isVoiceChat ? 28 : 28} 
+                            color="#FFF" 
+                          />
+                        </Animated.View>
+                      )}
                     </View>
                   </View>
                 );
@@ -368,7 +369,6 @@ export default function BottomMenu() {
               );
             })}
           </View>
-        )}
 
         {toastMsg && (
           <View style={styles.toast}>
