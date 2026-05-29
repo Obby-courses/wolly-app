@@ -941,6 +941,32 @@ export class TransactionRepository {
   }
 
   /**
+   * Retrieves active scheduled expenses (direction = 'out') in the future.
+   */
+  static async getScheduledExpenses(orderBy: 'date' | 'amount_asc' | 'amount_desc' = 'date'): Promise<any[]> {
+    const db = await getDBConnection();
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    let orderSql = 't.date ASC, t.time ASC';
+    if (orderBy === 'amount_asc') {
+      orderSql = 't.amount ASC';
+    } else if (orderBy === 'amount_desc') {
+      orderSql = 't.amount DESC';
+    }
+    
+    const results = await db.getAllAsync(`
+      SELECT t.*, s.name as subscription_name
+      FROM transactions t
+      LEFT JOIN subscriptions s ON t.subscription_id = s.id
+      WHERE t.is_deleted = 0 
+        AND t.direction = 'out'
+        AND t.date > ?
+      ORDER BY \${orderSql}
+    `, [todayStr]);
+    return results;
+  }
+
+  /**
    * Deletes all transactions and resets the net worth to baseline 1000.0.
    */
   static async deleteAll(): Promise<void> {

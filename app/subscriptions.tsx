@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, Pressable,
   TextInput, Modal, Alert, ActivityIndicator, Keyboard
@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import { SubscriptionRepository, Subscription, Frequency } from '../services/database/repositories/SubscriptionRepository';
+import { TransactionRepository } from '../services/database/repositories/TransactionRepository';
 import { ALL_CATEGORIES, getDomainForCategory, getCategory } from '../constants/categories';
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import CategoryPickerModal from '../components/CategoryPickerModal';
@@ -78,6 +79,21 @@ function monthlyEquivalent(sub: Subscription): number {
     case 'yearly':    return sub.amount / 12;
     default:          return sub.amount;
   }
+}
+
+function daysRemainingLabel(dateStr: string): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+  
+  const diffTime = target.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Oggi';
+  if (diffDays === 1) return 'Domani';
+  if (diffDays < 0) return 'Scaduta';
+  return `Tra ${diffDays} giorni`;
 }
 
 // ─── Add/Edit Modal ────────────────────────────────────────────────────────
@@ -290,25 +306,34 @@ export default function SubscriptionsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [subs, setSubs] = useState<Subscription[]>([]);
+  const [scheduledExpenses, setScheduledExpenses] = useState<any[]>([]);
+  const [scheduledSortBy, setScheduledSortBy] = useState<'date' | 'amount_asc' | 'amount_desc'>('date');
   const [loading, setLoading] = useState(true);
   const [totalMonthly, setTotalMonthly] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Subscription | null>(null);
-  const [showInactive, setShowInactive] = useState(false);
 
-  const load = async () => {
+  const load = async (orderBy = scheduledSortBy) => {
     setLoading(true);
-    const all = await SubscriptionRepository.getAll();
-    setSubs(all);
-    const total = await SubscriptionRepository.getTotalMonthly();
-    setTotalMonthly(total);
-    setLoading(false);
+    try {
+      const all = await SubscriptionRepository.getAll();
+      setSubs(all);
+      const total = await SubscriptionRepository.getTotalMonthly();
+      setTotalMonthly(total);
+      
+      const sched = await TransactionRepository.getScheduledExpenses(orderBy);
+      setScheduledExpenses(sched);
+    } catch (err) {
+      console.error('Error loading subscriptions and scheduled expenses:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useFocusEffect(useCallback(() => {
     analytics.trackScreen(ANALYTICS_SCREENS.SUBSCRIPTIONS);
-    load();
-  }, []));
+    load(scheduledSortBy);
+  }, [scheduledSortBy]));
 
   const active = subs.filter(s => s.is_active);
   const inactive = subs.filter(s => !s.is_active);
@@ -323,7 +348,7 @@ export default function SubscriptionsScreen() {
       start_date: form.start_date,
     });
     setShowModal(false);
-    load();
+    load(scheduledSortBy);
   };
 
   const handleEdit = async (form: SubFormState) => {
@@ -338,13 +363,13 @@ export default function SubscriptionsScreen() {
       is_active: form.is_active !== false,
     });
     setEditTarget(null);
-    load();
+    load(scheduledSortBy);
   };
 
   const handleToggle = async (sub: Subscription) => {
     if (!sub.id) return;
     await SubscriptionRepository.setIsActive(sub.id, !sub.is_active);
-    load();
+    load(scheduledSortBy);
   };
 
   const handleDelete = (sub: Subscription) => {
@@ -357,7 +382,7 @@ export default function SubscriptionsScreen() {
           text: 'Elimina', style: 'destructive',
           onPress: async () => {
             if (sub.id) await SubscriptionRepository.delete(sub.id);
-            load();
+            load(scheduledSortBy);
           }
         }
       ]
@@ -412,9 +437,49 @@ export default function SubscriptionsScreen() {
     );
   };
 
+  const renderScheduledCard = (tx: any) => {
+    const color = getCategoryColor(tx.category_key);
+    const category = getCategory(tx.category_key);
+
+    return (
+      <Pressable 
+        key={tx.id} 
+        style={({ pressed }) => [
+          styles.card, 
+          pressed && { opacity: 0.7 }
+        ]}
+        onPress={() => router.push({ pathname: "/transaction/[id]", params: { id: tx.id } })}
+      >
+        <View style={[styles.cardAccent, { backgroundColor: color }]} />
+        <View style={styles.cardBody}>
+          <View style={styles.cardTop}>
+            <Text style={styles.cardName} numberOfLines={1}>{tx.description || 'Spesa programmata'}</Text>
+            <View style={[styles.autoPill, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD', borderWidth: 1 }]}>
+              <Text style={[styles.autoPillText, { color: '#0A74FF' }]}>Programmata</Text>
+            </View>
+          </View>
+          <View style={styles.cardMeta}>
+            <Text style={styles.cardAmount}>€{tx.amount.toFixed(2)}</Text>
+            <Text style={styles.cardSep}>·</Text>
+            <Text style={styles.cardFrequency}>{category ? category.label : tx.subcategory_key.replace('_', ' ')}</Text>
+          </View>
+          <View style={styles.scheduledTimeRow}>
+            <Ionicons name="time-outline" size={13} color={COLORS.secondary} style={{ marginRight: 4 }} />
+            <Text style={styles.cardNextOccurrence}>
+              {tx.date} · {daysRemainingLabel(tx.date)}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.chevronContainer}>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.border} />
+        </View>
+      </Pressable>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {loading ? (
+      {loading && subs.length === 0 && scheduledExpenses.length === 0 ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#0A74FF" /></View>
       ) : (
         <View style={{ flex: 1 }}>
@@ -425,7 +490,7 @@ export default function SubscriptionsScreen() {
           >
             <View style={styles.header}>
               <View style={{ width: 80 }} />
-              <Text style={styles.title}>Abbonamenti</Text>
+              <Text style={styles.title}>Abbonamenti e Spese</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Pressable onPress={() => setShowModal(true)} style={styles.addButton}>
                   <Ionicons name="add" size={22} color="#FFFFFF" />
@@ -449,27 +514,71 @@ export default function SubscriptionsScreen() {
           <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 48 }]}>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-              {/* Active List */}
+              
+              {/* SEZIONE: ABBONAMENTI */}
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.macroSectionLabel}>ABBONAMENTI</Text>
+              </View>
+
               {active.length > 0 && (
                 <>
-                  <Text style={styles.sectionLabel}>ATTIVI</Text>
+                  <Text style={styles.subSectionLabel}>Attivi ({active.length})</Text>
                   {active.map(renderCard)}
                 </>
               )}
 
-              {/* Inactive List */}
               {inactive.length > 0 && (
                 <>
-                  <Text style={[styles.sectionLabel, { marginTop: SPACING.lg }]}>DISATTIVATI</Text>
+                  <Text style={[styles.subSectionLabel, { marginTop: SPACING.md }]}>Disattivati ({inactive.length})</Text>
                   {inactive.map(renderCard)}
                 </>
               )}
 
               {subs.length === 0 && (
                 <View style={styles.emptyState}>
-                  <Ionicons name="repeat-outline" size={48} color={COLORS.secondary} />
+                  <Ionicons name="repeat-outline" size={40} color={COLORS.secondary} />
                   <Text style={styles.emptyText}>Nessun abbonamento registrato</Text>
-                  <Text style={styles.emptySubtext}>Tocca + per aggiungerne uno</Text>
+                  <Text style={styles.emptySubtext}>Tocca + in alto per aggiungerne uno</Text>
+                </View>
+              )}
+
+              {/* SEZIONE: SPESE PROGRAMMATE */}
+              <View style={[styles.sectionHeaderRow, { marginTop: SPACING.xl }]}>
+                <Text style={styles.macroSectionLabel}>SPESE PROGRAMMATE</Text>
+                
+                {scheduledExpenses.length > 0 && (
+                  <View style={styles.sortContainer}>
+                    <Pressable 
+                      style={[styles.sortButton, scheduledSortBy === 'date' && styles.sortButtonActive]}
+                      onPress={() => setScheduledSortBy('date')}
+                    >
+                      <Text style={[styles.sortButtonText, scheduledSortBy === 'date' && styles.sortButtonTextActive]}>Data</Text>
+                    </Pressable>
+                    <Pressable 
+                      style={[styles.sortButton, scheduledSortBy === 'amount_desc' && styles.sortButtonActive]}
+                      onPress={() => setScheduledSortBy('amount_desc')}
+                    >
+                      <Ionicons name="arrow-down" size={10} color={scheduledSortBy === 'amount_desc' ? '#FFFFFF' : COLORS.secondary} />
+                      <Text style={[styles.sortButtonText, scheduledSortBy === 'amount_desc' && styles.sortButtonTextActive]}>€ Max</Text>
+                    </Pressable>
+                    <Pressable 
+                      style={[styles.sortButton, scheduledSortBy === 'amount_asc' && styles.sortButtonActive]}
+                      onPress={() => setScheduledSortBy('amount_asc')}
+                    >
+                      <Ionicons name="arrow-up" size={10} color={scheduledSortBy === 'amount_asc' ? '#FFFFFF' : COLORS.secondary} />
+                      <Text style={[styles.sortButtonText, scheduledSortBy === 'amount_asc' && styles.sortButtonTextActive]}>€ Min</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+
+              {scheduledExpenses.length > 0 ? (
+                scheduledExpenses.map(renderScheduledCard)
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="calendar-outline" size={40} color={COLORS.secondary} />
+                  <Text style={styles.emptyText}>Nessuna spesa programmata</Text>
+                  <Text style={styles.emptySubtext}>Le spese con data futura compariranno qui</Text>
                 </View>
               )}
             </ScrollView>
@@ -664,16 +773,68 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     fontFamily: TYPOGRAPHY.fontFamily,
   },
-  inactiveToggle: {
-    paddingVertical: SPACING.md,
-    marginBottom: SPACING.sm,
+  macroSectionLabel: {
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+    letterSpacing: 1.5,
+    fontWeight: '800',
   },
-  inactiveToggleText: {
-    fontSize: TYPOGRAPHY.sizes.xs,
+  subSectionLabel: {
+    fontSize: 10,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.secondary,
     textTransform: 'uppercase',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
+    marginBottom: SPACING.sm,
+    marginLeft: 4,
+    marginTop: SPACING.sm,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E7EB',
+    borderRadius: 10,
+    padding: 2,
+    gap: 2,
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+    gap: 2,
+  },
+  sortButtonActive: {
+    backgroundColor: '#FFFFFF',
+    ...SHADOWS.soft,
+  },
+  sortButtonText: {
+    fontSize: 10,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+  },
+  sortButtonTextActive: {
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  scheduledTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  chevronContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingRight: SPACING.lg,
   },
 });
 
