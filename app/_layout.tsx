@@ -10,6 +10,7 @@ import { View, LogBox } from 'react-native';
 import { usePathname } from 'expo-router';
 import { voiceStore } from '../services/voiceStore';
 import { networkStore } from '../services/networkStore';
+import { logScreenView } from '../services/firebase';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,6 +36,13 @@ export default function RootLayout() {
       unsub();
     };
   }, []);
+
+  // Track screen navigation automatically in Firebase Analytics
+  useEffect(() => {
+    if (pathname) {
+      logScreenView(pathname);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (loaded || error) {
