@@ -33,6 +33,11 @@ export interface QueryIntent {
   tag_filter?: string;            // tag specifico (es: "viaggio", "trasferta")
   is_recurring_filter?: boolean;  // true se si parla di spese ricorrenti o abbonamenti, altrimenti null
   is_scheduled_filter?: boolean;  // true se si parla di spese programmate una tantum o future, altrimenti null
+  _tokens?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 // ─── Prompt Builder (Dinamico) ───────────────────────────────────────────────
@@ -206,6 +211,14 @@ export async function parseQueryIntent(
     const raw = data.choices[0].message.content;
     console.log(`📄 [PARSER] Raw AI Response: ${raw}`);
     const intent: QueryIntent = JSON.parse(raw);
+
+    if (data.usage) {
+      intent._tokens = {
+        prompt_tokens: data.usage.prompt_tokens,
+        completion_tokens: data.usage.completion_tokens,
+        total_tokens: data.usage.total_tokens
+      };
+    }
 
     console.log(`✅ [PARSER] Intent: ${intent.archetype} | ${intent.direction} | ${intent.period.type} ${intent.period.year || ''}${intent.period.month ? '/' + intent.period.month : ''}`);
     if (intent.category_filter) console.log(`   Category: ${intent.category_filter}`);

@@ -2,6 +2,7 @@ import { parseQueryIntent, QueryIntent } from './aiQueryParser';
 import { executeQueryIntent, ExecutionResult, DistributionItem } from './queryExecutor';
 import { SubscriptionRepository, Subscription } from './database/repositories/SubscriptionRepository';
 import { translateSocialContext, translateLocationType, translateTimeOfDay } from '../constants/i18n';
+import { supabase } from './supabase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -509,7 +510,11 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
 }
 
 // ─── AI Rephraser (Per rendere le risposte più flessibili e umane) ─────────────
-async function rephraseWithAI(draft: string, userMessage: string): Promise<string> {
+async function rephraseWithAI(
+  draft: string, 
+  userMessage: string,
+  onTokensCaptured?: (tokens: { prompt_tokens: number, completion_tokens: number, total_tokens: number }) => void
+): Promise<string> {
   const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
   if (!apiKey) return draft;
 
@@ -546,6 +551,13 @@ Scrivi solo la risposta finale, senza preamboli o commenti.`;
 
     if (response.ok) {
       const data = await response.json();
+      if (data.usage && onTokensCaptured) {
+        onTokensCaptured({
+          prompt_tokens: data.usage.prompt_tokens,
+          completion_tokens: data.usage.completion_tokens,
+          total_tokens: data.usage.total_tokens
+        });
+      }
       const rephrased = data.choices[0].message.content.trim();
       return rephrased || draft;
     }
@@ -563,12 +575,16 @@ Scrivi solo la risposta finale, senza preamboli o commenti.`;
 export async function askAiChat(
   userMessage: string, 
   history: ChatMessage[] = [],
-  preParsedIntent?: QueryIntent
+  preParsedIntent?: QueryIntent,
+  inputMethod: 'voice' | 'text' = 'text'
 ): Promise<AiChatResponse> {
+  const startTime = Date.now();
   console.log('\n' + '='.repeat(60));
   console.log('🤖 [WOLLY AI — NUOVA ARCHITETTURA]');
-  console.log(`📝 INPUT: "${userMessage}"`);
+  console.log(`📝 INPUT: "${userMessage}" (${inputMethod})`);
   console.log('-'.repeat(60));
+
+  let parsedIntent: QueryIntent | undefined;
 
   try {
     let intent: QueryIntent;
@@ -580,6 +596,7 @@ export async function askAiChat(
       // ── FASE 1: AI Parser ───────────────────────────────────────────────────
       intent = await parseQueryIntent(userMessage, history);
     }
+    parsedIntent = intent;
 
     console.log('🔍 [PARSER] DETTAGLI INTENT:');
     console.log(`   • Archetipo: ${intent.archetype}`);
@@ -620,17 +637,107 @@ export async function askAiChat(
 
     console.log(`📝 [ORCHESTRATOR] Draft testuale: "${finalResponse.text_response}"`);
     
-    // Riformulazione AI per rendere la risposta più calda e flessibile
-    finalResponse.text_response = await rephraseWithAI(finalResponse.text_response, userMessage);
+    // Capture tokens of rephrase
+    let rephrasePromptTokens = 0;
+    let rephraseCompletionTokens = 0;
+    let rephraseTotalTokens = 0;
 
+    // Riformulazione AI per rendere la risposta più calda e flessibile
+    finalResponse.text_response = await rephraseWithAI(
+      finalResponse.text_response, 
+      userMessage,
+      (tokens) => {
+        rephrasePromptTokens = tokens.prompt_tokens;
+        rephraseCompletionTokens = tokens.completion_tokens;
+        rephraseTotalTokens = tokens.total_tokens;
+      }
+    );
+
+    const endTimestamp = new Date().toISOString();
     console.log(`📤 RISPOSTA FINALE: "${finalResponse.text_response}"`);
     console.log('='.repeat(60) + '\n');
+
+    const parserPromptTokens = intent._tokens?.prompt_tokens || 0;
+    const parserCompletionTokens = intent._tokens?.completion_tokens || 0;
+    const parserTotalTokens = intent._tokens?.total_tokens || 0;
+
+    const totalPrompt = parserPromptTokens + rephrasePromptTokens;
+    const totalCompletion = parserCompletionTokens + rephraseCompletionTokens;
+    const totalTotal = parserTotalTokens + rephraseTotalTokens;
+
+    // Llama 3.3 pricing on Groq: $0.59 / 1M input, $0.79 / 1M output
+    const computedCost = (totalPrompt * 0.59 + totalCompletion * 0.79) / 1000000;
+
+    // Classificazione is_advice: se archetype è 'text' o se fa domande conversazionali
+    const isAdvice = finalResponse.intent === 'text' || 
+                     intent.archetype === 'text' || 
+                     /consigli|consiglia|suggerisci|risparmiare|aiuto|opinione/i.test(userMessage);
+
+    // Salva nei log
+    try {
+      const { error } = await supabase
+        .from('parsing_logs')
+        .insert({
+          method_used: inputMethod,
+          start_time: new Date(startTime).toISOString(),
+          end_time: endTimestamp,
+          status_code: '200',
+          tokens: {
+            prompt: totalPrompt,
+            completion: totalCompletion,
+            total: totalTotal,
+            query_text: userMessage,
+            archetype: intent.archetype,
+            category_filter: intent.category_filter || null,
+            domain_filter: intent.domain_filter || null,
+            period_label: intent.period_label || null,
+            is_advice: isAdvice
+          },
+          cost_usd: computedCost,
+          app_version: '0.0.1'
+        });
+      if (error) throw error;
+      console.log(`📊 [ANALYTICS] AI Query logged successfully. Cost: $${computedCost.toFixed(6)}, Tokens: ${totalTotal}`);
+    } catch (e: any) {
+      console.warn('❌ [ANALYTICS] Failed to save AI query log:', e.message);
+    }
 
     return finalResponse;
 
   } catch (error: any) {
+    const endTimestamp = new Date().toISOString();
     console.error('[aiChat] Error:', error.message);
     console.log('='.repeat(60) + '\n');
+
+    // Log even on failure
+    try {
+      const { error: dbErr } = await supabase
+        .from('parsing_logs')
+        .insert({
+          method_used: inputMethod,
+          start_time: new Date(startTime).toISOString(),
+          end_time: endTimestamp,
+          status_code: error.name === 'AbortError' ? 'timeout' : '500',
+          tokens: {
+            prompt: 0,
+            completion: 0,
+            total: 0,
+            query_text: userMessage,
+            archetype: parsedIntent?.archetype || 'text',
+            category_filter: null,
+            domain_filter: null,
+            period_label: null,
+            is_advice: true
+          },
+          cost_usd: 0.0,
+          app_version: '0.0.1'
+        });
+      if (dbErr) throw dbErr;
+      console.log('📊 [ANALYTICS] AI error logged successfully');
+    } catch (dbErr: any) {
+      console.warn('❌ [ANALYTICS] Failed to save AI error log:', dbErr.message);
+    }
+
     return {
       intent: 'text',
       text_response: 'Mi dispiace, non sono riuscito a elaborare la tua richiesta. Riprova tra un momento.',

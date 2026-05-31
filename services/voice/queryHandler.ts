@@ -26,7 +26,7 @@ export async function handleQueryVoice(text: string): Promise<void> {
     );
 
     const response = await withTimeout(
-      askAiChat(text, aiChatStore.history),
+      askAiChat(text, aiChatStore.history, undefined, 'voice'),
       QUERY_TIMEOUT_MS,
       'Timeout analisi AI (15s)'
     );

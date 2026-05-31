@@ -133,6 +133,7 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
 
   // Migrations on subscriptions (for future fields)
   try { await db.execAsync(`ALTER TABLE subscriptions ADD COLUMN end_date TEXT;`); } catch (e) {}
+
 }
 
 export async function dropTables(db: SQLite.SQLiteDatabase) {
