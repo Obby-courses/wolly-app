@@ -17,6 +17,8 @@ export interface RemotePopup {
   icon_name?: string;
   button_text?: string;
   button_url?: string;
+  html_content?: string;
+  webview_url?: string;
   trigger_condition: 'always' | 'once';
   is_active: boolean;
 }

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 import { popupStore, RemotePopup } from '../services/popupStore';
 import { COLORS } from '../constants/Theme';
 
@@ -110,6 +111,8 @@ export default function RemotePopupModal() {
     return charCode > 127;
   };
 
+  const isWebView = !!(popup.html_content || popup.webview_url);
+
   return (
     <Modal
       transparent
@@ -118,60 +121,90 @@ export default function RemotePopupModal() {
       onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
-        <Animated.View style={[styles.modalCard, { transform: [{ scale: scaleAnim }] }]}>
-          
-          {/* Sezione Hero con Gradiente */}
-          <LinearGradient
-            colors={gradientColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroSection}
-          >
-            {/* Pulsante "X" in alto a destra */}
-            <TouchableOpacity style={styles.closeButton} onPress={handleClose} activeOpacity={0.7}>
-              <Ionicons name="close" size={22} color="#FFFFFF" />
+        {isWebView ? (
+          /* layout con WEBVIEW (HTML personalizzato da remoto) */
+          <Animated.View style={[styles.webViewCard, { transform: [{ scale: scaleAnim }] }]}>
+            {/* Pulsante "X" fluttuante sopra la WebView */}
+            <TouchableOpacity style={styles.webViewCloseButton} onPress={handleClose} activeOpacity={0.7}>
+              <Ionicons name="close" size={20} color="#FFFFFF" />
             </TouchableOpacity>
 
-            {/* Icona o Emoji centrale */}
-            <View style={styles.iconContainer}>
-              {popup.icon_name && isEmoji(popup.icon_name) ? (
-                <Text style={styles.emojiText}>{popup.icon_name}</Text>
+            <WebView
+              originWhitelist={['*']}
+              source={
+                popup.webview_url
+                  ? { uri: popup.webview_url }
+                  : { html: popup.html_content || '' }
+              }
+              style={{ flex: 1 }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              onMessage={(event) => {
+                // Se la pagina web invia un messaggio 'close' o 'dismiss', chiudiamo
+                const data = event.nativeEvent.data;
+                if (data === 'close' || data === 'dismiss') {
+                  handleClose();
+                }
+              }}
+            />
+          </Animated.View>
+        ) : (
+          /* layout NATIVO PREDEFINITO */
+          <Animated.View style={[styles.modalCard, { transform: [{ scale: scaleAnim }] }]}>
+            
+            {/* Sezione Hero con Gradiente */}
+            <LinearGradient
+              colors={gradientColors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroSection}
+            >
+              {/* Pulsante "X" in alto a destra */}
+              <TouchableOpacity style={styles.closeButton} onPress={handleClose} activeOpacity={0.7}>
+                <Ionicons name="close" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              {/* Icona o Emoji centrale */}
+              <View style={styles.iconContainer}>
+                {popup.icon_name && isEmoji(popup.icon_name) ? (
+                  <Text style={styles.emojiText}>{popup.icon_name}</Text>
+                ) : (
+                  <Ionicons
+                    name={(popup.icon_name || currentType.icon) as any}
+                    size={54}
+                    color="#FFFFFF"
+                  />
+                )}
+              </View>
+            </LinearGradient>
+
+            {/* Sezione dei Contenuti */}
+            <View style={styles.contentSection}>
+              <Text style={styles.titleText}>{popup.title}</Text>
+              <Text style={styles.messageText}>{popup.message}</Text>
+
+              {/* Pulsante d'azione opzionale */}
+              {popup.button_text ? (
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: currentType.buttonBg }]}
+                  onPress={handleAction}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionButtonText}>{popup.button_text}</Text>
+                </TouchableOpacity>
               ) : (
-                <Ionicons
-                  name={(popup.icon_name || currentType.icon) as any}
-                  size={54}
-                  color="#FFFFFF"
-                />
+                <TouchableOpacity
+                  style={styles.dismissTextButton}
+                  onPress={handleClose}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.dismissText}>Chiudi</Text>
+                </TouchableOpacity>
               )}
             </View>
-          </LinearGradient>
 
-          {/* Sezione dei Contenuti */}
-          <View style={styles.contentSection}>
-            <Text style={styles.titleText}>{popup.title}</Text>
-            <Text style={styles.messageText}>{popup.message}</Text>
-
-            {/* Pulsante d'azione opzionale */}
-            {popup.button_text ? (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: currentType.buttonBg }]}
-                onPress={handleAction}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionButtonText}>{popup.button_text}</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.dismissTextButton}
-                onPress={handleClose}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.dismissText}>Chiudi</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-        </Animated.View>
+          </Animated.View>
+        )}
       </View>
     </Modal>
   );
@@ -270,5 +303,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_700Bold',
     fontSize: 15,
     color: '#8E8E93',
+  },
+  webViewCard: {
+    width: Math.min(width - 32, 350),
+    height: 480,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.12,
+    shadowRadius: 32,
+    elevation: 8,
+    position: 'relative',
+  },
+  webViewCloseButton: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(28, 28, 30, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
   },
 });
