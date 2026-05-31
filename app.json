@@ -28,9 +28,10 @@
       "package": "com.wolly.app",
       "googleServicesFile": "./google-services.json",
       "permissions": [
-        "CAMERA",
-        "RECORD_AUDIO",
-        "READ_EXTERNAL_STORAGE"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "plugins": [
@@ -54,6 +55,13 @@
     ],
     "web": {
       "favicon": "./wolly_favicon.png"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2e36d335-ab0b-4618-86d2-18462cc671de"
+      }
+    },
+    "owner": "obbyapp"
   }
 }
