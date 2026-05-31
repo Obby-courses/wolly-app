@@ -4,6 +4,7 @@
  * and track dismissal state locally in AsyncStorage.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 export interface RemotePopup {
@@ -19,6 +20,7 @@ export interface RemotePopup {
   button_url?: string;
   html_content?: string;
   webview_url?: string;
+  target_app_version?: string; // Nuova colonna per filtrare per versione (es. '0.0.1' o '*' per tutte)
   trigger_condition: 'always' | 'once';
   is_active: boolean;
 }
@@ -98,11 +100,20 @@ export const popupStore = {
     // If popups are not loaded or the overlay is already showing a popup, skip
     if (!state.hasLoaded || state.currentVisiblePopup !== null) return;
 
-    // Find a popup matching the current pathname or the wildcard '*'
+    const currentVersion = Constants.expoConfig?.version || '0.0.1';
+
+    // Find a popup matching the current pathname, not seen yet, and matching the app version
     const matchedPopup = state.popups.find((popup) => {
       const routeMatches = popup.page_route === pathname || popup.page_route === '*';
       const notSeenYet = !state.seenPopupIds.includes(popup.id) || popup.trigger_condition === 'always';
-      return routeMatches && notSeenYet;
+      
+      // La versione corrisponde se non è specificata, se è '*' o se corrisponde esattamente alla versione corrente
+      const versionMatches =
+        !popup.target_app_version ||
+        popup.target_app_version === '*' ||
+        popup.target_app_version === currentVersion;
+
+      return routeMatches && notSeenYet && versionMatches;
     });
 
     if (matchedPopup) {
