@@ -11,6 +11,8 @@ import { usePathname } from 'expo-router';
 import { voiceStore } from '../services/voiceStore';
 import { networkStore } from '../services/networkStore';
 import { logScreenView } from '../services/firebase';
+import { popupStore } from '../services/popupStore';
+import RemotePopupModal from '../components/RemotePopupModal';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -29,6 +31,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     networkStore.loadInitialState();
+    popupStore.initialize(); // Inizializza pop-up da locale e Supabase
     const unsub = voiceStore.subscribe(() => {
       setVoiceOpen(voiceStore.getState().isOpen);
     });
@@ -37,10 +40,11 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Track screen navigation automatically in Firebase Analytics
+  // Track screen navigation automatically in Firebase Analytics and check for popups
   useEffect(() => {
     if (pathname) {
       logScreenView(pathname);
+      popupStore.checkRoute(pathname); // Controlla se ci sono popup attivi per questa rotta
     }
   }, [pathname]);
 
@@ -69,6 +73,9 @@ export default function RootLayout() {
           <Stack.Screen name="subscriptions" />
         </Stack>
       </SwipeNavigator>
+
+      {/* Remote Popup Modal Overlay */}
+      <RemotePopupModal />
 
       {/* Voice overlay — always mounted, animates in/out */}
       <VoiceChatOverlay />
