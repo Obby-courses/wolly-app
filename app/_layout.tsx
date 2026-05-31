@@ -50,7 +50,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded || error) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch(() => {
+        // Ignora silenziosamente l'errore se lo splash screen è già stato nascosto
+        // o se non è supportato nel controller corrente (frequente in Expo Go durante i refresh)
+      });
     }
   }, [loaded, error]);
 

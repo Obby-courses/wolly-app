@@ -507,11 +507,12 @@ export default function SubscriptionsScreen() {
           {/* Header Sfumato Blu Premium */}
           <LinearGradient
             colors={['#0A74FF', '#0857C3']}
-            style={[styles.headerGradient, { paddingTop: insets.top + 16, paddingBottom: 20 }]}
+            style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
           >
             <View style={styles.header}>
               <Text style={styles.title}>Periodiche e Programmate</Text>
             </View>
+            <Text style={styles.subtitle}>Gestisci le tue uscite ricorrenti e le spese programmate</Text>
           </LinearGradient>
 
           {/* Overlapping Bottom Sheet */}
@@ -625,7 +626,7 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingHorizontal: 20,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
@@ -642,9 +643,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: TYPOGRAPHY.fontBold,
     color: '#FFFFFF',
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    marginTop: 6,
   },
   netWorthHeaderContainer: {
     marginTop: 20,

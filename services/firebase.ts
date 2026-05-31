@@ -1,8 +1,17 @@
-import analytics from '@react-native-firebase/analytics';
 import Constants from 'expo-constants';
 
 // Determina se l'app sta girando dentro Expo Go (dove le librerie native Firebase non sono disponibili)
 const isExpoGo = Constants.appOwnership === 'expo';
+
+// Inizializza analytics in modo dinamico solo se NON siamo su Expo Go
+let getAnalytics: any = () => null;
+
+if (!isExpoGo) {
+  // L'import dinamico (require) evita il crash in Expo Go perché il modulo nativo
+  // viene richiesto solo nel client standalone.
+  const analyticsModule = require('@react-native-firebase/analytics').default;
+  getAnalytics = () => analyticsModule();
+}
 
 /**
  * Logs a custom event to Firebase Analytics.
@@ -15,8 +24,11 @@ export const logCustomEvent = async (eventName: string, params?: Record<string, 
     return;
   }
   try {
-    await analytics().logEvent(eventName, params);
-    console.log(`[Firebase Analytics] Event logged: ${eventName}`, params || '');
+    const analytics = getAnalytics();
+    if (analytics) {
+      await analytics.logEvent(eventName, params);
+      console.log(`[Firebase Analytics] Event logged: ${eventName}`, params || '');
+    }
   } catch (error) {
     console.error(`[Firebase Analytics] Error logging event ${eventName}:`, error);
   }
@@ -33,11 +45,14 @@ export const logScreenView = async (screenName: string, screenClass?: string) =>
     return;
   }
   try {
-    await analytics().logScreenView({
-      screen_name: screenName,
-      screen_class: screenClass || screenName,
-    });
-    console.log(`[Firebase Analytics] Screen view logged: ${screenName}`);
+    const analytics = getAnalytics();
+    if (analytics) {
+      await analytics.logScreenView({
+        screen_name: screenName,
+        screen_class: screenClass || screenName,
+      });
+      console.log(`[Firebase Analytics] Screen view logged: ${screenName}`);
+    }
   } catch (error) {
     console.error(`[Firebase Analytics] Error logging screen view ${screenName}:`, error);
   }
@@ -53,8 +68,11 @@ export const setUserProperties = async (properties: Record<string, string | null
     return;
   }
   try {
-    await analytics().setUserProperties(properties);
-    console.log('[Firebase Analytics] User properties updated', properties);
+    const analytics = getAnalytics();
+    if (analytics) {
+      await analytics.setUserProperties(properties);
+      console.log('[Firebase Analytics] User properties updated', properties);
+    }
   } catch (error) {
     console.error('[Firebase Analytics] Error setting user properties:', error);
   }
@@ -70,8 +88,11 @@ export const setAnalyticsUserId = async (userId: string | null) => {
     return;
   }
   try {
-    await analytics().setUserId(userId);
-    console.log(`[Firebase Analytics] User ID set to: ${userId}`);
+    const analytics = getAnalytics();
+    if (analytics) {
+      await analytics.setUserId(userId);
+      console.log(`[Firebase Analytics] User ID set to: ${userId}`);
+    }
   } catch (error) {
     console.error('[Firebase Analytics] Error setting user ID:', error);
   }

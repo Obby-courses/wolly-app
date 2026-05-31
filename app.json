@@ -31,6 +31,10 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
@@ -62,6 +66,12 @@
         "projectId": "2e36d335-ab0b-4618-86d2-18462cc671de"
       }
     },
-    "owner": "obbyapp"
+    "owner": "obbyapp",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2e36d335-ab0b-4618-86d2-18462cc671de"
+    }
   }
 }
