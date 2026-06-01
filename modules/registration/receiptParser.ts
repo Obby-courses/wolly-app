@@ -5,13 +5,7 @@ import { ParsedExpense } from './types';
 
 export async function pickImage(): Promise<string | null> {
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
-  if (status !== 'granted') {
-    console.warn('Camera permission not granted');
-  }
-  const libStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (libStatus.status !== 'granted') {
-     console.warn('Library permissions not granted');
-  }
+  if (status !== 'granted') return null;
 
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: 'images',
@@ -25,26 +19,14 @@ export async function pickImage(): Promise<string | null> {
   return null;
 }
 
-export async function pickImageFromLibrary(): Promise<string | null> {
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: 'images',
-    allowsEditing: true,
-    quality: 0.8,
-  });
-
-  if (!result.canceled && result.assets && result.assets.length > 0) {
-    return result.assets[0].uri;
-  }
-  return null;
-}
-
 export async function parseFromReceipt(
-  useCamera: boolean = true,
-  locationContext?: { city: string | null; address: string | null }
+  locationContext?: { city: string | null; address: string | null },
+  onImagePicked?: () => void
 ): Promise<ParsedExpense | null> {
-  const imageUri = useCamera ? await pickImage() : await pickImageFromLibrary();
+  const imageUri = await pickImage();
   
   if (!imageUri) return null;
+  if (onImagePicked) onImagePicked();
 
   const text = await extractTextFromImage(imageUri);
   if (!text) {

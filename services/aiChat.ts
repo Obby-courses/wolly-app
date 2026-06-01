@@ -1,5 +1,5 @@
 import { parseQueryIntent, QueryIntent } from './aiQueryParser';
-import { executeQueryIntent, ExecutionResult, DistributionItem } from './queryExecutor';
+import { executeQueryIntent, ExecutionResult, DistributionItem, periodToDateRange } from './queryExecutor';
 import { SubscriptionRepository, Subscription } from './database/repositories/SubscriptionRepository';
 import { translateSocialContext, translateLocationType, translateTimeOfDay } from '../constants/i18n';
 import { supabase } from './supabase';
@@ -705,11 +705,30 @@ export async function askAiChat(
       console.log(`📊 [ANALYTICS] AI Query logged successfully. Cost: $${computedCost.toFixed(6)}, Tokens: ${totalTotal}`);
 
       const durationMs = Date.now() - startTime;
+      const resolvedPeriod = periodToDateRange(intent.period);
+
+      const filtersList: string[] = [];
+      if (intent.category_filter) filtersList.push('category');
+      if (intent.domain_filter) filtersList.push('domain');
+      if (intent.merchant_filter) filtersList.push('merchant');
+      if (intent.city_filter) filtersList.push('city');
+      if (intent.social_context_filter) filtersList.push('social_context');
+      if (intent.person_filter) filtersList.push('person');
+      if (intent.holiday_filter) filtersList.push('holiday');
+      if (intent.tag_filter) filtersList.push('tag');
+      if (intent.is_recurring_filter) filtersList.push('recurring');
+      if (intent.is_scheduled_filter) filtersList.push('scheduled');
+      const activeFiltersStr = filtersList.length > 0 ? filtersList.join(',') : null;
+      
+      let chartTypeValue = finalResponse.chart ? finalResponse.chart.type : null;
+      if (!chartTypeValue && (finalResponse.total_data || intent.archetype === 'total')) {
+          chartTypeValue = 'big_number';
+      }
+
       const { error: analysisError } = await supabase.from('analysis_logs').insert({
         id: uuid.v4().toString(),
         created_at: endTimestamp,
-        query_text: userMessage,
-        input_method: inputMethod,
+        method_used: inputMethod,
         duration_ms: durationMs,
         prompt_tokens: totalPrompt,
         completion_tokens: totalCompletion,
@@ -718,7 +737,13 @@ export async function askAiChat(
         category_filter: intent.category_filter || null,
         domain_filter: intent.domain_filter || null,
         period_label: intent.period_label || null,
-        is_advice: isAdvice ? 1 : 0,
+        period_start: resolvedPeriod.from,
+        period_end: resolvedPeriod.to,
+        is_advice: isAdvice,
+        chart_type: chartTypeValue,
+        status_code: '200',
+        active_filters: activeFiltersStr,
+        app_version: '0.0.1',
         cost_usd: computedCost,
         device_id: currentDeviceId
       });
@@ -763,11 +788,25 @@ export async function askAiChat(
       console.log('📊 [ANALYTICS] AI error logged successfully');
 
       const durationMs = Date.now() - startTime;
+      const resolvedPeriod = parsedIntent ? periodToDateRange(parsedIntent.period) : null;
+
+      const filtersList: string[] = [];
+      if (parsedIntent?.category_filter) filtersList.push('category');
+      if (parsedIntent?.domain_filter) filtersList.push('domain');
+      if (parsedIntent?.merchant_filter) filtersList.push('merchant');
+      if (parsedIntent?.city_filter) filtersList.push('city');
+      if (parsedIntent?.social_context_filter) filtersList.push('social_context');
+      if (parsedIntent?.person_filter) filtersList.push('person');
+      if (parsedIntent?.holiday_filter) filtersList.push('holiday');
+      if (parsedIntent?.tag_filter) filtersList.push('tag');
+      if (parsedIntent?.is_recurring_filter) filtersList.push('recurring');
+      if (parsedIntent?.is_scheduled_filter) filtersList.push('scheduled');
+      const activeFiltersStr = filtersList.length > 0 ? filtersList.join(',') : null;
+
       const { error: analysisError } = await supabase.from('analysis_logs').insert({
         id: uuid.v4().toString(),
         created_at: endTimestamp,
-        query_text: userMessage,
-        input_method: inputMethod,
+        method_used: inputMethod,
         duration_ms: durationMs,
         prompt_tokens: 0,
         completion_tokens: 0,
@@ -776,7 +815,13 @@ export async function askAiChat(
         category_filter: null,
         domain_filter: null,
         period_label: null,
-        is_advice: 1,
+        period_start: resolvedPeriod ? resolvedPeriod.from : null,
+        period_end: resolvedPeriod ? resolvedPeriod.to : null,
+        is_advice: true,
+        chart_type: null,
+        status_code: error.name === 'AbortError' ? 'timeout' : '500',
+        active_filters: activeFiltersStr,
+        app_version: '0.0.1',
         cost_usd: 0.0,
         device_id: currentDeviceId
       });

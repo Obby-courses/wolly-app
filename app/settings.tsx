@@ -150,6 +150,23 @@ export default function SettingsScreen() {
                   />
                 </View>
 
+                {/* Unauthorized Mode (Test Permessi) */}
+                <View style={styles.item}>
+                  <View style={[styles.iconContainer, { backgroundColor: '#FEF08A' }]}>
+                    <Ionicons name="lock-closed" size={20} color="#CA8A04" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.itemTitleText}>Unauthorized Mode</Text>
+                    <Text style={styles.itemSubtitleText}>Forza il rifiuto dei permessi (Microfono e Fotocamera)</Text>
+                  </View>
+                  <Switch
+                    value={networkState.isUnauthorizedMode}
+                    onValueChange={(val) => networkStore.setUnauthorizedMode(val)}
+                    trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
+                    thumbColor={'#FFF'}
+                  />
+                </View>
+
                 {/* Elimina tutte le transazioni */}
                 <Pressable style={[styles.item, styles.dangerItem]} onPress={handleDeleteAll}>
                   <View style={[styles.iconContainer, { backgroundColor: '#FCE8E6' }]}>

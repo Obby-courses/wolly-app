@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, View, Pressable, Platform, Text,
   Animated, PanResponder, Alert, Keyboard,
+  Modal, ActivityIndicator,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,8 @@ import { networkStore } from '../services/networkStore';
 import { analytics } from '../services/analytics';
 import { aiChatStore } from '../services/aiChat';
 import Svg, { Circle } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
+import PermissionModal, { PermissionType } from './PermissionModal';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -37,6 +40,8 @@ export default function BottomMenu() {
   const [voiceState, setVoiceState] = useState(voiceStore.getState());
   const [isOffline, setIsOffline] = useState(networkStore.getState().isOffline);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [permissionType, setPermissionType] = useState<PermissionType>(null);
 
   useEffect(() => {
     const unsubVoice = voiceStore.subscribe(() => setVoiceState(voiceStore.getState()));
@@ -86,8 +91,7 @@ export default function BottomMenu() {
 
   const handleCamera = async () => {
     try {
-      setIsProcessing(true);
-      const parsed = await parseFromReceipt(true, undefined);
+      const parsed = await parseFromReceipt(undefined, () => setIsProcessing(true));
       if (parsed === null) return;
 
       if (parsed && parsed.amount > 0) {
@@ -131,6 +135,7 @@ export default function BottomMenu() {
   const lastTapTimeRef = useRef(0);
   const isDoubleTapRef = useRef(false);
   const hasStartedRecordingRef = useRef(false);
+  const hasFailedPermissionRef = useRef(false);
   const isReleasingRef = useRef(false);
   
   const progressAnim = useRef(new Animated.Value(1)).current;
@@ -181,20 +186,41 @@ export default function BottomMenu() {
       onPanResponderGrant: () => {
         isReleasingRef.current = false;
         hasStartedRecordingRef.current = false;
+        hasFailedPermissionRef.current = false;
         
         const now = Date.now();
         if (now - lastTapTimeRef.current < 300) {
            if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
            isDoubleTapRef.current = true;
            analytics.trackClick('btn_camera_scontrino_open', pathname);
-           handleCamera();
+           
+           (async () => {
+             const devState = networkStore.getState();
+             const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+             if (devState.isUnauthorizedMode || camPerm.status !== 'granted') {
+               setPermissionType('camera');
+               setPermissionModalVisible(true);
+               return;
+             }
+             handleCamera();
+           })();
            return;
         }
         isDoubleTapRef.current = false;
         lastTapTimeRef.current = now;
 
-        holdTimeoutRef.current = setTimeout(() => {
+        holdTimeoutRef.current = setTimeout(async () => {
           if (isDoubleTapRef.current) return;
+          
+          const devState = networkStore.getState();
+          const audioPerm = await Audio.requestPermissionsAsync();
+          if (devState.isUnauthorizedMode || audioPerm.status !== 'granted') {
+            hasFailedPermissionRef.current = true;
+            setPermissionType('microphone');
+            setPermissionModalVisible(true);
+            return;
+          }
+
           hasStartedRecordingRef.current = true;
           voiceStore.startRecording(pathname);
           analytics.trackClick('btn_voice_rec_start', pathname);
@@ -227,6 +253,8 @@ export default function BottomMenu() {
         if (isDoubleTapRef.current) return;
 
         if (!hasStartedRecordingRef.current) {
+           if (hasFailedPermissionRef.current) return;
+
            tapTimeoutRef.current = setTimeout(() => {
               analytics.trackClick('btn_ai_chat_open', pathname);
               if (pathname !== '/ai-chat') {
@@ -385,6 +413,24 @@ export default function BottomMenu() {
             <Text style={styles.toastText}>{toastMsg}</Text>
           </View>
         )}
+
+        <Modal transparent visible={isProcessing} animationType="fade">
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="large" color={COLORS.brandBlue} />
+              <Text style={styles.loadingText}>Analisi scontrino in corso...</Text>
+            </View>
+          </View>
+        </Modal>
+
+        <PermissionModal
+          visible={permissionModalVisible}
+          type={permissionType}
+          onClose={() => {
+            setPermissionModalVisible(false);
+            setPermissionType(null);
+          }}
+        />
       </View>
     </View>
   );
@@ -406,6 +452,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...SHADOWS.medium,
     minHeight: 80,
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    borderRadius: 20,
+    alignItems: 'center',
+    gap: 16,
+    ...SHADOWS.medium,
+  },
+  loadingText: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    fontSize: 16,
+    color: '#0F172A',
   },
   cancelAbsoluteContainer: {
     position: 'absolute',

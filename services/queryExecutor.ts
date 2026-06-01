@@ -59,7 +59,7 @@ export interface ExecutionResult {
 
 // ─── Period → DateRange ───────────────────────────────────────────────────────
 
-function periodToDateRange(period: QueryPeriod): { from: string; to: string } {
+export function periodToDateRange(period: QueryPeriod): { from: string; to: string } {
   const now = new Date();
   const today = now.toISOString().split('T')[0];
 
@@ -94,24 +94,24 @@ function periodToDateRange(period: QueryPeriod): { from: string; to: string } {
 
 function buildPeriodLabel(period: QueryPeriod): string {
   const now = new Date();
-  const MONTH_NAMES = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
 
-  if (period.type === 'week') return 'Questa settimana';
+  if (period.type === 'week') return 'This week';
   if (period.type === 'month') {
     const m = period.month ?? (now.getMonth() + 1);
     const y = period.year ?? now.getFullYear();
     const isCurrentMonth = m === (now.getMonth() + 1) && y === now.getFullYear();
-    return isCurrentMonth ? 'Questo mese' : `${MONTH_NAMES[m - 1]} ${y}`;
+    return isCurrentMonth ? 'This month' : `${MONTH_NAMES[m - 1]} ${y}`;
   }
   if (period.type === 'year') {
     const y = period.year ?? now.getFullYear();
-    return y === now.getFullYear() ? 'Quest\'anno' : `Anno ${y}`;
+    return y === now.getFullYear() ? 'This year' : `Year ${y}`;
   }
   if (period.type === 'custom' && period.from && period.to) {
-    return `Dal ${period.from} al ${period.to}`;
+    return `From ${period.from} to ${period.to}`;
   }
-  return 'Tutta la storia';
+  return 'All time';
 }
 
 /**
@@ -263,7 +263,7 @@ export async function executeQueryIntent(intent: QueryIntent): Promise<Execution
         const y = (intent.period.year ?? now.getFullYear()) - 1;
         prevFrom = `${y}-01-01`;
         prevTo = `${y}-12-31`;
-        prevLabel = `Anno ${y}`;
+        prevLabel = `Year ${y}`;
       }
 
       const compResult = await getComparison(

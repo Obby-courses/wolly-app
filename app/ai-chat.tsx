@@ -172,7 +172,7 @@ export default function AiChatPage() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.headerTop}>
         <Pressable
           onPress={() => {
@@ -294,13 +294,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   inputBoxRound: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F9FAFB',
     borderRadius: 24,
     paddingHorizontal: 20,
     paddingVertical: 12,
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.08)',
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
   },
   bottomInput: {
     flex: 1,

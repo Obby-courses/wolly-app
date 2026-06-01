@@ -30,11 +30,9 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
@@ -49,7 +47,6 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app accesses your photos to let you share them with your friends.",
           "cameraPermission": "Allow Wolly to access your camera."
         }
       ],

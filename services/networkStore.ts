@@ -6,11 +6,13 @@ type Listener = () => void;
 interface NetworkState {
   isNetworkReachable: boolean;
   isDemoOffline: boolean;
+  isUnauthorizedMode: boolean;
 }
 
 let state: NetworkState = {
   isNetworkReachable: true,
   isDemoOffline: false,
+  isUnauthorizedMode: false,
 };
 
 const listeners = new Set<Listener>();
@@ -48,12 +50,28 @@ export const networkStore = {
     }
   },
 
+  setUnauthorizedMode: async (isUnauthorized: boolean) => {
+    state = { ...state, isUnauthorizedMode: isUnauthorized };
+    notify();
+    try {
+      await AsyncStorage.setItem('@unauthorized_mode', isUnauthorized ? 'true' : 'false');
+    } catch (e) {
+      console.error('Failed to save unauthorized mode setting', e);
+    }
+  },
+
   loadInitialState: async () => {
     try {
       const demoStr = await AsyncStorage.getItem('@demo_offline');
       if (demoStr === 'true') {
         state = { ...state, isDemoOffline: true };
       }
+      
+      const unauthorizedStr = await AsyncStorage.getItem('@unauthorized_mode');
+      if (unauthorizedStr === 'true') {
+        state = { ...state, isUnauthorizedMode: true };
+      }
+
       const netState = await Network.getNetworkStateAsync();
       state = { ...state, isNetworkReachable: netState.isInternetReachable ?? true };
       notify();

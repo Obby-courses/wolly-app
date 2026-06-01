@@ -57,6 +57,7 @@ function buildParserPrompt(currentDateISO: string, cities: string[], socialConte
 Oggi è ${currentDateISO}.
 
 TASSONOMIA DISPONIBILE:
+- DOMINI (domain_filter): ${domainList}
 - CATEGORIE (category_filter): ${categoryList}
 - CITTÀ CONOSCIUTE (city_filter): ${cityList}
 - CONTESTI SOCIALI (social_context_filter): ${socialList} (Usa rigorosamente uno di questi valori in inglese se menzionato: friends, family, colleagues, couple, strangers, alone)
@@ -101,7 +102,7 @@ FORMATO JSON OBBLIGATORIO:
   "category_filter": string|null,
   "domain_filter": string|null,
   "merchant_filter": string|null,
-  "period_label": "stringa leggibile (es: 'Aprile 2026' o 'Ieri' o 'Ultimi 12 mesi')",
+  "period_label": "English readable string (e.g. 'April 2026', 'Yesterday', 'Last 12 months')",
   "city_filter": string|null,
   "group_by": "category"|"city"|null,
   "social_context_filter": string|null,
@@ -119,9 +120,9 @@ REGOLE CRITICHE PER DATE E PERIODI:
 - Se l'utente si riferisce a un intervallo personalizzato o relativo (es: "ieri", "l'altro ieri", "ultimi 5 giorni", "ultimi 12 mesi", "ultimo anno"):
   * Imposta "type": "custom".
   * Calcola rigorosamente le date "from" e "to" basandoti su oggi (${currentDateISO}).
-  * Esempio "ieri" (se oggi è 2026-05-17) → "from": "2026-05-16", "to": "2026-05-16", "period_label": "Ieri".
-  * Esempio "l'altro ieri" (se oggi è 2026-05-17) → "from": "2026-05-15", "to": "2026-05-15", "period_label": "L'altro ieri".
-  * Esempio "nell'ultimo anno" o "negli ultimi 12 mesi" (se oggi è 2026-05-17) → "from": "2025-05-17", "to": "2026-05-17", "period_label": "Ultimi 12 mesi".
+  * Esempio "ieri" (se oggi è 2026-05-17) → "from": "2026-05-16", "to": "2026-05-16", "period_label": "Yesterday".
+  * Esempio "l'altro ieri" (se oggi è 2026-05-17) → "from": "2026-05-15", "to": "2026-05-15", "period_label": "Day before yesterday".
+  * Esempio "nell'ultimo anno" o "negli ultimi 12 mesi" (se oggi è 2026-05-17) → "from": "2025-05-17", "to": "2026-05-17", "period_label": "Last 12 months".
   * NOTA: "nell'ultimo anno" NON significa anno solare concluso 2025! Significa ultimi 365 giorni (type: "custom", from: 1 anno fa, to: oggi).
 - Se l'utente specifica un anno o mese preciso (es: "nel 2025", "a marzo 2025"):
   * Imposta "type": "year" o "month" con "year" e "month" numerici appropriati, e "from"/"to" a null.
@@ -237,7 +238,7 @@ export async function parseQueryIntent(
       direction: 'out',
       aggregation_type: 'total',
       period: { type: 'month', year: now.getFullYear(), month: now.getMonth() + 1 },
-      period_label: 'Questo mese',
+      period_label: 'This month',
     };
   }
 }
