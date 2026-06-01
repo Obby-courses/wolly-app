@@ -4,6 +4,7 @@ import { parseFromManual } from '../modules/registration/manualParser';
 import { DOMAINS_CONFIG, ALL_CATEGORIES, getDomainForCategory } from '../constants/categories';
 import { COMUNI_ITALIANI } from '../constants/comuni';
 import { supabase } from '../services/supabase';
+import { analytics } from '../services/analytics';
 
 export interface SubscriptionSuggestion {
   suggest_subscription: boolean;
@@ -22,6 +23,8 @@ export async function parseExpenseWithAI(
 ): Promise<ParsedExpenseWithSuggestion> {
   const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
   if (!apiKey) throw new Error('Missing Groq API Key (EXPO_PUBLIC_GROQ_FINANCE_API)');
+
+  const currentDeviceId = await analytics.getDeviceId();
 
   const now = new Date();
   const currentTimestamp = now.toISOString();
@@ -307,7 +310,8 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
             status_code: statusCode,
             tokens: tokenUsage,
             cost_usd: computedCost,
-            app_version: '0.0.1'
+            app_version: '0.0.1',
+            device_id: currentDeviceId
           }).select('id').single();
           
           if (logError) {
@@ -362,7 +366,8 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
         status_code: error.name === 'AbortError' ? 'timeout' : '500',
         tokens: null,
         cost_usd: 0,
-        app_version: '0.0.1'
+        app_version: '0.0.1',
+        device_id: currentDeviceId
       }).select('id').single();
       
       if (logError) {

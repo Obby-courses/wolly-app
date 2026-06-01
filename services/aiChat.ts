@@ -3,6 +3,8 @@ import { executeQueryIntent, ExecutionResult, DistributionItem } from './queryEx
 import { SubscriptionRepository, Subscription } from './database/repositories/SubscriptionRepository';
 import { translateSocialContext, translateLocationType, translateTimeOfDay } from '../constants/i18n';
 import { supabase } from './supabase';
+import { analytics } from './analytics';
+import uuid from 'react-native-uuid';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -579,6 +581,8 @@ export async function askAiChat(
   inputMethod: 'voice' | 'text' = 'text'
 ): Promise<AiChatResponse> {
   const startTime = Date.now();
+  const currentDeviceId = await analytics.getDeviceId();
+  
   console.log('\n' + '='.repeat(60));
   console.log('🤖 [WOLLY AI — NUOVA ARCHITETTURA]');
   console.log(`📝 INPUT: "${userMessage}" (${inputMethod})`);
@@ -694,10 +698,32 @@ export async function askAiChat(
             is_advice: isAdvice
           },
           cost_usd: computedCost,
-          app_version: '0.0.1'
+          app_version: '0.0.1',
+          device_id: currentDeviceId
         });
       if (error) throw error;
       console.log(`📊 [ANALYTICS] AI Query logged successfully. Cost: $${computedCost.toFixed(6)}, Tokens: ${totalTotal}`);
+
+      const durationMs = Date.now() - startTime;
+      const { error: analysisError } = await supabase.from('analysis_logs').insert({
+        id: uuid.v4().toString(),
+        created_at: endTimestamp,
+        query_text: userMessage,
+        input_method: inputMethod,
+        duration_ms: durationMs,
+        prompt_tokens: totalPrompt,
+        completion_tokens: totalCompletion,
+        total_tokens: totalTotal,
+        archetype: intent.archetype,
+        category_filter: intent.category_filter || null,
+        domain_filter: intent.domain_filter || null,
+        period_label: intent.period_label || null,
+        is_advice: isAdvice ? 1 : 0,
+        cost_usd: computedCost,
+        device_id: currentDeviceId
+      });
+      if (analysisError) console.warn('❌ [ANALYTICS] Failed to save analysis_logs:', analysisError.message);
+
     } catch (e: any) {
       console.warn('❌ [ANALYTICS] Failed to save AI query log:', e.message);
     }
@@ -730,10 +756,32 @@ export async function askAiChat(
             is_advice: true
           },
           cost_usd: 0.0,
-          app_version: '0.0.1'
+          app_version: '0.0.1',
+          device_id: currentDeviceId
         });
       if (dbErr) throw dbErr;
       console.log('📊 [ANALYTICS] AI error logged successfully');
+
+      const durationMs = Date.now() - startTime;
+      const { error: analysisError } = await supabase.from('analysis_logs').insert({
+        id: uuid.v4().toString(),
+        created_at: endTimestamp,
+        query_text: userMessage,
+        input_method: inputMethod,
+        duration_ms: durationMs,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+        archetype: parsedIntent?.archetype || 'text',
+        category_filter: null,
+        domain_filter: null,
+        period_label: null,
+        is_advice: 1,
+        cost_usd: 0.0,
+        device_id: currentDeviceId
+      });
+      if (analysisError) console.warn('❌ [ANALYTICS] Failed to save error in analysis_logs:', analysisError.message);
+
     } catch (dbErr: any) {
       console.warn('❌ [ANALYTICS] Failed to save AI error log:', dbErr.message);
     }

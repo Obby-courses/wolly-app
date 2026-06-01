@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import uuid from 'react-native-uuid';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 /**
@@ -56,6 +58,36 @@ export const ANALYTICS_BUTTONS = {
 class WollyAnalytics {
   private isDevelopment = __DEV__;
   private appVersion = Constants.expoConfig?.version || '0.2.0';
+  private deviceId: string | null = null;
+
+  constructor() {
+    this.initDeviceId();
+  }
+
+  private async initDeviceId() {
+    try {
+      const stored = await AsyncStorage.getItem('@wolly_device_id');
+      if (stored) {
+        this.deviceId = stored;
+      } else {
+        const newId = `usr_${uuid.v4()}`;
+        await AsyncStorage.setItem('@wolly_device_id', newId);
+        this.deviceId = newId;
+      }
+    } catch (e) {
+      console.warn('[Analytics] Failed to initialize device ID', e);
+    }
+  }
+
+  /**
+   * Restituisce il Device ID univoco e anonimo
+   */
+  public async getDeviceId(): Promise<string | null> {
+    if (!this.deviceId) {
+      await this.initDeviceId();
+    }
+    return this.deviceId;
+  }
 
   /**
    * Traccia la visualizzazione di una schermata (Screen View)
@@ -126,4 +158,5 @@ class WollyAnalytics {
 }
 
 export const analytics = new WollyAnalytics();
+
 
