@@ -10,6 +10,7 @@ import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
 import { CATEGORIES_CONFIG } from '../../constants/categories';
 import TimeFilter, { TimeRange } from '../../components/TimeFilter';
 import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../../services/analytics';
+import TransactionPreview from '../../components/TransactionPreview';
 
 const { width } = Dimensions.get('window');
 
@@ -39,7 +40,7 @@ const CompactDistributionCard = ({ title, data, selectedKeys, onToggleKey, onRes
   const hasData = data.length > 0 && total > 0;
 
   return (
-    <View style={[styles.card, { padding: 16, marginBottom: 0 }]}>
+    <View style={[styles.card, { paddingVertical: 16, paddingHorizontal: 0, marginBottom: 0 }]}>
       <View style={[styles.cardHeader, { marginBottom: 12 }]}>
         <Text style={[styles.cardTitle, { fontSize: 16 }]}>{title}</Text>
         {selectedKeys.length > 0 && (
@@ -392,7 +393,7 @@ export default function ExpensesScreen() {
               </View>
 
               {/* Trend Chart */}
-              <View style={[styles.card, { padding: 10, marginBottom: 10 }]}>
+              <View style={[styles.card, { paddingVertical: 10, paddingHorizontal: 0, marginBottom: 10 }]}>
                 <View style={[styles.cardHeader, { marginBottom: 6 }]}>
                   <Text style={[styles.cardTitle, { fontSize: 16 }]}>Andamento Temporale</Text>
                   <Ionicons name="trending-down-outline" size={18} color={COLORS.danger} />
@@ -422,7 +423,7 @@ export default function ExpensesScreen() {
               </View>
 
               {/* Transaction List */}
-              <View style={[styles.card, { padding: 16, marginBottom: 0 }]}>
+              <View style={[styles.card, { paddingVertical: 16, paddingHorizontal: 0, marginBottom: 0 }]}>
                 <View style={[styles.cardHeader, { marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                   <Text style={[styles.cardTitle, { fontSize: 16 }]}>Tutti i Movimenti</Text>
                   <Ionicons name="list-outline" size={20} color={COLORS.secondary} />
@@ -431,27 +432,12 @@ export default function ExpensesScreen() {
                 {transactions.length === 0 ? (
                   <Text style={[styles.emptyText, { fontSize: 13, marginTop: 6 }]}>Nessuna transazione trovata</Text>
                 ) : (
-                  transactions.map((tx, idx) => (
-                    <Pressable 
-                      key={tx.id} 
-                      style={({ pressed }) => [
-                        styles.txItemCompact, 
-                        idx === transactions.length - 1 && { borderBottomWidth: 0 },
-                        pressed && { backgroundColor: '#F3F4F6' }
-                      ]}
+                  transactions.map((tx) => (
+                    <TransactionPreview
+                      key={tx.id}
+                      item={tx}
                       onPress={() => router.push({ pathname: "/transaction/[id]", params: { id: tx.id } })}
-                    >
-                      <View style={styles.txInfo}>
-                        <Text style={[styles.txDesc, { fontSize: 15 }]} numberOfLines={1}>{tx.description || 'Senza descrizione'}</Text>
-                        <Text style={[styles.txMeta, { fontSize: 11, marginTop: 2 }]}>{tx.date} • {tx.subcategory_key.replace('_', ' ')}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[styles.txAmount, { fontSize: 15 }, tx.direction === 'in' ? styles.txIn : styles.txOut]}>
-                          {tx.direction === 'in' ? '+' : '-'} € {tx.amount.toFixed(0)}
-                        </Text>
-                        <Ionicons name="chevron-forward" size={16} color={COLORS.border} style={{ marginLeft: 6 }} />
-                      </View>
-                    </Pressable>
+                    />
                   ))
                 )}
               </View>
@@ -466,7 +452,7 @@ export default function ExpensesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
   },
   headerGradient: {
     paddingHorizontal: 20,
@@ -490,7 +476,7 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     marginTop: -20,
@@ -510,12 +496,10 @@ const styles = StyleSheet.create({
     ...SHADOWS.soft,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    ...SHADOWS.soft,
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    marginBottom: 16,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -635,16 +619,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   totalPeriodCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: 'transparent',
+    paddingVertical: 16,
+    paddingHorizontal: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
     marginBottom: 10,
-    ...SHADOWS.soft,
   },
   totalPeriodLabel: {
     fontSize: 14,

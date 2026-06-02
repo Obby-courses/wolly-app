@@ -14,6 +14,7 @@ import { getDomainForCategory, getCategory } from '../constants/categories';
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
+import TransactionPreview from '../components/TransactionPreview';
 
 const FREQUENCIES: { key: Frequency; label: string }[] = [
   { key: 'monthly',       label: 'Mensile' },
@@ -416,85 +417,32 @@ export default function SubscriptionsScreen() {
   } : undefined;
 
   const renderCard = (sub: Subscription) => {
-    const color = getCategoryColor(sub.category_key);
-    const freqLabel = FREQUENCIES.find(f => f.key === sub.frequency)?.label || sub.frequency;
+    const nextDateStr = nextOccurrenceLabel(sub);
     const isActive = sub.is_active !== false;
-    const isIncome = sub.direction === 'in';
-    const accentColor = isIncome ? '#059669' : color;
 
     return (
-      <Pressable 
-        key={sub.id} 
-        style={[styles.card, !isActive && { opacity: 0.55 }]}
+      <TransactionPreview
+        key={sub.id}
+        item={{
+          ...sub,
+          isSubscription: true,
+          displayDate: isActive ? `Prossimo: ${nextDateStr}` : 'Inattivo',
+        }}
         onPress={() => openEdit(sub)}
-      >
-        <View style={[styles.cardAccent, { backgroundColor: isActive ? accentColor : '#9CA3AF' }]} />
-        <View style={styles.cardBody}>
-          <View style={styles.cardTop}>
-            <Text style={[styles.cardName, !isActive && { color: COLORS.secondary }]}>{sub.name}</Text>
-            {isIncome && isActive && (
-              <View style={[styles.autoPill, { backgroundColor: '#D1FAE5', marginLeft: 8 }]}>
-                <Text style={[styles.autoPillText, { color: '#065F46' }]}>Entrata</Text>
-              </View>
-            )}
-            {!isActive && (
-              <View style={[styles.autoPill, { backgroundColor: '#E5E7EB', marginLeft: 8 }]}>
-                <Text style={[styles.autoPillText, { color: COLORS.secondary }]}>Inattivo</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.cardMeta}>
-            <Text style={[styles.cardAmount, !isActive && { color: COLORS.secondary }, isIncome && isActive && { color: '#059669' }]}>
-              {isIncome ? '+' : ''}€{sub.amount.toFixed(2)}
-            </Text>
-            <Text style={styles.cardSep}>·</Text>
-            <Text style={styles.cardFrequency}>{freqLabel}</Text>
-          </View>
-          {isActive && (
-            <Text style={styles.cardNextOccurrence}>Prossimo: {nextOccurrenceLabel(sub)}</Text>
-          )}
-        </View>
-      </Pressable>
+      />
     );
   };
 
   const renderScheduledCard = (tx: any) => {
-    const color = getCategoryColor(tx.category_key);
-    const category = getCategory(tx.category_key);
-
     return (
-      <Pressable 
-        key={tx.id} 
-        style={({ pressed }) => [
-          styles.card, 
-          pressed && { opacity: 0.7 }
-        ]}
+      <TransactionPreview
+        key={tx.id}
+        item={{
+          ...tx,
+          displayDate: `${tx.date} · ${daysRemainingLabel(tx.date)}`,
+        }}
         onPress={() => router.push({ pathname: "/transaction/[id]", params: { id: tx.id } })}
-      >
-        <View style={[styles.cardAccent, { backgroundColor: color }]} />
-        <View style={styles.cardBody}>
-          <View style={styles.cardTop}>
-            <Text style={styles.cardName} numberOfLines={1}>{tx.description || 'Spesa programmata'}</Text>
-            <View style={[styles.autoPill, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD', borderWidth: 1 }]}>
-              <Text style={[styles.autoPillText, { color: '#0A74FF' }]}>Programmata</Text>
-            </View>
-          </View>
-          <View style={styles.cardMeta}>
-            <Text style={styles.cardAmount}>€{tx.amount.toFixed(2)}</Text>
-            <Text style={styles.cardSep}>·</Text>
-            <Text style={styles.cardFrequency}>{category ? category.label : tx.subcategory_key.replace('_', ' ')}</Text>
-          </View>
-          <View style={styles.scheduledTimeRow}>
-            <Ionicons name="time-outline" size={13} color={COLORS.secondary} style={{ marginRight: 4 }} />
-            <Text style={styles.cardNextOccurrence}>
-              {tx.date} · {daysRemainingLabel(tx.date)}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.chevronContainer}>
-          <Ionicons name="chevron-forward" size={18} color={COLORS.border} />
-        </View>
-      </Pressable>
+      />
     );
   };
 
@@ -617,7 +565,7 @@ export default function SubscriptionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
   },
   center: {
     flex: 1,
@@ -684,7 +632,7 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     marginTop: -20,

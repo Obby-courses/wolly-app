@@ -11,7 +11,7 @@ export const COLORS = {
   success: '#34C759',
   warning: '#FF9500',
   danger: '#FF3B30',
-  background: '#F2F2F7', // Premium warm off-white
+  background: '#FFFFFF', // Pure white primary background
   surface: '#FFFFFF',
   border: '#E5E5EA',
 

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, Pressable, Alert,
-  TextInput, Platform, ActivityIndicator, Switch, LayoutAnimation, Keyboard
+  TextInput, Platform, ActivityIndicator, Switch, LayoutAnimation, Keyboard, KeyboardAvoidingView,
+  PanResponder, Animated, Dimensions
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +18,31 @@ import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../services/analytics';
 import { COMUNI_ITALIANI, ComuneItem } from '../constants/comuni';
 import CategoryPickerModal from '../components/CategoryPickerModal';
-import CategoryPill from '../components/CategoryPill';
+import CategoryPill, { getCategoryColor } from '../components/CategoryPill';
+import { LinearGradient } from 'expo-linear-gradient';
+const sanitizeLocationField = (val: string | null | undefined): string => {
+  if (!val) return '';
+  const blacklist = [
+    'italia', 'italy', 'abruzzo', 'basilicata', 'calabria', 'campania', 
+    'emilia-romagna', 'emilia romagna', 'friuli-venezia giulia', 'friuli venezia giulia', 'lazio', 
+    'liguria', 'lombardia', 'marche', 'molise', 'piemonte', 'puglia', 
+    'sardegna', 'sicilia', 'toscana', 'trentino-alto adige', 'trentino alto adige', 'trentino', 'alto adige', 'umbria', 
+    'valle d\'aosta', 'valle daosta', 'veneto'
+  ];
+  return val
+    .split(/[,;]/)
+    .map(part => part.trim())
+    .filter(part => {
+      const lower = part.toLowerCase();
+      return !blacklist.some(blacklisted => lower === blacklisted || lower.includes(blacklisted));
+    })
+    .join(', ');
+};
+
+const capitalizeProperNoun = (val: string | null | undefined): string => {
+  if (!val) return '';
+  return val.trim().replace(/\b\w/g, c => c.toUpperCase());
+};
 
 const DEFAULT_EXPENSE = {
   amount: 0,
@@ -75,9 +100,31 @@ export default function ExpenseDetail() {
 
   // Accordion active state
   const [activeField, setActiveField] = useState<string | null>(null);
+
+  // Inline text field edit mode: tracks which inline row TextInput is currently editable
+  const [focusedInlineField, setFocusedInlineField] = useState<string | null>(null);
   
   // Ref to ScrollView for centering
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Map of input refs and generic focus handler to center focused text inputs when keyboard active
+  const inputRefs = useRef<{[key: string]: any}>({});
+  const handleInputFocus = (fieldName: string) => {
+    setTimeout(() => {
+      const inputRef = inputRefs.current[fieldName];
+      if (inputRef && scrollViewRef.current) {
+        inputRef.measureLayout(
+          scrollViewRef.current,
+          (x: number, y: number, w: number, h: number) => {
+            // Centra l'input nella visualizzazione, lasciando un margine superiore per la tastiera
+            const targetY = Math.max(0, y - 120);
+            scrollViewRef.current?.scrollTo({ y: targetY, animated: true });
+          },
+          (err: any) => console.log('measureLayout error for ' + fieldName, err)
+        );
+      }
+    }, 250); // Attendi l'animazione della tastiera
+  };
 
   // Calendar State
   const [calendarDate, setCalendarDate] = useState(() => {
@@ -167,18 +214,18 @@ export default function ExpenseDetail() {
               subcategory_key: row.subcategory_key || row.category_key,
               category_confidence: row.category_confidence ?? 1.0,
               date: row.date,
-              time: row.time || '12:00',
+              time: row.time || null,
               time_of_day: row.time_of_day || 'afternoon',
               is_weekend: row.is_weekend === 1,
               day_of_week: row.day_of_week || 'monday',
-              social_context: (row.social_context || 'alone') as SocialContext,
+              social_context: (row.social_context || null) as SocialContext,
               people_mentioned: row.people_mentioned ? row.people_mentioned.split(',') : [],
               group_size: row.group_size ?? null,
               is_social: row.social_context !== 'alone' && !!row.social_context,
-              location_type: (row.location_type || 'physical_store') as LocationType,
+              location_type: (row.location_type || null) as LocationType,
               location_name: row.location_name || '',
-              city: row.city || '',
-              address: row.address || '',
+              city: sanitizeLocationField(row.city || ''),
+              address: sanitizeLocationField(row.address || ''),
               is_travel: row.is_travel === 1,
               is_online: row.is_online === 1,
               refund: null,
@@ -224,6 +271,8 @@ export default function ExpenseDetail() {
         const merged: ParsedExpense = {
           ...DEFAULT_EXPENSE,
           ...parsed,
+          city: sanitizeLocationField(parsed.city),
+          address: sanitizeLocationField(parsed.address),
           tags: parsed.tags || [],
           people_mentioned: parsed.people_mentioned || [],
         };
@@ -301,6 +350,12 @@ export default function ExpenseDetail() {
         return;
       }
 
+      // Validazione abbonamento periodico
+      if (dateMode === 'periodic' && !periodicName.trim()) {
+        Alert.alert('Attenzione', 'Inserisci un nome per la spesa periodica (es. Netflix, Affitto...).');
+        return;
+      }
+
       analytics.trackClick(ANALYTICS_BUTTONS.SAVE_TRANSACTION, ANALYTICS_SCREENS.EXPENSE_DETAIL, {
         is_existing: isEditingExisting,
         amount: editableExpense.amount,
@@ -314,6 +369,8 @@ export default function ExpenseDetail() {
       const expenseToSave: ParsedExpense = {
         ...editableExpense,
         date: editableExpense.date || todayStr,
+        // Se è una spesa periodica e non ha orario, usa 12:00 come default
+        time: editableExpense.time || (dateMode === 'periodic' || isSubscriptionActive ? '12:00' : null),
       };
 
       if (isEditingExisting) {
@@ -327,9 +384,16 @@ export default function ExpenseDetail() {
         const txId = await TransactionRepository.insert(expenseToSave);
 
         // Gestione abbonamento: periodic mode o AI-detected
+        // Nota: isSubscriptionActive viene resettato quando si torna a 'single', quindi non c'è doppio salvataggio
         let subscription_id: string | null = null;
 
-        if (dateMode === 'periodic' && periodicName.trim()) {
+        if (dateMode === 'periodic') {
+          // Clampa il giorno di ricorrenza al range valido
+          const isWeekly = periodicFrequency === 'weekly' || periodicFrequency === 'biweekly';
+          const rawDay = parseInt(periodicDay);
+          const clampedDay = isWeekly
+            ? Math.max(0, Math.min(6, isNaN(rawDay) ? 0 : rawDay))
+            : Math.max(1, Math.min(28, isNaN(rawDay) ? 1 : rawDay)); // max 28 per sicurezza su tutti i mesi
           const subId = await SubscriptionRepository.insert({
             name: periodicName.trim(),
             amount: expenseToSave.amount,
@@ -337,7 +401,7 @@ export default function ExpenseDetail() {
             direction: expenseToSave.direction as 'in' | 'out',
             category_key: expenseToSave.category_key,
             frequency: periodicFrequency,
-            recurrence_day: parseInt(periodicDay) || null,
+            recurrence_day: clampedDay,
             start_date: expenseToSave.date,
             auto_detected: false,
           });
@@ -360,8 +424,6 @@ export default function ExpenseDetail() {
         if (subscription_id) {
           await TransactionRepository.update(txId, { subscription_id });
         }
-
-
       }
 
       if (!isEditingExisting && returnTo) {
@@ -462,8 +524,9 @@ export default function ExpenseDetail() {
     : [];
 
   const handleCitySelect = (comune: ComuneItem) => {
-    updateField('city', comune.n);
-    updateField('address', `${comune.r}, Italia`);
+    updateField('city', sanitizeLocationField(comune.n));
+    // Don't append region/country, keep address empty or for street input
+    updateField('address', '');
     setCitySearch('');
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setActiveField(null);
@@ -561,12 +624,17 @@ export default function ExpenseDetail() {
         </View>
       </View>
 
-      <ScrollView 
-        ref={scrollViewRef}
-        style={styles.container} 
-        contentContainerStyle={styles.content} 
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.container} 
+          contentContainerStyle={styles.content} 
+          showsVerticalScrollIndicator={false}
+        >
         
         {/* SECTION: GENERALE */}
         <Text style={styles.sectionTitle}>GENERALE</Text>
@@ -591,43 +659,65 @@ export default function ExpenseDetail() {
           <View style={styles.amountContainer}>
              <Text style={[styles.currency, { color: isIncome ? COLORS.success : COLORS.primary }]}>€</Text>
              <TextInput 
+                ref={ref => inputRefs.current['amount'] = ref}
                 style={[styles.amountInput, { color: isIncome ? COLORS.success : COLORS.primary }]}
                 value={amountInputText}
                 onChangeText={(val) => {
-                  const cleaned = val.replace(/[^0-9,.]/g, '');
+                  // Permette solo cifre e UN singolo separatore decimale (virgola o punto)
+                  let cleaned = val.replace(/[^0-9,.]/g, '');
+                  // Blocca il secondo separatore: mantieni solo il primo tra virgola e punto
+                  const firstComma = cleaned.indexOf(',');
+                  const firstDot = cleaned.indexOf('.');
+                  if (firstComma !== -1 && firstDot !== -1) {
+                    // Se ci sono entrambi, rimuovi il secondo
+                    if (firstComma < firstDot) {
+                      cleaned = cleaned.replace(/\./g, '');
+                    } else {
+                      cleaned = cleaned.replace(/,/g, '');
+                    }
+                  }
+                  // Blocca separatori multipli dello stesso tipo
+                  cleaned = cleaned.replace(/(,.*),/g, '$1').replace(/(\..*)\./, '$1');
                   setAmountInputText(cleaned);
                   const numericVal = parseFloat(cleaned.replace(',', '.')) || 0;
                   updateField('amount', numericVal);
                 }}
                 keyboardType="decimal-pad"
+                onFocus={() => handleInputFocus('amount')}
              />
           </View>
 
           {/* CLASSIFICATION ROW - single tap opens full picker */}
-          <Pressable
-            style={[styles.detailItemVertical, styles.detailItemBorder]}
-            onPress={() => setShowCategoryPicker(true)}
+          <SwipeableRow 
+            enabled={editableExpense.category_key !== 'altro_altro'}
+            onReset={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              updateField('category_key', 'altro_altro');
+              updateField('subcategory_key', 'altro_altro');
+            }}
           >
-            <View style={styles.detailTextContainer}>
-              <Text style={styles.detailLabel}>Classificazione</Text>
-              <View style={styles.classificationRow}>
-                {editableExpense.category_key && editableExpense.category_key !== 'altro_altro' ? (
-                  <>
-                    <CategoryPill categoryKey={editableExpense.category_key} />
-                    {category && <Text style={styles.classificationArrow}>›</Text>}
-                    {category && (
-                      <Text style={styles.categoryInlineText}>{category.label}</Text>
-                    )}
-                  </>
-                ) : (
-                  <Text style={styles.detailValue}>
-                    ----
-                  </Text>
-                )}
+            <Pressable
+              style={[styles.detailItemVertical, styles.detailItemBorder]}
+              onPress={() => setShowCategoryPicker(true)}
+            >
+              <View style={styles.detailTextContainer}>
+                <View style={styles.classificationRow}>
+                  {editableExpense.category_key ? (
+                    <>
+                      <View style={[styles.classificationDot, { backgroundColor: getCategoryColor(editableExpense.category_key) }]} />
+                      <Text style={styles.detailValue}>
+                        {category ? (category.label.charAt(0).toUpperCase() + category.label.slice(1).toLowerCase()) : (domain ? (domain.label.charAt(0).toUpperCase() + domain.label.slice(1).toLowerCase()) : 'Altro')}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.detailValue}>----</Text>
+                  )}
+                </View>
+                <Text style={styles.detailLabel}>Classificazione</Text>
               </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
-          </Pressable>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
+            </Pressable>
+          </SwipeableRow>
 
           <CategoryPickerModal
             visible={showCategoryPicker}
@@ -638,58 +728,58 @@ export default function ExpenseDetail() {
           />
 
           {/* DATE ACCORDION */}
-          <Pressable 
-            style={[styles.detailItemVertical, styles.detailItemBorder]}
-            onPress={() => toggleField('date', 110)}
+          <SwipeableRow 
+            enabled={editableExpense.date !== null}
+            onReset={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              updateField('date', null);
+              updateField('day_of_week', null);
+              updateField('is_weekend', false);
+            }}
           >
-            <View style={styles.detailTextContainer}>
-              <Text style={styles.detailLabel}>Data</Text>
-              <Text style={styles.detailValue}>
-                {editableExpense.date 
-                  ? new Date(editableExpense.date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
-                  : '---'}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {isFuture && dateMode === 'single' && (
-                <View style={styles.scheduledBadge}>
-                  <Ionicons name="calendar-outline" size={12} color="#0A74FF" style={{ marginRight: 4 }} />
-                  <Text style={styles.scheduledBadgeText}>(programmato)</Text>
-                </View>
-              )}
-              {dateMode === 'periodic' && (
-                <View style={[styles.scheduledBadge, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]}>
-                  <Ionicons name="repeat" size={12} color="#16A34A" style={{ marginRight: 4 }} />
-                  <Text style={[styles.scheduledBadgeText, { color: '#16A34A' }]}>
-                    (periodica · {periodicFrequency === 'monthly' ? 'mensile' : periodicFrequency === 'weekly' ? 'settimanale' : periodicFrequency === 'yearly' ? 'annuale' : 'bisettimanale'})
-                  </Text>
-                </View>
-              )}
-              {!!editableExpense.date && (
-                <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    updateField('date', null);
-                    updateField('day_of_week', null);
-                    updateField('is_weekend', false);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
-                </Pressable>
-              )}
-              <Ionicons name={activeField === 'date' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
-            </View>
-          </Pressable>
+            <Pressable 
+              style={[styles.detailItemVertical, activeField !== 'date' && styles.detailItemBorder]}
+              onPress={() => toggleField('date', 110)}
+            >
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailValue}>
+                  {editableExpense.date 
+                    ? new Date(editableExpense.date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : 'Oggi (default)'}
+                </Text>
+                <Text style={styles.detailLabel}>Data</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {isFuture && dateMode === 'single' && (
+                  <View style={styles.scheduledBadge}>
+                    <Ionicons name="calendar-outline" size={12} color="#0A74FF" style={{ marginRight: 4 }} />
+                    <Text style={styles.scheduledBadgeText}>(programmato)</Text>
+                  </View>
+                )}
+                {dateMode === 'periodic' && (
+                  <View style={[styles.scheduledBadge, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]}>
+                    <Ionicons name="repeat" size={12} color="#16A34A" style={{ marginRight: 4 }} />
+                    <Text style={[styles.scheduledBadgeText, { color: '#16A34A' }]}>
+                      (periodica · {periodicFrequency === 'monthly' ? 'mensile' : periodicFrequency === 'weekly' ? 'settimanale' : periodicFrequency === 'yearly' ? 'annuale' : 'bisettimanale'})
+                    </Text>
+                  </View>
+                )}
+                <Ionicons name={activeField === 'date' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+              </View>
+            </Pressable>
+          </SwipeableRow>
 
           {activeField === 'date' && (
-            <View style={styles.calendarContainer}>
+            <View style={[styles.calendarContainer, styles.expandedSection, styles.detailItemBorder]}>
               {/* Tab selector: Una tantum / Periodica */}
               <View style={styles.dateModeTabs}>
                 <Pressable 
                   style={[styles.dateModeTab, dateMode === 'single' && styles.dateModeTabActive]}
-                  onPress={() => setDateMode('single')}
+                  onPress={() => {
+                    setDateMode('single');
+                    // Fix #13: resetta il flag AI-subscription se l'utente torna a Una tantum
+                    setIsSubscriptionActive(false);
+                  }}
                 >
                   <Ionicons name="calendar-outline" size={14} color={dateMode === 'single' ? '#FFFFFF' : COLORS.secondary} style={{ marginRight: 4 }} />
                   <Text style={[styles.dateModeTabText, dateMode === 'single' && styles.dateModeTabTextActive]}>Una tantum</Text>
@@ -751,77 +841,102 @@ export default function ExpenseDetail() {
                 </>
               ) : (
                 <View style={styles.periodicForm}>
-                  <Text style={styles.periodicLabel}>Nome</Text>
+                  <Text style={styles.periodicLabel}>Nome abbonamento *</Text>
                   <TextInput
-                    style={styles.periodicInput}
+                    ref={ref => inputRefs.current['periodicName'] = ref}
+                    style={[styles.periodicInput, !periodicName.trim() && { borderColor: '#FCA5A5', borderWidth: 1 }]}
                     placeholder="es. Netflix, Stipendio, Affitto"
                     placeholderTextColor={COLORS.secondary}
                     value={periodicName}
                     onChangeText={setPeriodicName}
+                    onFocus={() => handleInputFocus('periodicName')}
                   />
+                  {!periodicName.trim() && (
+                    <Text style={{ fontSize: 11, color: '#EF4444', marginTop: 4 }}>Campo obbligatorio</Text>
+                  )}
 
                   <Text style={[styles.periodicLabel, { marginTop: 14 }]}>Frequenza</Text>
                   <View style={styles.periodicChipRow}>
-                    {([['weekly', 'Sett.'], ['biweekly', 'Bisett.'], ['monthly', 'Mensile'], ['yearly', 'Annuale']] as const).map(([key, label]) => (
+                    {([['weekly', 'Settimanale'], ['biweekly', 'Bisettimanale'], ['monthly', 'Mensile'], ['yearly', 'Annuale']] as const).map(([key, label]) => (
                       <Pressable
                         key={key}
                         style={[styles.periodicChip, periodicFrequency === key && styles.periodicChipActive]}
-                        onPress={() => setPeriodicFrequency(key as any)}
+                        onPress={() => {
+                          setPeriodicFrequency(key as any);
+                          // Reset giorno al default quando cambia frequenza
+                          setPeriodicDay(key === 'weekly' || key === 'biweekly' ? '0' : '1');
+                        }}
                       >
                         <Text style={[styles.periodicChipText, periodicFrequency === key && styles.periodicChipTextActive]}>{label}</Text>
                       </Pressable>
                     ))}
                   </View>
 
-                  <Text style={[styles.periodicLabel, { marginTop: 14 }]}>
-                    {periodicFrequency === 'weekly' || periodicFrequency === 'biweekly' 
-                      ? 'Giorno della settimana (0=Lun…6=Dom)' 
-                      : 'Giorno del mese (1–31)'}
-                  </Text>
-                  <TextInput
-                    style={styles.periodicInput}
-                    keyboardType="number-pad"
-                    placeholder={periodicFrequency === 'weekly' || periodicFrequency === 'biweekly' ? '0' : '1'}
-                    placeholderTextColor={COLORS.secondary}
-                    value={periodicDay}
-                    onChangeText={setPeriodicDay}
-                  />
+                  {/* Picker giorno — chip visive invece di TextInput libero */}
+                  {(periodicFrequency === 'weekly' || periodicFrequency === 'biweekly') ? (
+                    <>
+                      <Text style={[styles.periodicLabel, { marginTop: 14 }]}>Giorno della settimana</Text>
+                      <View style={[styles.periodicChipRow, { flexWrap: 'wrap' }]}>
+                        {(['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'] as const).map((label, idx) => (
+                          <Pressable
+                            key={idx}
+                            style={[styles.periodicChip, periodicDay === String(idx) && styles.periodicChipActive, { minWidth: 44 }]}
+                            onPress={() => setPeriodicDay(String(idx))}
+                          >
+                            <Text style={[styles.periodicChipText, periodicDay === String(idx) && styles.periodicChipTextActive]}>{label}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[styles.periodicLabel, { marginTop: 14 }]}>Giorno del mese</Text>
+                      <Text style={{ fontSize: 11, color: COLORS.secondary, marginBottom: 8 }}>Limitato al 28° per compatibilità con tutti i mesi</Text>
+                      <View style={[styles.periodicChipRow, { flexWrap: 'wrap' }]}>
+                        {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
+                          <Pressable
+                            key={day}
+                            style={[styles.periodicChip, periodicDay === String(day) && styles.periodicChipActive, { minWidth: 36, justifyContent: 'center', alignItems: 'center' }]}
+                            onPress={() => setPeriodicDay(String(day))}
+                          >
+                            <Text style={[styles.periodicChipText, periodicDay === String(day) && styles.periodicChipTextActive]}>{day}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </>
+                  )}
                 </View>
               )}
             </View>
           )}
 
           {/* TIME ACCORDION - VERTICAL ALARM SCROLL WHEEL */}
-          <Pressable 
-            style={[styles.detailItemVertical, styles.detailItemBorder]}
-            onPress={() => toggleField('time', 150)}
+          <SwipeableRow 
+            enabled={editableExpense.time !== null}
+            onReset={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              updateField('time', null);
+              updateField('time_of_day', null);
+            }}
           >
-            <View style={styles.detailTextContainer}>
-              <Text style={styles.detailLabel}>Orario</Text>
-              <Text style={styles.detailValue}>
-                {editableExpense.time || '--:--'}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {!!editableExpense.time && (
-                <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    updateField('time', null);
-                    updateField('time_of_day', null);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
-                </Pressable>
-              )}
-              <Ionicons name={activeField === 'time' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
-            </View>
-          </Pressable>
+            <Pressable 
+              style={[styles.detailItemVertical, activeField !== 'time' && styles.detailItemBorder]}
+              onPress={() => toggleField('time', 150)}
+            >
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailValue}>
+                  {editableExpense.time || '----'}
+                </Text>
+                <Text style={styles.detailLabel}>Orario</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name={activeField === 'time' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+              </View>
+            </Pressable>
+          </SwipeableRow>
 
           {activeField === 'time' && (
-            <View style={styles.timePickerContainer}>
+            <View style={[styles.timePickerContainer, styles.expandedSection, styles.detailItemBorder]}>
               <View style={styles.wheelHeaders}>
                 <Text style={styles.wheelHeaderLabel}>ORE</Text>
                 <Text style={styles.wheelHeaderLabel}>MINUTI</Text>
@@ -876,49 +991,47 @@ export default function ExpenseDetail() {
           )}
 
           {/* LOCALITY / CITY ACCORDION */}
-          <Pressable 
-            style={styles.detailItemVertical}
-            onPress={() => toggleField('city', 220)}
+          <SwipeableRow 
+            enabled={!!editableExpense.city || !!editableExpense.address}
+            onReset={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              updateField('city', '');
+              updateField('address', '');
+              setCitySearch('');
+            }}
           >
-            <View style={styles.detailTextContainer}>
-              <Text style={styles.detailLabel}>Località</Text>
-              <Text style={styles.detailValue}>
-                {editableExpense.city 
-                  ? `${editableExpense.city}${editableExpense.address ? `, ${editableExpense.address}` : ''}` 
-                  : '---'}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {(!!editableExpense.city || !!editableExpense.address) && (
-                <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    updateField('city', '');
-                    updateField('address', '');
-                    setCitySearch('');
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
-                </Pressable>
-              )}
-              <Ionicons name={activeField === 'city' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
-            </View>
-          </Pressable>
+            <Pressable 
+              style={styles.detailItemVertical}
+              onPress={() => toggleField('city', 220)}
+            >
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailValue}>
+                  {editableExpense.city 
+                    ? `${capitalizeProperNoun(editableExpense.city)}${editableExpense.address ? `, ${capitalizeProperNoun(editableExpense.address)}` : ''}` 
+                    : '----'}
+                </Text>
+                <Text style={styles.detailLabel}>Località</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name={activeField === 'city' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+              </View>
+            </Pressable>
+          </SwipeableRow>
 
           {activeField === 'city' && (
-            <View style={styles.citySearchContainer}>
+            <View style={[styles.citySearchContainer, styles.expandedSection]}>
               <Text style={styles.editorLabel}>Città (Comune)</Text>
               <View style={styles.searchRow}>
                 <Ionicons name="search" size={18} color={COLORS.secondary} style={{ marginRight: 8 }} />
                 <TextInput
+                  ref={ref => inputRefs.current['citySearch'] = ref}
                   style={styles.cityInput}
                   placeholder="Cerca comune italiano (es. Vimercate, Milano...)"
                   placeholderTextColor={COLORS.secondary}
                   value={citySearch}
                   onChangeText={setCitySearch}
                   autoFocus
+                  onFocus={() => handleInputFocus('citySearch')}
                 />
               </View>
 
@@ -932,7 +1045,7 @@ export default function ExpenseDetail() {
                     >
                       <Ionicons name="location-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
                       <Text style={styles.cityResultText}>
-                        <Text style={{ fontWeight: '700' }}>{c.n}</Text> ({c.s}) · <Text style={{ color: COLORS.secondary, fontSize: 12 }}>{c.r}</Text>
+                        <Text style={{ fontWeight: '700' }}>{c.n}</Text> ({c.s})
                       </Text>
                     </Pressable>
                   ))}
@@ -941,11 +1054,13 @@ export default function ExpenseDetail() {
 
               <Text style={[styles.editorLabel, { marginTop: 15 }]}>Via / Indirizzo specifico</Text>
               <TextInput
+                ref={ref => inputRefs.current['address'] = ref}
                 style={styles.inlineTextInput}
                 placeholder="es. Via Garibaldi, 10"
                 placeholderTextColor={COLORS.secondary}
                 value={editableExpense.address || ''}
-                onChangeText={(v) => updateField('address', v)}
+                onChangeText={(v) => updateField('address', sanitizeLocationField(v))}
+                onFocus={() => handleInputFocus('address')}
               />
             </View>
           )}
@@ -957,69 +1072,134 @@ export default function ExpenseDetail() {
         <Text style={styles.sectionTitle}>DETTAGLI</Text>
         <View style={styles.card}>
           
-          {/* NOTA E NEGOZIO - CAMPI DI TESTO DIRETTI SENZA ACCORDION */}
-          <View style={styles.directInputGroup}>
-            <Text style={styles.directInputLabel}>Nota</Text>
-            <TextInput
-              style={styles.directTextInput}
-              placeholder="Inserisci una nota o descrizione"
-              placeholderTextColor={COLORS.secondary}
-              value={editableExpense.description || editableExpense.reason || ''}
-              onChangeText={(v) => updateField('description', v)}
-            />
-          </View>
+          {/* NOTA E NEGOZIO - CAMPI DI TESTO DIRETTI SULLA RIGA */}
+          <SwipeableRow 
+            enabled={!!(editableExpense.description || editableExpense.reason)}
+            onReset={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              updateField('description', '');
+              updateField('reason', '');
+              setFocusedInlineField(null);
+            }}
+          >
+            <View style={[styles.detailItemVertical, styles.detailItemBorder]}>
+              <View style={styles.detailTextContainer}>
+                <View style={styles.textInputFadeContainer}>
+                  <TextInput
+                    ref={ref => inputRefs.current['description'] = ref}
+                    style={styles.rowTextInput}
+                    placeholder="----"
+                    placeholderTextColor={COLORS.primary}
+                    value={editableExpense.description || editableExpense.reason || ''}
+                    onChangeText={(v) => updateField('description', v)}
+                    editable={focusedInlineField === 'description'}
+                    scrollEnabled={false}
+                    onPressIn={() => {
+                      if (focusedInlineField !== 'description') {
+                        setFocusedInlineField('description');
+                        setTimeout(() => inputRefs.current['description']?.focus(), 30);
+                      }
+                    }}
+                    onFocus={() => {
+                      setFocusedInlineField('description');
+                      handleInputFocus('description');
+                    }}
+                    onBlur={() => setFocusedInlineField(null)}
+                  />
+                  <LinearGradient
+                    colors={['rgba(255, 255, 255, 0)', '#FFFFFF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.rightFadeOverlay}
+                    pointerEvents="none"
+                  />
+                </View>
+                <Text style={styles.detailLabel}>Nota</Text>
+              </View>
+            </View>
+          </SwipeableRow>
 
-          <View style={[styles.directInputGroup, { marginTop: 15 }]}>
-            <Text style={styles.directInputLabel}>Negozio</Text>
-            <TextInput
-              style={styles.directTextInput}
-              placeholder="es. Esselunga, Starbucks..."
-              placeholderTextColor={COLORS.secondary}
-              value={editableExpense.location_name || ''}
-              onChangeText={(v) => updateField('location_name', v)}
-            />
-          </View>
-
-          <View style={{ height: 15 }} />
+          <SwipeableRow 
+            enabled={!!editableExpense.location_name}
+            onReset={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              updateField('location_name', '');
+              setFocusedInlineField(null);
+            }}
+          >
+            <View style={[styles.detailItemVertical, styles.detailItemBorder]}>
+              <View style={styles.detailTextContainer}>
+                <View style={styles.textInputFadeContainer}>
+                  <TextInput
+                    ref={ref => inputRefs.current['location_name'] = ref}
+                    style={styles.rowTextInput}
+                    placeholder="----"
+                    placeholderTextColor={COLORS.primary}
+                    value={capitalizeProperNoun(editableExpense.location_name)}
+                    onChangeText={(v) => updateField('location_name', capitalizeProperNoun(v))}
+                    editable={focusedInlineField === 'location_name'}
+                    scrollEnabled={false}
+                    onPressIn={() => {
+                      if (focusedInlineField !== 'location_name') {
+                        setFocusedInlineField('location_name');
+                        setTimeout(() => inputRefs.current['location_name']?.focus(), 30);
+                      }
+                    }}
+                    onFocus={() => {
+                      setFocusedInlineField('location_name');
+                      handleInputFocus('location_name');
+                    }}
+                    onBlur={() => setFocusedInlineField(null)}
+                  />
+                  <LinearGradient
+                    colors={['rgba(255, 255, 255, 0)', '#FFFFFF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.rightFadeOverlay}
+                    pointerEvents="none"
+                  />
+                </View>
+                <Text style={styles.detailLabel}>Negozio</Text>
+              </View>
+            </View>
+          </SwipeableRow>
 
           {/* PAYMENT METHOD ACCORDION - ONLY CHIPS SELECT, NO TEXT INPUT */}
-          <Pressable 
-            style={[styles.detailItemVertical, styles.detailItemBorder]}
-            onPress={() => toggleField('payment_method', 380)}
+          <SwipeableRow 
+            enabled={!!editableExpense.payment_method}
+            onReset={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              updateField('payment_method', null);
+            }}
           >
-            <View style={styles.detailTextContainer}>
-              <Text style={styles.detailLabel}>Metodo Pagamento</Text>
-              <Text style={styles.detailValue}>
-                {editableExpense.payment_method || 'Non specificato'}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {!!editableExpense.payment_method && (
-                <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    updateField('payment_method', null);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
-                </Pressable>
-              )}
-              <Ionicons name={activeField === 'payment_method' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
-            </View>
-          </Pressable>
+            <Pressable 
+              style={[styles.detailItemVertical, activeField !== 'payment_method' && styles.detailItemBorder]}
+              onPress={() => toggleField('payment_method', 380)}
+            >
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailValue}>
+                  {editableExpense.payment_method 
+                    ? editableExpense.payment_method.charAt(0).toUpperCase() + editableExpense.payment_method.slice(1).toLowerCase()
+                    : '----'}
+                </Text>
+                <Text style={styles.detailLabel}>Metodo Pagamento</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name={activeField === 'payment_method' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+              </View>
+            </Pressable>
+          </SwipeableRow>
 
           {activeField === 'payment_method' && (
-            <View style={styles.editorExpandContainer}>
+            <View style={[styles.editorExpandContainer, styles.expandedSection, styles.detailItemBorder]}>
               <View style={styles.quickChipsRow}>
                 {['Contanti', 'Bancomat', 'Bonifico', 'Altro'].map(m => {
-                  const isSel = editableExpense.payment_method === m;
+                  const isSel = (editableExpense.payment_method || '').toLowerCase() === m.toLowerCase();
                   return (
                     <Pressable
                       key={m}
                       onPress={() => {
-                        updateField('payment_method', m);
+                        updateField('payment_method', m.toLowerCase());
                         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                         setActiveField(null);
                       }}
@@ -1034,44 +1214,42 @@ export default function ExpenseDetail() {
           )}
 
           {/* SOCIAL CONTEXT ACCORDION */}
-          <Pressable 
-            style={[styles.detailItemVertical, editableExpense.is_social ? styles.detailItemBorder : {}]}
-            onPress={() => toggleField('social_context', 440)}
+          <SwipeableRow 
+            enabled={!!editableExpense.social_context}
+            onReset={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              updateField('social_context', null);
+              updateField('is_social', false);
+              updateField('people_mentioned', []);
+              updateField('split', null);
+            }}
           >
-            <View style={styles.detailTextContainer}>
-              <Text style={styles.detailLabel}>Livello Sociale</Text>
-              <Text style={styles.detailValue}>
-                {translateSocialContext(editableExpense.social_context) || '---'}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {!!editableExpense.social_context && (
-                <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    updateField('social_context', null);
-                    updateField('is_social', false);
-                    updateField('people_mentioned', []);
-                    updateField('split', null);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
-                </Pressable>
-              )}
-              <Ionicons name={activeField === 'social_context' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
-            </View>
-          </Pressable>
+            <Pressable 
+              style={[styles.detailItemVertical, activeField !== 'social_context' && styles.detailItemBorder]}
+              onPress={() => toggleField('social_context', 440)}
+            >
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailValue}>
+                  {editableExpense.social_context 
+                    ? (() => { const s = translateSocialContext(editableExpense.social_context); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); })()
+                    : '----'}
+                </Text>
+                <Text style={styles.detailLabel}>Livello Sociale</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name={activeField === 'social_context' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+              </View>
+            </Pressable>
+          </SwipeableRow>
 
           {activeField === 'social_context' && (
-            <View style={styles.editorExpandContainer}>
+            <View style={[styles.editorExpandContainer, styles.expandedSection, editableExpense.is_social && styles.detailItemBorder]}>
               <View style={styles.quickChipsRow}>
                 {[
-                  { key: 'alone', label: 'Solo (Privato)' },
+                  { key: 'alone', label: 'Da solo' },
                   { key: 'friends', label: 'Amici' },
-                  { key: 'couple', label: 'Coppia' },
-                  { key: 'family', label: 'Famiglia' },
+                  { key: 'couple', label: 'In coppia' },
+                  { key: 'family', label: 'In famiglia' },
                   { key: 'colleagues', label: 'Colleghi' }
                 ].map(item => {
                   const isSel = editableExpense.social_context === item.key;
@@ -1096,37 +1274,33 @@ export default function ExpenseDetail() {
           {/* PERSONE ACCORDION - ATTIVO E VISIBILE SOLO SE IL CONTESTO SOCIALE E DIVERSO DA SOLO E NULLO */}
           {editableExpense.social_context && editableExpense.social_context !== 'alone' && (
             <>
-              <Pressable 
-                style={[styles.detailItemVertical, styles.detailItemBorder]}
-                onPress={() => toggleField('people_mentioned', 480)}
+              <SwipeableRow 
+                enabled={editableExpense.people_mentioned.length > 0}
+                onReset={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  updateField('people_mentioned', []);
+                }}
               >
-                <View style={styles.detailTextContainer}>
-                  <Text style={styles.detailLabel}>Persone con cui viene fatto</Text>
-                  <Text style={styles.detailValue}>
-                    {editableExpense.people_mentioned.length > 0 
-                      ? editableExpense.people_mentioned.join(', ') 
-                      : '---'}
-                  </Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  {editableExpense.people_mentioned.length > 0 && (
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                        updateField('people_mentioned', []);
-                      }}
-                      style={{ padding: 4 }}
-                    >
-                      <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
-                    </Pressable>
-                  )}
-                  <Ionicons name={activeField === 'people_mentioned' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
-                </View>
-              </Pressable>
-
+                <Pressable 
+                  style={[styles.detailItemVertical, activeField !== 'people_mentioned' && styles.detailItemBorder]}
+                  onPress={() => toggleField('people_mentioned', 480)}
+                >
+                  <View style={styles.detailTextContainer}>
+                    <Text style={styles.detailValue}>
+                      {editableExpense.people_mentioned.length > 0 
+                        ? editableExpense.people_mentioned.map(p => capitalizeProperNoun(p)).join(', ') 
+                        : '----'}
+                    </Text>
+                    <Text style={styles.detailLabel}>Persone con cui viene fatto</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Ionicons name={activeField === 'people_mentioned' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+                  </View>
+                </Pressable>
+              </SwipeableRow>
+ 
               {activeField === 'people_mentioned' && (
-                <View style={styles.editorExpandContainer}>
+                <View style={[styles.editorExpandContainer, styles.expandedSection, styles.detailItemBorder]}>
                   <Text style={styles.editorLabel}>Seleziona o aggiungi persone</Text>
                   <View style={styles.quickChipsRow}>
                     {/* Render dynamic unique people loaded from DB or default */}
@@ -1140,7 +1314,7 @@ export default function ExpenseDetail() {
                         >
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Text style={[styles.quickChipText, isSel && styles.quickChipTextActive]}>
-                              {personStr.charAt(0).toUpperCase() + personStr.slice(1)}
+                              {capitalizeProperNoun(personStr)}
                             </Text>
                             {isSel && (
                               <Ionicons name="close-circle" size={14} color="#FFF" style={{ marginLeft: 6 }} />
@@ -1149,7 +1323,7 @@ export default function ExpenseDetail() {
                         </Pressable>
                       );
                     })}
-
+ 
                     {/* Render any other custom people in the array that are not in availablePeople yet */}
                     {(editableExpense.people_mentioned || []).map((customPerson) => {
                       if (availablePeople.includes(customPerson)) return null;
@@ -1161,7 +1335,7 @@ export default function ExpenseDetail() {
                         >
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Text style={[styles.quickChipText, styles.quickChipTextActive]}>
-                              {customPerson.charAt(0).toUpperCase() + customPerson.slice(1)}
+                              {capitalizeProperNoun(customPerson)}
                             </Text>
                             <Ionicons name="close-circle" size={14} color="#FFF" style={{ marginLeft: 6 }} />
                           </View>
@@ -1187,6 +1361,7 @@ export default function ExpenseDetail() {
                   {showNewPersonInput && (
                     <View style={styles.inlineTagInputContainer}>
                       <TextInput
+                        ref={ref => inputRefs.current['newPersonInput'] = ref}
                         style={styles.inlineTagInput}
                         placeholder="Nome (es. Mario, Elena...)"
                         placeholderTextColor={COLORS.secondary}
@@ -1194,6 +1369,7 @@ export default function ExpenseDetail() {
                         onChangeText={setNewPersonInput}
                         autoFocus
                         onSubmitEditing={handleAddCustomPerson}
+                        onFocus={() => handleInputFocus('newPersonInput')}
                       />
                       <Pressable 
                         onPress={handleAddCustomPerson}
@@ -1216,39 +1392,37 @@ export default function ExpenseDetail() {
           )}
 
           {/* LOCATION TYPE ACCORDION - ONLY TWO OPTIONS */}
-          <Pressable 
-            style={styles.detailItemVertical}
-            onPress={() => toggleField('location_type', 500)}
+          <SwipeableRow 
+            enabled={!!editableExpense.location_type}
+            onReset={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              updateField('location_type', null);
+              updateField('is_online', false);
+            }}
           >
-            <View style={styles.detailTextContainer}>
-              <Text style={styles.detailLabel}>Tipo Location</Text>
-              <Text style={styles.detailValue}>
-                {translateLocationType(editableExpense.location_type) || 'Non specificato'}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {!!editableExpense.location_type && (
-                <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    updateField('location_type', null);
-                    updateField('is_online', false);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons name="close-circle" size={18} color={COLORS.secondary} />
-                </Pressable>
-              )}
-              <Ionicons name={activeField === 'location_type' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
-            </View>
-          </Pressable>
+            <Pressable 
+              style={[styles.detailItemVertical, activeField !== 'location_type' && styles.detailItemBorder]}
+              onPress={() => toggleField('location_type', 500)}
+            >
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailValue}>
+                  {editableExpense.location_type 
+                    ? (() => { const s = translateLocationType(editableExpense.location_type); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); })()
+                    : '----'}
+                </Text>
+                <Text style={styles.detailLabel}>Tipo Location</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name={activeField === 'location_type' ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.secondary} />
+              </View>
+            </Pressable>
+          </SwipeableRow>
 
           {activeField === 'location_type' && (
-            <View style={styles.editorExpandContainer}>
+            <View style={[styles.editorExpandContainer, styles.expandedSection]}>
               <View style={styles.quickChipsRow}>
                 {[
-                  { key: 'physical_store', label: 'Negozio Fisico' },
+                  { key: 'physical_store', label: 'Negozio fisico' },
                   { key: 'online', label: 'Online' }
                 ].map(item => {
                   const isSel = editableExpense.location_type === item.key;
@@ -1290,7 +1464,7 @@ export default function ExpenseDetail() {
                 )}
               </View>
             </Pressable>
-
+ 
             {/* Render dynamic unique tags loaded from DB or default */}
             {availableTags.map((tagStr) => {
               const isSel = (editableExpense.tags || []).includes(tagStr);
@@ -1311,7 +1485,7 @@ export default function ExpenseDetail() {
                 </Pressable>
               );
             })}
-
+ 
             {/* Render any other custom tags in the array that are not in availableTags yet */}
             {(editableExpense.tags || []).map((customTag) => {
               if (availableTags.includes(customTag)) return null;
@@ -1349,6 +1523,7 @@ export default function ExpenseDetail() {
           {showNewTagInput && (
             <View style={styles.inlineTagInputContainer}>
               <TextInput
+                ref={ref => inputRefs.current['newTagInput'] = ref}
                 style={styles.inlineTagInput}
                 placeholder="Nome nuovo tag (es. regali, auto...)"
                 placeholderTextColor={COLORS.secondary}
@@ -1356,6 +1531,7 @@ export default function ExpenseDetail() {
                 onChangeText={setNewTagInput}
                 autoFocus
                 onSubmitEditing={handleAddCustomTag}
+                onFocus={() => handleInputFocus('newTagInput')}
               />
               <Pressable 
                 onPress={handleAddCustomTag}
@@ -1367,63 +1543,92 @@ export default function ExpenseDetail() {
           )}
         </View>
 
-        {/* EXTRA TAGS DECORATORS WITH CLOSE/REMOVE BUTTONS */}
-        <View style={styles.tagRow}>
-          {editableExpense.is_online && (
-            <Pressable 
-              onPress={() => {
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                updateField('is_online', false);
-                updateField('location_type', 'physical_store');
-              }}
-              style={[styles.tag, { flexDirection: 'row', alignItems: 'center' }]}
-            >
-              <Text style={styles.tagText}>Online</Text>
-              <Ionicons name="close" size={12} color={COLORS.secondary} style={{ marginLeft: 4 }} />
-            </Pressable>
-          )}
-          {editableExpense.is_travel && (
-            <Pressable 
-              onPress={() => {
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                updateField('is_travel', false);
-              }}
-              style={[styles.tag, { flexDirection: 'row', alignItems: 'center' }]}
-            >
-              <Text style={styles.tagText}>Viaggio</Text>
-              <Ionicons name="close" size={12} color={COLORS.secondary} style={{ marginLeft: 4 }} />
-            </Pressable>
-          )}
-          {editableExpense.is_weekend && (
-            <Pressable 
-              onPress={() => {
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                updateField('is_weekend', false);
-              }}
-              style={[styles.tag, { flexDirection: 'row', alignItems: 'center' }]}
-            >
-              <Text style={styles.tagText}>Weekend</Text>
-              <Ionicons name="close" size={12} color={COLORS.secondary} style={{ marginLeft: 4 }} />
-            </Pressable>
-          )}
-          {(editableExpense.tags || []).map(t => (
-            <Pressable 
-              key={t}
-              onPress={() => toggleTagChip(t)}
-              style={[styles.tag, { flexDirection: 'row', alignItems: 'center' }]}
-            >
-              <Text style={styles.tagText}>{t.charAt(0).toUpperCase() + t.slice(1)}</Text>
-              <Ionicons name="close" size={12} color={COLORS.secondary} style={{ marginLeft: 4 }} />
-            </Pressable>
-          ))}
-        </View>
-
 
         
       </ScrollView>
-    </SafeAreaView>
+    </KeyboardAvoidingView>
+  </SafeAreaView>
   );
 }
+
+interface SwipeableRowProps {
+  children: React.ReactNode;
+  onReset: () => void;
+  enabled?: boolean;
+}
+
+const SwipeableRow = ({ children, onReset, enabled = true }: SwipeableRowProps) => {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const screenWidth = Dimensions.get('window').width;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        if (!enabled) return false;
+        // Capture horizontal swipe gestures immediately to bypass children interception (e.g. TextInput)
+        return Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 10 && gestureState.dx < 0;
+      },
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        if (!enabled) return false;
+        return Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 10 && gestureState.dx < 0;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx < 0) {
+          const drag = gestureState.dx;
+          const cappedDrag = drag < -80 ? -80 + (drag + 80) * 0.2 : drag;
+          translateX.setValue(cappedDrag);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -30) {
+          // Snap back immediately with spring animation and call onReset right away
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 6,
+          }).start();
+          onReset();
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
+
+  const opacity = translateX.interpolate({
+    inputRange: [-50, 0],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={styles.swipeContainer}>
+      <Animated.View style={[styles.resetBackground, { opacity }]}>
+        <Ionicons name="refresh-outline" size={20} color="#FFF" style={styles.resetIcon} />
+      </Animated.View>
+      <Animated.View
+        style={{
+          transform: [{ translateX }],
+          backgroundColor: '#FFF',
+        }}
+        {...panResponder.panHandlers}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+};
 
 const DetailItem = ({ label, value, onPress, isLast }: { label: string, value: string | number | null, onPress?: () => void, isLast?: boolean }) => (
   <Pressable 
@@ -1432,8 +1637,8 @@ const DetailItem = ({ label, value, onPress, isLast }: { label: string, value: s
     disabled={!onPress}
   >
     <View style={styles.detailTextContainer}>
+      <Text style={styles.detailValue}>{value || '----'}</Text>
       <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value || '---'}</Text>
     </View>
     {onPress && <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />}
   </Pressable>
@@ -1461,15 +1666,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 10,
     marginTop: 10,
-    marginLeft: 5
+    marginLeft: 0
   },
   card: { 
-    backgroundColor: COLORS.surface, 
-    borderRadius: 24, 
-    padding: 24, 
+    backgroundColor: 'transparent', 
+    paddingVertical: 16, 
+    paddingHorizontal: 0, 
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   sliderContainer: { 
     flexDirection: 'row', 
@@ -1505,9 +1708,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border
   },
-  detailTextContainer: { flex: 1 },
-  detailLabel: { fontSize: 10, color: COLORS.secondary, textTransform: 'uppercase', fontWeight: '700', marginBottom: 4 },
-  detailValue: { fontSize: 15, color: COLORS.primary, fontWeight: '600' },
+  detailTextContainer: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  detailLabel: { 
+    fontSize: 14, 
+    color: COLORS.secondary, 
+    fontFamily: TYPOGRAPHY.fontFamily,
+    textAlign: 'right',
+  },
+  detailValue: { 
+    fontSize: 14, 
+    color: COLORS.primary, 
+    fontWeight: '600',
+    textAlign: 'left',
+  },
   classificationRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 2 },
   classificationArrow: { fontSize: 14, color: COLORS.secondary, marginRight: 6, fontWeight: '300' },
   categoryInlineText: { fontSize: 13, color: COLORS.primary, fontWeight: '500', flexShrink: 1 },
@@ -1534,18 +1753,49 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamily,
     borderWidth: 1,
     borderColor: COLORS.border,
+    textAlign: 'left',
+  },
+  rowTextInput: {
+    flex: 1,
+    textAlign: 'left',
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontFamily: TYPOGRAPHY.fontFamily,
+    paddingVertical: 4,
+  },
+  textInputFadeContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    marginRight: 8,
+    maxWidth: '75%',
+  },
+  rightFadeOverlay: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 24,
+  },
+  classificationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
 
   // Accordion Editors Style
-  editorExpandContainer: {
-    paddingVertical: 10,
-    backgroundColor: COLORS.background,
-    borderRadius: 16,
-    paddingHorizontal: 12,
+  expandedSection: {
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
+  editorExpandContainer: {},
   inlineTextInput: {
     backgroundColor: '#FFF',
     borderRadius: 12,
@@ -1556,6 +1806,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.primary,
     fontFamily: TYPOGRAPHY.fontFamily,
+    textAlign: 'left',
   },
   quickChipsRow: {
     flexDirection: 'row',
@@ -1585,12 +1836,7 @@ const styles = StyleSheet.create({
   },
 
   // Calendar Styling
-  calendarContainer: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
-  },
+  calendarContainer: {},
   scheduledBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1712,6 +1958,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.06)',
+    textAlign: 'left',
   },
   periodicChipRow: {
     flexDirection: 'row',
@@ -1738,10 +1985,6 @@ const styles = StyleSheet.create({
 
   // Vertical Alarm Clock Scroll Wheel Styling
   timePickerContainer: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
     alignItems: 'center',
   },
   wheelHeaders: {
@@ -1797,12 +2040,7 @@ const styles = StyleSheet.create({
   },
 
   // City Search Styling
-  citySearchContainer: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
-  },
+  citySearchContainer: {},
   editorLabel: {
     fontSize: 10,
     fontWeight: '800',
@@ -1980,5 +2218,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.primary,
+  },
+  swipeContainer: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  resetBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#EF4444',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingRight: 24,
+  },
+  resetIcon: {
+    fontWeight: 'bold',
   },
 });

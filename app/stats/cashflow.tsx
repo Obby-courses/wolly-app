@@ -146,7 +146,7 @@ export default function CashflowScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
   },
   headerGradient: {
     paddingHorizontal: 20,
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     marginTop: -20,
@@ -190,12 +190,9 @@ const styles = StyleSheet.create({
     ...SHADOWS.soft,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    ...SHADOWS.soft,
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingHorizontal: 0,
   },
   cardHeaderRow: {
     flexDirection: 'row',

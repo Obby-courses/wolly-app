@@ -16,7 +16,7 @@ import { NetWorthRepository } from '../services/database/repositories/NetWorthRe
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { getCategory } from '../constants/categories';
 import { getCategoryColor } from '../components/CategoryPill';
-import TransactionItem from '../components/TransactionItem';
+import TransactionPreview from '../components/TransactionPreview';
 
 function getNextOccurrenceDate(sub: any): Date {
   const today = new Date();
@@ -259,7 +259,7 @@ export default function Home() {
   };
 
   const renderTransaction = ({ item }: { item: any }) => (
-    <TransactionItem item={item} />
+    <TransactionPreview item={item} />
   );
 
   const formattedNetWorth = netWorth.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -402,7 +402,7 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
   },
   centerContainer: {
     flex: 1,
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     marginTop: -20,

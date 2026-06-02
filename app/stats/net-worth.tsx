@@ -15,7 +15,7 @@ const { width } = Dimensions.get('window');
 
 const WealthChart = ({ data, labels }: { data: any[], labels: string[] }) => {
   if (data.length === 0) return null;
-  const chartWidth = width - (SPACING.lg * 4);
+  const chartWidth = width - (SPACING.lg * 2);
   const chartHeight = 130;
   const safeMargin = 10;
   const maxVal = Math.max(...data.map(d => d.wealth), 1) * 1.1;
@@ -159,7 +159,7 @@ export default function NetWorthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
   },
   headerGradient: {
     paddingHorizontal: 20,
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     marginTop: -20,
@@ -203,12 +203,9 @@ const styles = StyleSheet.create({
     ...SHADOWS.soft,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    ...SHADOWS.soft,
+    backgroundColor: 'transparent',
+    paddingVertical: 16,
+    paddingHorizontal: 0,
   },
   cardHeaderRow: {
     flexDirection: 'row',
