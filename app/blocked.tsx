@@ -105,7 +105,7 @@ export default function BlockedScreen() {
             color={isNotWhitelisted ? '#F97316' : '#EF4444'} 
             style={{ marginRight: 10 }} 
           />
-          <Text style={[styles.infoText, isNotWhitelisted && { color: '#F97316' }]}>supporto@wolly.app</Text>
+          <Text style={[styles.infoText, isNotWhitelisted && { color: '#F97316' }]}>obbycourses@gmail.com</Text>
         </View>
       </View>
 

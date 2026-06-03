@@ -191,93 +191,95 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Impostazioni di Sviluppo</Text>
-            
-            <View style={styles.item}>
-              <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-                <Ionicons name="code-working" size={20} color="#0284C7" />
+          {userProfile?.role === 'admin' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Impostazioni di Sviluppo</Text>
+              
+              <View style={styles.item}>
+                <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+                  <Ionicons name="code-working" size={20} color="#0284C7" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.itemTitleText}>Dev Settings</Text>
+                  <Text style={styles.itemSubtitleText}>Abilita strumenti sviluppatore e gestione dati</Text>
+                </View>
+                <Switch
+                  value={devSettingsEnabled}
+                  onValueChange={handleToggleDevSettings}
+                  trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
+                  thumbColor={'#FFF'}
+                />
               </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.itemTitleText}>Dev Settings</Text>
-                <Text style={styles.itemSubtitleText}>Abilita strumenti sviluppatore e gestione dati</Text>
-              </View>
-              <Switch
-                value={devSettingsEnabled}
-                onValueChange={handleToggleDevSettings}
-                trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
-                thumbColor={'#FFF'}
-              />
+
+              {devSettingsEnabled && (
+                <>
+                  {/* Inizializza Onboarding */}
+                  <Pressable style={[styles.item, { marginTop: 8 }]} onPress={async () => {
+                    await AsyncStorage.setItem('wolly_onboarding_completed', 'false');
+                    router.push('/onboarding');
+                  }}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+                      <Ionicons name="rocket" size={20} color="#0284C7" />
+                    </View>
+                    <Text style={styles.itemText}>Inizializza Onboarding</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                  </Pressable>
+
+                  {/* Gestione Dati & Seed */}
+                  <Pressable style={styles.item} onPress={() => router.push('/seed-data')}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#E6F0FF' }]}>
+                      <Ionicons name="server" size={20} color="#0A74FF" />
+                    </View>
+                    <Text style={styles.itemText}>Gestione Dati & Seed</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                  </Pressable>
+
+                  {/* Modalità Demo Offline */}
+                  <View style={styles.item}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#E6F4EA' }]}>
+                      <Ionicons name="cloud-offline" size={20} color="#34C759" />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.itemTitleText}>Modalità Demo Offline</Text>
+                      <Text style={styles.itemSubtitleText}>Forza l'app in modalità senza rete (disabilita AI)</Text>
+                    </View>
+                    <Switch
+                      value={networkState.isDemoOffline}
+                      onValueChange={(val) => networkStore.setDemoOffline(val)}
+                      trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
+                      thumbColor={'#FFF'}
+                    />
+                  </View>
+
+                  {/* Unauthorized Mode (Test Permessi) */}
+                  <View style={styles.item}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#FEF08A' }]}>
+                      <Ionicons name="lock-closed" size={20} color="#CA8A04" />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.itemTitleText}>Unauthorized Mode</Text>
+                      <Text style={styles.itemSubtitleText}>Forza il rifiuto dei permessi (Microfono e Fotocamera)</Text>
+                    </View>
+                    <Switch
+                      value={networkState.isUnauthorizedMode}
+                      onValueChange={(val) => networkStore.setUnauthorizedMode(val)}
+                      trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
+                      thumbColor={'#FFF'}
+                    />
+                  </View>
+
+                  {/* Elimina tutte le transazioni */}
+                  <Pressable style={[styles.item, styles.dangerItem]} onPress={handleDeleteAll}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#FCE8E6' }]}>
+                      <Ionicons name="trash" size={20} color="#EF4444" />
+                    </View>
+                    <Text style={[styles.itemText, styles.dangerText]}>Elimina tutte le transazioni</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#EF4444" />
+                  </Pressable>
+                </>
+              )}
             </View>
-
-            {devSettingsEnabled && (
-              <>
-                {/* Inizializza Onboarding */}
-                <Pressable style={[styles.item, { marginTop: 8 }]} onPress={async () => {
-                  await AsyncStorage.setItem('wolly_onboarding_completed', 'false');
-                  router.push('/onboarding');
-                }}>
-                  <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-                    <Ionicons name="rocket" size={20} color="#0284C7" />
-                  </View>
-                  <Text style={styles.itemText}>Inizializza Onboarding</Text>
-                  <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-                </Pressable>
-
-                {/* Gestione Dati & Seed */}
-                <Pressable style={styles.item} onPress={() => router.push('/seed-data')}>
-                  <View style={[styles.iconContainer, { backgroundColor: '#E6F0FF' }]}>
-                    <Ionicons name="server" size={20} color="#0A74FF" />
-                  </View>
-                  <Text style={styles.itemText}>Gestione Dati & Seed</Text>
-                  <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-                </Pressable>
-
-                {/* Modalità Demo Offline */}
-                <View style={styles.item}>
-                  <View style={[styles.iconContainer, { backgroundColor: '#E6F4EA' }]}>
-                    <Ionicons name="cloud-offline" size={20} color="#34C759" />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.itemTitleText}>Modalità Demo Offline</Text>
-                    <Text style={styles.itemSubtitleText}>Forza l'app in modalità senza rete (disabilita AI)</Text>
-                  </View>
-                  <Switch
-                    value={networkState.isDemoOffline}
-                    onValueChange={(val) => networkStore.setDemoOffline(val)}
-                    trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
-                    thumbColor={'#FFF'}
-                  />
-                </View>
-
-                {/* Unauthorized Mode (Test Permessi) */}
-                <View style={styles.item}>
-                  <View style={[styles.iconContainer, { backgroundColor: '#FEF08A' }]}>
-                    <Ionicons name="lock-closed" size={20} color="#CA8A04" />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.itemTitleText}>Unauthorized Mode</Text>
-                    <Text style={styles.itemSubtitleText}>Forza il rifiuto dei permessi (Microfono e Fotocamera)</Text>
-                  </View>
-                  <Switch
-                    value={networkState.isUnauthorizedMode}
-                    onValueChange={(val) => networkStore.setUnauthorizedMode(val)}
-                    trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
-                    thumbColor={'#FFF'}
-                  />
-                </View>
-
-                {/* Elimina tutte le transazioni */}
-                <Pressable style={[styles.item, styles.dangerItem]} onPress={handleDeleteAll}>
-                  <View style={[styles.iconContainer, { backgroundColor: '#FCE8E6' }]}>
-                    <Ionicons name="trash" size={20} color="#EF4444" />
-                  </View>
-                  <Text style={[styles.itemText, styles.dangerText]}>Elimina tutte le transazioni</Text>
-                  <Ionicons name="chevron-forward" size={18} color="#EF4444" />
-                </Pressable>
-              </>
-            )}
-          </View>
+          )}
 
           {/* ── Sezione Account (sempre visibile) ──────────────────────────── */}
           <View style={styles.section}>
