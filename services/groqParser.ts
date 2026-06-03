@@ -71,10 +71,9 @@ DOMINI e relative CATEGORIE (domain_key -> [category_key1, category_key2, ...]):
    - "date": deve essere sempre "YYYY-MM-DD". Default: ${currentDateISO}.
    - "time": deve essere sempre "HH:mm". Default: ${currentTime} se non specificato diversamente.
 8. DIRECTION: Deduci da contesto ("pagato", "speso" → "out"; "ricevuto", "stipendio", "rimborso" → "in"). Se l'input contiene solo un importo e un negozio/categoria (es: "50€ al bar", "10 euro da Esselunga", "15€ di sigarette") senza verbi specifici, assumi SEMPRE che sia una spesa ("out"). Default: "out".
-9. VENDITORE vs GEOGRAFIA: 
+9. VENDITORE:
    - location_name: Estrai il nome del brand o negozio (es: "Esselunga", "Amazon", "McDonald's"). Se è un acquisto online, metti is_online = true e location_type = "online".
    - city e address: Estrai città e indirizzo se menzionati esplicitamente (es: "a Milano", "in via Torino"). 
-   - FALLBACK GEOGRAFICO: Se la città/indirizzo NON sono detti esplicitamente, usa questi dati del telefono dell'utente: Città: ${locationContext?.city || 'non disponibile'}, Indirizzo: ${locationContext?.address || 'non disponibile'}.
 10. PERSONE: Estrai nomi propri menzionati in people_mentioned. Deduci social_context: "friends", "family", "colleagues", "couple", "strangers", "alone". Se non specificato, usa null.
 11. LOCATION TYPE: Deduci location_type tra: "home", "restaurant", "physical_store", "online", "transport", "work", "travel", "abroad".
   "amount": number,

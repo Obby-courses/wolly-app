@@ -138,7 +138,7 @@ export default function OnboardingScreen() {
         await AsyncStorage.setItem('wolly_onboarding_completed', 'true');
         await AsyncStorage.setItem('wolly_last_nw_sync_date', new Date().toISOString().split('T')[0]);
 
-        analytics.trackEvent('onboarding_completed', { initial_balance: finalBalance });
+        analytics.trackEvent('onboarding_completed', { success: true });
 
         // Navigate home
         router.replace('/');
