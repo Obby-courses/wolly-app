@@ -11,6 +11,8 @@ import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import AnomalyReporter from '../components/AnomalyReporter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteUserAccount } from '../services/dbFunctions';
+import { supabase } from '../services/supabase';
+import { getProfile, clearProfile, getRoleLabel, getRoleColor, type UserProfile } from '../services/profileStore';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -19,6 +21,8 @@ export default function SettingsScreen() {
   const [networkState, setNetworkState] = useState(networkStore.getState());
   const [devSettingsEnabled, setDevSettingsEnabled] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     analytics.trackScreen(ANALYTICS_SCREENS.SETTINGS);
@@ -28,6 +32,9 @@ export default function SettingsScreen() {
       if (val !== null) setDevSettingsEnabled(val === 'true');
     });
 
+    // Carica profilo utente
+    getProfile().then(profile => setUserProfile(profile));
+
     const unsub = networkStore.subscribe(() => setNetworkState(networkStore.getState()));
     return () => { unsub(); };
   }, []);
@@ -35,6 +42,33 @@ export default function SettingsScreen() {
   const handleToggleDevSettings = async (val: boolean) => {
     setDevSettingsEnabled(val);
     await AsyncStorage.setItem('wolly_dev_settings_enabled', String(val));
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Esci da Wolly',
+      'Sei sicuro di voler uscire? Potrai rientrare in qualsiasi momento con il tuo account Google.',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Esci',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLoggingOut(true);
+            try {
+              await clearProfile();
+              await supabase.auth.signOut();
+              router.replace('/login');
+            } catch (e) {
+              console.error('[Settings] Errore logout:', e);
+              Alert.alert('Errore', 'Impossibile effettuare il logout. Riprova.');
+            } finally {
+              setIsLoggingOut(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteAll = () => {
@@ -229,10 +263,54 @@ export default function SettingsScreen() {
             )}
           </View>
 
-          {/* ── Sezione Account (sempre visibile) ──────────────────────── */}
+          {/* ── Sezione Account (sempre visibile) ──────────────────────────── */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Account</Text>
 
+            {/* Info profilo utente */}
+            {userProfile && (
+              <View style={styles.profileCard}>
+                <View style={[styles.iconContainer, { backgroundColor: '#EFF6FF' }]}>
+                  <Ionicons name="person-circle-outline" size={22} color="#0A74FF" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.itemTitleText} numberOfLines={1}>{userProfile.email}</Text>
+                  <View style={[styles.roleBadge, { backgroundColor: getRoleColor(userProfile.role) + '20' }]}>
+                    <View style={[styles.roleDot, { backgroundColor: getRoleColor(userProfile.role) }]} />
+                    <Text style={[styles.roleText, { color: getRoleColor(userProfile.role) }]}>
+                      {getRoleLabel(userProfile.role)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Pulsante Esci */}
+            <Pressable
+              style={[styles.item, styles.logoutItem]}
+              onPress={handleLogout}
+              disabled={isLoggingOut}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: '#FFF7ED' }]}>
+                {isLoggingOut
+                  ? <ActivityIndicator size="small" color="#F97316" />
+                  : <Ionicons name="log-out-outline" size={20} color="#F97316" />
+                }
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.itemTitleText, { color: '#F97316' }]}>
+                  {isLoggingOut ? 'Uscita in corso...' : 'Esci'}
+                </Text>
+                <Text style={styles.itemSubtitleText}>
+                  Disconnetti il tuo account Google
+                </Text>
+              </View>
+              {!isLoggingOut && (
+                <Ionicons name="chevron-forward" size={18} color="#F97316" />
+              )}
+            </Pressable>
+
+            {/* Elimina account */}
             <Pressable
               style={[styles.item, styles.dangerItem]}
               onPress={handleDeleteAccount}
@@ -355,5 +433,40 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     color: '#EF4444',
-  }
+  },
+  logoutItem: {
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    ...SHADOWS.soft,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 4,
+    gap: 4,
+  },
+  roleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  roleText: {
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontBold,
+    letterSpacing: 0.3,
+  },
 });

@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL || '').trim();
 const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '').trim();
 
 // Pulisci le virgolette se presenti per errore
-const cleanUrl = supabaseUrl.replace(/['"]/g, '');
-const cleanKey = supabaseAnonKey.replace(/['"]/g, '');
+const cleanUrl = supabaseUrl.replace(/['\"]/g, '');
+const cleanKey = supabaseAnonKey.replace(/['\"]/g, '');
 
 // Controlla se le chiavi Supabase fornite sono quelle segnaposto o vuote e se l'URL è formalmente valido
 export const isSupabaseConfigured = (): boolean => {
@@ -28,7 +29,11 @@ let client: any;
 try {
   client = createClient(actualUrl, actualKey, {
     auth: {
-      persistSession: false, // Disabilitiamo la persistenza per il log degli eventi analitici anonimi
+      // persistSession: true — necessario per mantenere la sessione Google tra un avvio e l'altro
+      persistSession: true,
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
     },
   });
 } catch (e) {
@@ -36,7 +41,10 @@ try {
   // Fallback sicuro per evitare crash all'avvio dell'applicazione
   client = createClient('https://placeholder-url-for-supabase.co', 'placeholder-key', {
     auth: {
-      persistSession: false,
+      persistSession: true,
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
     },
   });
 }
