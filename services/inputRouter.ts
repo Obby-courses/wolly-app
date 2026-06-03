@@ -49,6 +49,11 @@ const QUERY_PATTERNS = [
   /\b(categoria|categorie|distribuzione|grafico|andamento)\b/i,
   /\bqual[ei]?\b/i,
   /\bwolly\b/i,
+  // Net worth & variation queries
+  /\b(patrimonio|saldo|ricchezza|bilancio)\b/i,
+  /\b(variazion[ei]|variato|cambiato|cambiamento|differenz[ae]|delta)\b/i,
+  /\b(aumentato|diminuito|cresciuto|calato|salito|sceso)\b/i,
+  /\b(nell'ultimo|negli\s+ultimi|nell'ultima|nelle\s+ultime)\b/i,
 ];
 
 // Pattern interrogativi o analitici STRETTI (che definiscono una query anche se c'è un importo)
@@ -58,6 +63,9 @@ const STRICT_QUERY_PATTERNS = [
   /\b(mostrami|dimmi|analizza|fammi\s+vedere|mostra)\b/i,
   /\b(media|somma|conteggio|confronta|comparazione|grafico|andamento|distribuzione)\b/i,
   /\bqual[ei]?\b/i,
+  // Net worth variation strict patterns
+  /\b(variazion[ei]|cambiato|cambiamento|differenz[ae]|delta)\b/i,
+  /\b(patrimonio|saldo|ricchezza)\b/i,
 ];
 
 // ─── Router ───────────────────────────────────────────────────────────────────

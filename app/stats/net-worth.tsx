@@ -44,6 +44,40 @@ const WealthChart = ({ data, labels }: { data: any[], labels: string[] }) => {
   );
 };
 
+const DeltaChart = ({ data, labels }: { data: any[], labels: string[] }) => {
+  if (data.length === 0) return null;
+  const chartWidth = width - (SPACING.lg * 2);
+  const chartHeight = 80;
+  const deltas = data.map(d => (d.income || 0) - (d.expense || 0));
+  const maxAbs = Math.max(...deltas.map(Math.abs), 1);
+  const barCount = deltas.length;
+  const totalGap = Math.max(1, barCount - 1) * 2;
+  const barWidth = Math.max(2, (chartWidth - totalGap) / barCount);
+  const midY = chartHeight / 2;
+
+  return (
+    <View style={styles.wealthChartContainer}>
+      <Text style={styles.deltaChartLabel}>Variazione giornaliera</Text>
+      <Svg width={chartWidth} height={chartHeight}>
+        {/* zero line */}
+        <Path d={`M 0 ${midY} L ${chartWidth} ${midY}`} stroke="rgba(0,0,0,0.08)" strokeWidth="1" />
+        {deltas.map((delta, i) => {
+          const barH = Math.max(2, (Math.abs(delta) / maxAbs) * (midY - 4));
+          const x = i * (barWidth + 2);
+          const y = delta >= 0 ? midY - barH : midY;
+          const color = delta >= 0 ? '#22C55E' : '#EF4444';
+          return <Path key={i} d={`M ${x} ${y} L ${x} ${y + barH} L ${x + barWidth} ${y + barH} L ${x + barWidth} ${y} Z`} fill={color} opacity="0.8" />;
+        })}
+      </Svg>
+      <View style={styles.chartLabelsRow}>
+        {labels.filter((_, i) => i % Math.max(1, Math.floor(labels.length / 6)) === 0).map((l, i) => (
+          <Text key={i} style={styles.chartLabelText}>{l}</Text>
+        ))}
+      </View>
+    </View>
+  );
+};
+
 export default function NetWorthScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -143,6 +177,13 @@ export default function NetWorthScreen() {
                 timeRange === 'Anno' ? ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'] :
                 netWorthTrend.map(s => s.label || '')
               }/>
+
+              <DeltaChart data={netWorthTrend} labels={
+                timeRange === 'Settimana' ? netWorthTrend.map(s => s.label || '') : 
+                timeRange === 'Mese' ? netWorthTrend.map(s => s.day?.toString() || '') : 
+                timeRange === 'Anno' ? ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'] :
+                netWorthTrend.map(s => s.label || '')
+              }/>
               
               <View style={styles.currentWealthRow}>
                 <Text style={styles.currentWealthValue}>€ {selectedTotalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</Text>
@@ -227,6 +268,15 @@ const styles = StyleSheet.create({
   wealthChartContainer: {
     marginTop: SPACING.xs,
     alignItems: 'center',
+  },
+  deltaChartLabel: {
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.secondary,
+    alignSelf: 'flex-start',
+    marginTop: SPACING.md,
+    marginBottom: 4,
+    letterSpacing: 0.3,
   },
   chartLabelsRow: {
     flexDirection: 'row',

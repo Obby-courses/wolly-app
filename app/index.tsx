@@ -377,9 +377,10 @@ export default function Home() {
                       keyboardType="numeric"
                       returnKeyType="done"
                       onSubmitEditing={handleConfirmNetWorthEdit}
+                      onBlur={() => setIsEditingNetWorth(false)}
                       selectionColor="rgba(255,255,255,0.5)"
                     />
-                    <Text style={styles.netWorthCurrency}> EUR</Text>
+                    <Text style={styles.netWorthCurrency}> €</Text>
                     <Pressable onPress={handleConfirmNetWorthEdit} style={styles.confirmEditButton}>
                       <Ionicons name="checkmark" size={20} color="#FFFFFF" />
                     </Pressable>
