@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, FlatList, Dimensions } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, FlatList, Dimensions, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -71,6 +71,10 @@ export default function Home() {
   const [percentageChange, setPercentageChange] = useState<number>(0);
   const [subMonthlyEstimate, setSubMonthlyEstimate] = useState<number>(0);
   const [isNetWorthHidden, setIsNetWorthHidden] = useState(false);
+  const [isEditingNetWorth, setIsEditingNetWorth] = useState(false);
+  const [editNetWorthValue, setEditNetWorthValue] = useState('');
+  const [editIsNegative, setEditIsNegative] = useState(false);
+  const editInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('wolly_nw_hidden').then(val => {
@@ -89,6 +93,76 @@ export default function Home() {
     const nextVal = !isNetWorthHidden;
     setIsNetWorthHidden(nextVal);
     await AsyncStorage.setItem('wolly_nw_hidden', String(nextVal));
+  };
+
+  const handleNetWorthTap = () => {
+    if (isNetWorthHidden) return; // don't allow editing while hidden
+    const absVal = Math.abs(netWorth);
+    const formatted = absVal.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('.', '_').replace(',', ',').replace(/_/g, '.');
+    setEditNetWorthValue(formatted);
+    setEditIsNegative(netWorth < 0);
+    setIsEditingNetWorth(true);
+    setTimeout(() => editInputRef.current?.focus(), 80);
+  };
+
+  const handleEditNetWorthChange = (newVal: string) => {
+    // Same formatting logic as onboarding
+    let hasComma = newVal.includes(',');
+    let endsWithDot = newVal.endsWith('.');
+    const dotDecimalMatch = newVal.match(/\.(\d{1,2})$/);
+    let hasDotDecimal = !hasComma && dotDecimalMatch !== null;
+    let integerPart = '';
+    let decimalPart = '';
+    if (hasComma) {
+      const parts = newVal.split(',');
+      integerPart = parts[0];
+      decimalPart = parts[1] || '';
+    } else if (hasDotDecimal && dotDecimalMatch) {
+      const lastDotIndex = newVal.lastIndexOf('.');
+      integerPart = newVal.slice(0, lastDotIndex);
+      decimalPart = dotDecimalMatch[1];
+      hasComma = true;
+    } else if (endsWithDot) {
+      integerPart = newVal.slice(0, -1);
+      decimalPart = '';
+      hasComma = true;
+    } else {
+      integerPart = newVal;
+    }
+    const cleanInteger = integerPart.replace(/\D/g, '');
+    const cleanDecimal = decimalPart.replace(/\D/g, '').slice(0, 2);
+    const checkVal = parseFloat(cleanInteger + '.' + (cleanDecimal || '0')) || 0;
+    if (checkVal > 999999999.99) return;
+    const formattedInteger = cleanInteger.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    let formattedVal = formattedInteger;
+    if (hasComma || endsWithDot) formattedVal += ',' + cleanDecimal;
+    setEditNetWorthValue(formattedVal);
+  };
+
+  const handleConfirmNetWorthEdit = () => {
+    const cleanBalance = editNetWorthValue.replace(/\./g, '').replace(',', '.').trim();
+    const numVal = parseFloat(cleanBalance) || 0;
+    const finalAmount = editIsNegative ? -numVal : numVal;
+    const diff = finalAmount - netWorth;
+    if (diff === 0) { setIsEditingNetWorth(false); return; }
+    const diffSign = diff > 0 ? '+' : '-';
+    const diffFormatted = `${diffSign}€${Math.abs(diff).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const newFormatted = `€${Math.abs(finalAmount).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    Alert.alert(
+      'Aggiorna patrimonio',
+      `Stai impostando il patrimonio a ${newFormatted} (variazione: ${diffFormatted}). Confermi?`,
+      [
+        { text: 'Annulla', style: 'cancel', onPress: () => setIsEditingNetWorth(false) },
+        {
+          text: 'Conferma',
+          onPress: async () => {
+            setIsEditingNetWorth(false);
+            await NetWorthRepository.recordManualAdjustment(finalAmount);
+            setNetWorth(finalAmount);
+          },
+        },
+      ]
+    );
   };
   
   useEffect(() => {
@@ -284,24 +358,57 @@ export default function Home() {
             <View style={styles.netWorthHeaderContainer}>
               <Text style={styles.netWorthLabel}>Patrimonio totale</Text>
               <View style={styles.netWorthValueContainer}>
-                <Text style={styles.netWorthValue}>
-                  {isNetWorthHidden ? (
-                    <Text style={{ fontSize: 36, letterSpacing: 4 }}>••••••</Text>
-                  ) : (
-                    <>
-                      <Text style={styles.netWorthCurrency}>€ </Text>
-                      <Text>{integerPart}</Text>
-                      <Text style={styles.netWorthCents}>,{centsPart}</Text>
-                    </>
-                  )}
-                </Text>
-                <Pressable onPress={toggleNetWorthVisibility} style={styles.eyeButton}>
-                  <Ionicons 
-                    name={isNetWorthHidden ? "eye-off-sharp" : "eye-sharp"} 
-                    size={18} 
-                    color="#FFFFFF" 
-                  />
-                </Pressable>
+                {isEditingNetWorth ? (
+                  // ── INLINE EDIT MODE ────────────────────────────────────
+                  <>
+                    <Pressable
+                      onPress={() => setEditIsNegative(!editIsNegative)}
+                      style={[styles.signToggle, editIsNegative ? styles.signToggleNeg : styles.signTogglePos]}
+                    >
+                      <Text style={[styles.signToggleText, editIsNegative ? { color: '#FCA5A5' } : { color: '#BFDBFE' }]}>
+                        {editIsNegative ? '-' : '+'}
+                      </Text>
+                    </Pressable>
+                    <TextInput
+                      ref={editInputRef}
+                      style={styles.netWorthEditInput}
+                      value={editNetWorthValue}
+                      onChangeText={handleEditNetWorthChange}
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                      onSubmitEditing={handleConfirmNetWorthEdit}
+                      selectionColor="rgba(255,255,255,0.5)"
+                    />
+                    <Text style={styles.netWorthCurrency}> EUR</Text>
+                    <Pressable onPress={handleConfirmNetWorthEdit} style={styles.confirmEditButton}>
+                      <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                    </Pressable>
+                  </>
+                ) : (
+                  // ── DISPLAY MODE ─────────────────────────────────────────
+                  <>
+                    <Pressable onPress={handleNetWorthTap} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={styles.netWorthValue}>
+                        {isNetWorthHidden ? (
+                          <Text style={{ fontSize: 36, letterSpacing: 4 }}>••••••</Text>
+                        ) : (
+                          <>
+                            <Text style={styles.netWorthCurrency}>€ </Text>
+                            <Text>{integerPart}</Text>
+                            <Text style={styles.netWorthCents}>,{centsPart}</Text>
+                          </>
+                        )}
+                      </Text>
+                    </Pressable>
+                    <Pressable onPress={toggleNetWorthVisibility} style={styles.eyeButton}>
+                      <Ionicons
+                        name={isNetWorthHidden ? 'eye-off-sharp' : 'eye-sharp'}
+                        size={18}
+                        color="#FFFFFF"
+                      />
+                    </Pressable>
+                  </>
+                )}
               </View>
             </View>
 
@@ -429,6 +536,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
+    minHeight: 48,
   },
   netWorthValue: {
     color: '#FFFFFF',
@@ -437,8 +545,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   netWorthCurrency: {
-    fontSize: 28,
-    color: '#FFFFFF',
+    fontSize: 20,
+    color: 'rgba(255,255,255,0.75)',
     fontFamily: TYPOGRAPHY.fontBold,
   },
   netWorthCents: {
@@ -454,6 +562,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
+  },
+  netWorthEditInput: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontFamily: TYPOGRAPHY.fontBold,
+    letterSpacing: -0.5,
+    flex: 1,
+    paddingVertical: 0,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1.5,
+    borderBottomColor: 'rgba(255,255,255,0.5)',
+    minWidth: 80,
+  },
+  signToggle: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  signTogglePos: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  signToggleNeg: {
+    backgroundColor: 'rgba(239,68,68,0.3)',
+  },
+  signToggleText: {
+    fontSize: 18,
+    fontFamily: TYPOGRAPHY.fontBold,
+  },
+  confirmEditButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   cardsRow: {
     flexDirection: 'row',

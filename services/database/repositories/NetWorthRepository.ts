@@ -1,6 +1,8 @@
 import { getDBConnection } from '../db';
-import uuid from 'react-native-uuid';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../../supabase';
+import { analytics } from '../../analytics';
+
 
 export class NetWorthRepository {
   static async getCurrentTotal(): Promise<number> {
@@ -12,30 +14,55 @@ export class NetWorthRepository {
     return 1000.0;
   }
 
+  /**
+   * Used ONLY during onboarding to set the initial balance.
+   * Logs to Supabase with source='onboarding'.
+   */
   static async updateTotal(newAmount: number): Promise<void> {
     const db = await getDBConnection();
     const currentTotal = await this.getCurrentTotal();
     const diff = newAmount - currentTotal;
-
     if (diff === 0) return;
-
     const now = new Date().toISOString();
-    const adjId = uuid.v4().toString();
-    
-    await db.runAsync(
-      `INSERT INTO transactions (
-        id, created_at, date, time, amount, net_amount, currency, direction, 
-        category_key, subcategory_key, description, is_travel, is_online, 
-        input_method, raw_input, is_deleted
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        adjId, now, now.split('T')[0], null, diff, diff, 'EUR', 'adj',
-        'system', 'adjustment', 'Aggiustamento manuale patrimonio', 0, 0,
-        'manual', 'ADJ_SYNC', 0
-      ]
-    );
-
     await db.runAsync(`UPDATE net_worth SET amount = ?, updated_at = ?`, [newAmount, now]);
+    // Log to Supabase (fire-and-forget, non-blocking)
+    this._logAdjustmentToSupabase(currentTotal, newAmount, diff, 'onboarding').catch(() => {});
+  }
+
+  /**
+   * Used for manual user-initiated adjustments (home screen / settings).
+   * Updates net_worth locally and logs to Supabase.
+   * Does NOT touch the transactions table.
+   */
+  static async recordManualAdjustment(newAmount: number): Promise<void> {
+    const db = await getDBConnection();
+    const currentTotal = await this.getCurrentTotal();
+    const diff = newAmount - currentTotal;
+    if (diff === 0) return;
+    const now = new Date().toISOString();
+    await db.runAsync(`UPDATE net_worth SET amount = ?, updated_at = ?`, [newAmount, now]);
+    // Log to Supabase (fire-and-forget, non-blocking)
+    this._logAdjustmentToSupabase(currentTotal, newAmount, diff, 'manual').catch(() => {});
+  }
+
+  private static async _logAdjustmentToSupabase(
+    oldAmount: number,
+    newAmount: number,
+    diff: number,
+    source: string
+  ): Promise<void> {
+    try {
+      const deviceId = await analytics.getDeviceId();
+      await supabase.from('net_worth_adjustments_log').insert({
+        device_id: deviceId,
+        old_amount: oldAmount,
+        new_amount: newAmount,
+        diff: diff,
+        source: source,
+      });
+    } catch (e) {
+      console.warn('[NetWorthRepository] Failed to log adjustment to Supabase:', e);
+    }
   }
 
   static async incrementTotal(amountDelta: number): Promise<void> {
