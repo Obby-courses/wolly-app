@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 9999,
     paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 14,
     justifyContent: 'center',
     borderWidth: 0,
     shadowColor: '#000',
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
-    minHeight: 58,
+    minHeight: 62,
   },
   bottomInput: {
     flex: 1,

@@ -13,7 +13,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING } from '../../constants/Theme';
 import { AiChatResponse } from '../../services/aiChat';
 import { QueryIntent } from '../../services/aiQueryParser';
@@ -126,21 +126,22 @@ export default function AiResponseView({
 
   const isTextOnly = answer.intent === 'text' || answer.intent === 'advice';
 
-  // Calcolo dinamico del font size per evitare parole tagliate e per far entrare tutto nello schermo
+  // Calcolo dinamico del font size basato sulla larghezza dello schermo e la parola più lunga
+  const { width } = Dimensions.get('window');
+  // Consideriamo un padding di sicurezza di circa 48px totali (24px per lato)
+  const availableWidth = width - 48;
+  
   const words = answer.text_response.split(/[\s,.\n]+/);
   const maxWordLength = Math.max(...words.map(w => w.length), 1);
   
-  // Se la parola più lunga è > 10 caratteri, riduciamo il font size da 45px fino a un minimo di 20px
-  let dynamicFontSize = 45;
-  if (maxWordLength > 10) {
-    dynamicFontSize = Math.max(20, 45 - (maxWordLength - 10) * 3);
-  }
+  // Fattore di larghezza per i caratteri (circa 0.58 del font size per Outfit Bold / Sans-Serif)
+  const charWidthFactor = 0.58;
+  const maxFontForWord = availableWidth / (maxWordLength * charWidthFactor);
   
-  // Se l'intero testo è molto lungo, lo riduciamo ulteriormente per adattarlo allo schermo
-  const totalLength = answer.text_response.length;
-  if (totalLength > 120) {
-    dynamicFontSize = Math.min(dynamicFontSize, Math.max(20, 45 - (totalLength - 120) * 0.15));
-  }
+  // Impostiamo la dimensione massima desiderata a 45px (come da richiesta precedente), 
+  // ridimensionandola solo se la parola più lunga non c'entrerebbe altrimenti.
+  let dynamicFontSize = Math.min(45, maxFontForWord);
+  dynamicFontSize = Math.max(18, Math.floor(dynamicFontSize)); // Minimo di sicurezza 18px
 
   const body = (
     <>
