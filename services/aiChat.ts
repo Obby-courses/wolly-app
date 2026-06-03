@@ -415,6 +415,14 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
       text_response = `Per quanto riguarda ${formattedLabel}, non ho trovato nessuna transazione.`;
     } else {
       text_response = `Per quanto riguarda ${formattedLabel}, ho trovato ${count} transazioni in totale. Ecco le più rilevanti:`;
+      const txDetails = tx.map((t: any) => {
+        const dateFormatted = new Date(t.date).toLocaleDateString('it-IT');
+        const desc = t.description || t.category_key.replace(/_/g, ' ');
+        const sign = t.direction === 'in' ? '+' : '-';
+        const cityStr = t.city ? ` a ${t.city}` : '';
+        return `- ${dateFormatted}: ${desc} (${sign}€${Math.abs(t.amount).toFixed(2)})${cityStr}`;
+      }).join('\n');
+      text_response += `\n${txDetails}`;
     }
 
     return {
@@ -427,11 +435,13 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
         title: `Transazioni — ${label}`,
         total_count: count,
         items: tx.map((t: any) => ({
+          ...t,
           id: t.id,
           date: t.date,
           time: t.time,
           description: t.description,
-          amount: t.direction === 'in' ? t.amount : -t.amount,
+          amount: t.amount,
+          direction: t.direction,
           category_key: t.category_key,
           is_impulsive: false,
           subscription_name: t.subscription_name ? ` (${t.subscription_name})` : undefined,

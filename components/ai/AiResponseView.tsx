@@ -80,9 +80,17 @@ function renderFormattedText(text: string, queryIntent: QueryIntent | undefined,
   if (queryIntent?.merchant_filter) boldTerms.add(queryIntent.merchant_filter.toLowerCase());
 
   // Social Context / People
-  const social = ['friends', 'amici', 'family', 'famiglia', 'colleagues', 'colleghi', 'couple', 'coppia', 'alone', 'solo', 'strangers', 'sconosciuti'];
+  const social = ['friends', 'amici', 'family', 'famiglia', 'colleagues', 'colleghi', 'couple', 'coppia', 'alone', 'strangers', 'sconosciuti'];
   social.forEach(s => boldTerms.add(s));
-  if (queryIntent?.social_context_filter) boldTerms.add(queryIntent.social_context_filter.toLowerCase());
+  if (queryIntent?.social_context_filter) {
+    const filterLower = queryIntent.social_context_filter.toLowerCase();
+    boldTerms.add(filterLower);
+    if (filterLower === 'alone') {
+      boldTerms.add('da solo');
+      boldTerms.add('da sola');
+      boldTerms.add('solo');
+    }
+  }
   if (queryIntent?.person_filter) boldTerms.add(queryIntent.person_filter.toLowerCase());
 
   // Tags
