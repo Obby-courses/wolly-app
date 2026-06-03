@@ -142,6 +142,8 @@ const EMPTY_FORM: SubFormState = {
   is_active: true,
 };
 
+const MONTHS_IT = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+
 function SubModal({
   visible, onClose, onSave, onDelete, initial
 }: {
@@ -155,9 +157,34 @@ function SubModal({
   const [saving, setSaving] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
+  // Calendar State for start_date (used for yearly)
+  const [calendarDate, setCalendarDate] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
   React.useEffect(() => {
     setForm(initial || EMPTY_FORM);
+    if (initial?.start_date) {
+      const d = new Date(initial.start_date);
+      if (!isNaN(d.getTime())) setCalendarDate({ year: d.getFullYear(), month: d.getMonth() });
+    }
   }, [initial, visible]);
+
+  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+  const getFirstDayOfMonth = (y: number, m: number) => {
+    const day = new Date(y, m, 1).getDay();
+    return day === 0 ? 6 : day - 1; // Mon=0, Sun=6
+  };
+  const changeMonth = (dir: 'next' | 'prev') => {
+    setCalendarDate(curr => {
+      let m = curr.month + (dir === 'next' ? 1 : -1);
+      let y = curr.year;
+      if (m > 11) { m = 0; y += 1; }
+      if (m < 0) { m = 11; y -= 1; }
+      return { year: y, month: m };
+    });
+  };
 
   const set = (k: keyof SubFormState, v: any) => setForm(f => ({ ...f, [k]: v }));
 
@@ -306,31 +333,105 @@ function SubModal({
             {form.frequency === 'monthly'
               ? 'Giorno del mese (1–31)'
               : form.frequency === 'yearly'
-              ? 'Giorno del mese (da data inizio)'
-              : 'Giorno della settimana (0=Lun…6=Dom)'}
+              ? 'Data rinnovo annuale'
+              : 'Giorno della settimana'}
           </Text>
           {(form.frequency === 'monthly' || form.frequency === 'yearly') && (
             <Text style={modal.fieldHint}>
               Per giorni oltre il 28°: se il mese è più corto, il rinnovo avviene l'ultimo giorno disponibile (es. il 31 in aprile → 30 apr).
             </Text>
           )}
-          <TextInput
-            style={modal.input}
-            keyboardType="number-pad"
-            placeholder={form.frequency === 'monthly' || form.frequency === 'yearly' ? '1' : '0'}
-            placeholderTextColor={COLORS.secondary}
-            value={form.recurrence_day}
-            onChangeText={v => set('recurrence_day', v)}
-          />
 
-          <Text style={modal.label}>Data inizio (YYYY-MM-DD)</Text>
-          <TextInput
-            style={modal.input}
-            placeholder="2026-01-01"
-            placeholderTextColor={COLORS.secondary}
-            value={form.start_date}
-            onChangeText={v => set('start_date', v)}
-          />
+          {form.frequency === 'weekly' || form.frequency === 'biweekly' ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+              {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => {
+                const isSelected = form.recurrence_day === String(i);
+                return (
+                  <Pressable
+                    key={i}
+                    onPress={() => set('recurrence_day', String(i))}
+                    style={[
+                      modal.chip,
+                      { paddingHorizontal: 0, width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+                      isSelected && modal.chipActive
+                    ]}
+                  >
+                    <Text style={[modal.chipText, isSelected && modal.chipTextActive]}>{d}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : form.frequency === 'yearly' ? (
+            <View style={{ backgroundColor: COLORS.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: COLORS.border, marginTop: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Pressable onPress={() => changeMonth('prev')} style={{ padding: 4 }}>
+                  <Ionicons name="chevron-back" size={20} color={COLORS.primary} />
+                </Pressable>
+                <Text style={{ fontFamily: TYPOGRAPHY.fontBold, color: COLORS.primary, fontSize: 14 }}>
+                  {MONTHS_IT[calendarDate.month]} {calendarDate.year}
+                </Text>
+                <Pressable onPress={() => changeMonth('next')} style={{ padding: 4 }}>
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                </Pressable>
+              </View>
+              <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => (
+                  <Text key={i} style={{ flex: 1, textAlign: 'center', fontSize: 12, color: COLORS.secondary, fontFamily: TYPOGRAPHY.fontBold }}>{d}</Text>
+                ))}
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {(() => {
+                  const days = getDaysInMonth(calendarDate.year, calendarDate.month);
+                  const firstDay = getFirstDayOfMonth(calendarDate.year, calendarDate.month);
+                  const grid = [];
+                  for (let i = 0; i < firstDay; i++) {
+                    grid.push(<View key={`empty-${i}`} style={{ width: '14.28%', aspectRatio: 1 }} />);
+                  }
+                  for (let i = 1; i <= days; i++) {
+                    const dateStr = `${calendarDate.year}-${String(calendarDate.month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    const isSelected = form.start_date === dateStr;
+                    grid.push(
+                      <Pressable 
+                        key={`day-${i}`} 
+                        onPress={() => {
+                          set('start_date', dateStr);
+                          set('recurrence_day', String(i));
+                        }}
+                        style={{ width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center' }}
+                      >
+                        <View style={[{ width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }, isSelected && { backgroundColor: COLORS.primary }]}>
+                          <Text style={[{ fontSize: 14, color: COLORS.primary, fontFamily: TYPOGRAPHY.fontFamily }, isSelected && { color: '#FFF', fontFamily: TYPOGRAPHY.fontBold }]}>{i}</Text>
+                        </View>
+                      </Pressable>
+                    );
+                  }
+                  return grid;
+                })()}
+              </View>
+            </View>
+          ) : (
+            <TextInput
+              style={modal.input}
+              keyboardType="number-pad"
+              placeholder="1"
+              placeholderTextColor={COLORS.secondary}
+              value={form.recurrence_day}
+              onChangeText={v => set('recurrence_day', v)}
+            />
+          )}
+
+          {form.frequency !== 'yearly' && (
+            <>
+              <Text style={modal.label}>Data inizio (YYYY-MM-DD)</Text>
+              <TextInput
+                style={modal.input}
+                placeholder="2026-01-01"
+                placeholderTextColor={COLORS.secondary}
+                value={form.start_date}
+                onChangeText={v => set('start_date', v)}
+              />
+            </>
+          )}
 
           {/* PULSANTE ELIMINA PERIODICA */}
           {!!initial && onDelete && (

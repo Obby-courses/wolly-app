@@ -851,6 +851,94 @@ export default function ExpenseDetail() {
                     onChangeText={setPeriodicName}
                     onFocus={() => handleInputFocus('periodicName')}
                   />
+                  {periodicFrequency === 'monthly' ? (
+                    <>
+                      <Text style={[styles.periodicLabel, { marginTop: 14 }]}>Giorno del mese (1-31)</Text>
+                      <TextInput
+                        ref={ref => inputRefs.current['periodicDay'] = ref}
+                        style={styles.periodicInput}
+                        keyboardType="number-pad"
+                        placeholder="es. 15"
+                        placeholderTextColor={COLORS.secondary}
+                        value={periodicDay}
+                        onChangeText={setPeriodicDay}
+                        onFocus={() => handleInputFocus('periodicDay')}
+                      />
+                    </>
+                  ) : periodicFrequency === 'weekly' || periodicFrequency === 'biweekly' ? (
+                    <>
+                      <Text style={[styles.periodicLabel, { marginTop: 14 }]}>Giorno della settimana</Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                        {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => {
+                          const isSelected = periodicDay === String(i);
+                          return (
+                            <Pressable
+                              key={i}
+                              onPress={() => setPeriodicDay(String(i))}
+                              style={[
+                                styles.dayCell,
+                                { flex: 1, marginHorizontal: 2, height: 40, borderRadius: 8, aspectRatio: undefined },
+                                isSelected && styles.dayCellSelected
+                              ]}
+                            >
+                              <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{d}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </>
+                  ) : periodicFrequency === 'yearly' ? (
+                    <>
+                      <Text style={[styles.periodicLabel, { marginTop: 14 }]}>Data rinnovo annuale</Text>
+                      <View style={{ backgroundColor: COLORS.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: COLORS.border, marginTop: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                          <Pressable onPress={() => changeMonth('prev')} style={{ padding: 4 }}>
+                            <Ionicons name="chevron-back" size={20} color={COLORS.primary} />
+                          </Pressable>
+                          <Text style={{ fontFamily: TYPOGRAPHY.fontBold, color: COLORS.primary, fontSize: 14 }}>
+                            {MONTHS_IT[calendarDate.month]} {calendarDate.year}
+                          </Text>
+                          <Pressable onPress={() => changeMonth('next')} style={{ padding: 4 }}>
+                            <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                          </Pressable>
+                        </View>
+                        <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                          {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => (
+                            <Text key={i} style={{ flex: 1, textAlign: 'center', fontSize: 12, color: COLORS.secondary, fontFamily: TYPOGRAPHY.fontBold }}>{d}</Text>
+                          ))}
+                        </View>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                          {(() => {
+                            const days = getDaysInMonth(calendarDate.year, calendarDate.month);
+                            const firstDay = getFirstDayOfMonth(calendarDate.year, calendarDate.month);
+                            const grid = [];
+                            for (let i = 0; i < firstDay; i++) {
+                              grid.push(<View key={`empty-${i}`} style={{ width: '14.28%', aspectRatio: 1 }} />);
+                            }
+                            for (let i = 1; i <= days; i++) {
+                              const dateStr = `${calendarDate.year}-${String(calendarDate.month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                              const isSelected = editableExpense.date === dateStr;
+                              grid.push(
+                                <Pressable 
+                                  key={`day-${i}`} 
+                                  onPress={() => {
+                                    handleDaySelect(i);
+                                    setPeriodicDay(String(i)); // Ensure periodicDay is set for fallback
+                                  }}
+                                  style={{ width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center' }}
+                                >
+                                  <View style={[{ width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }, isSelected && { backgroundColor: COLORS.primary }]}>
+                                    <Text style={[{ fontSize: 14, color: COLORS.primary, fontFamily: TYPOGRAPHY.fontFamily }, isSelected && { color: '#FFF', fontFamily: TYPOGRAPHY.fontBold }]}>{i}</Text>
+                                  </View>
+                                </Pressable>
+                              );
+                            }
+                            return grid;
+                          })()}
+                        </View>
+                      </View>
+                    </>
+                  ) : null}
                   {!periodicName.trim() && (
                     <Text style={{ fontSize: 11, color: '#EF4444', marginTop: 4 }}>Campo obbligatorio</Text>
                   )}
