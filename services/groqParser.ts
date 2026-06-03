@@ -125,6 +125,7 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
   - USCITE periodiche: abbonamenti (Netflix, Spotify, Amazon Prime, Adobe, palestra), affitto pagato, assicurazione, bollette, rate, importi fissi ricorrenti (9.99, 15.99, etc.)
   - ENTRATE periodiche: stipendio, salario, rendita, affitto ricevuto, pensione, borsa di studio mensile, entrate fisse ricorrenti
   In tutti gli altri casi imposta false e gli altri campi abbonamento a null.
+  Se "suggest_subscription" è true, "subscription_name" NON deve mai essere null o vuoto. Se il nome dell'abbonamento o stipendio non è specificato esplicitamente dall'utente, deducilo sempre dalla categoria o dal contesto (ad es. "Palestra" se inerente a sport/palestre, "Bolletta" se inerente a utenze/bollette/luce/gas, "Affitto" per spese di casa/affitto, "Stipendio" per entrate ricorrenti, "Abbonamento" o nome servizio come "Netflix" o "Spotify" per tv/musica/streaming).
 `;
 
   try {
@@ -273,9 +274,40 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
         }
 
         // Extract subscription suggestion from AI response
+        let subName = (result as any).subscription_name;
+        if (!!(result as any).suggest_subscription && (!subName || subName.trim() === '')) {
+          if (result.category_key) {
+            const lowerCat = result.category_key.toLowerCase();
+            if (lowerCat.includes('bollette') || lowerCat.includes('utenze') || lowerCat.includes('energia') || lowerCat.includes('gas') || lowerCat.includes('luce')) {
+              subName = 'Bolletta';
+            } else if (lowerCat.includes('affitto') || lowerCat.includes('casa') || lowerCat.includes('mutuo')) {
+              subName = 'Affitto';
+            } else if (lowerCat.includes('sport') || lowerCat.includes('fitness') || lowerCat.includes('palestra')) {
+              subName = 'Palestra';
+            } else if (lowerCat.includes('stipendio') || lowerCat.includes('stipendi') || lowerCat.includes('entrata_ricorrente') || lowerCat.includes('entrate')) {
+              subName = 'Stipendio';
+            } else if (lowerCat.includes('tv') || lowerCat.includes('streaming') || lowerCat.includes('film') || lowerCat.includes('video')) {
+              subName = 'Abbonamento Streaming';
+            } else if (lowerCat.includes('music') || lowerCat.includes('spotify') || lowerCat.includes('audio') || lowerCat.includes('libri')) {
+              subName = 'Abbonamento Audio';
+            } else if (lowerCat.includes('software') || lowerCat.includes('app') || lowerCat.includes('cloud')) {
+              subName = 'Abbonamento Software';
+            } else {
+              const parts = result.category_key.split('_');
+              subName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            }
+          }
+          if (!subName && result.description) {
+            subName = result.description;
+          }
+          if (!subName) {
+            subName = 'Abbonamento';
+          }
+        }
+
         const subscriptionSuggestion: SubscriptionSuggestion = {
           suggest_subscription: !!(result as any).suggest_subscription,
-          subscription_name: (result as any).subscription_name || undefined,
+          subscription_name: subName ? subName.trim() : undefined,
           subscription_amount: (result as any).subscription_amount || undefined,
           subscription_frequency: (result as any).subscription_frequency || undefined,
           subscription_day: (result as any).subscription_day || undefined,
