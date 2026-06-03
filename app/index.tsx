@@ -332,25 +332,27 @@ export default function Home() {
 
       setUpcomingSubs(mergedUpcoming.slice(0, 3));
 
-      // 1. Spese di questo mese
+      // 1. Spese degli ultimi 30 giorni
       const today = new Date();
-      const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
       const todayStr = today.toISOString().split('T')[0];
-      const thisMonthSum = await TransactionRepository.getExpensesSumForPeriod(firstDayThisMonth, todayStr);
+      
+      const date30DaysAgo = new Date(today);
+      date30DaysAgo.setDate(today.getDate() - 29);
+      const date30DaysAgoStr = date30DaysAgo.toISOString().split('T')[0];
+      
+      const thisMonthSum = await TransactionRepository.getExpensesSumForPeriod(date30DaysAgoStr, todayStr);
       setThisMonthExpenses(thisMonthSum);
 
-      // Spese dello stesso periodo del mese precedente
-      const firstDayPrevMonthObj = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const sameDayPrevMonthObj = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+      // Spese del periodo subito precedente (i 30 giorni antecedenti)
+      const date60DaysAgo = new Date(today);
+      date60DaysAgo.setDate(today.getDate() - 59);
+      const date60DaysAgoStr = date60DaysAgo.toISOString().split('T')[0];
       
-      // Gestiamo l'eventualità in cui il mese precedente avesse meno giorni
-      if (sameDayPrevMonthObj.getMonth() !== firstDayPrevMonthObj.getMonth()) {
-        sameDayPrevMonthObj.setDate(0);
-      }
+      const date31DaysAgo = new Date(today);
+      date31DaysAgo.setDate(today.getDate() - 30);
+      const date31DaysAgoStr = date31DaysAgo.toISOString().split('T')[0];
       
-      const firstDayPrevMonth = firstDayPrevMonthObj.toISOString().split('T')[0];
-      const sameDayPrevMonth = sameDayPrevMonthObj.toISOString().split('T')[0];
-      const prevMonthSum = await TransactionRepository.getExpensesSumForPeriod(firstDayPrevMonth, sameDayPrevMonth);
+      const prevMonthSum = await TransactionRepository.getExpensesSumForPeriod(date60DaysAgoStr, date31DaysAgoStr);
       setPrevMonthExpensesComp(prevMonthSum);
       
       // Calcolo percentuale
@@ -465,7 +467,7 @@ export default function Home() {
               {/* Card Spese del Mese (Debit Card Style) */}
               <View style={styles.glassCard}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardHeaderText}>SPESE IN MAG 26</Text>
+                  <Text style={styles.cardHeaderText}>ULTIMI 30 GIORNI</Text>
                 </View>
                 <Text style={styles.cardValueText} numberOfLines={1}>
                   €{thisMonthExpenses.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
@@ -479,7 +481,7 @@ export default function Home() {
                     percentageChange <= 0 ? styles.trendTextGreen : styles.trendTextRed
                   ]} numberOfLines={1}>
                     {percentageChange !== 0 ? (
-                      `${percentageChange > 0 ? '+' : '-'}${Math.abs(percentageChange).toFixed(0)}% vs mese prec.`
+                      `${percentageChange > 0 ? '+' : '-'}${Math.abs(percentageChange).toFixed(0)}% vs 30gg prec.`
                     ) : (
                       'Trend stabile'
                     )}
