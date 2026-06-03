@@ -93,6 +93,11 @@ export default function TermsScreen() {
           </InfoBox>
           <BulletItem>
             <Text style={styles.bulletText}>
+              <Text style={styles.bold}>Nessuna garanzia sull'AI</Text>: Le risposte generate dall'intelligenza artificiale possono contenere errori, imprecisioni o informazioni incomplete. L'utente è sempre responsabile della verifica delle informazioni prima di assumere qualsiasi decisione basata su tali contenuti.
+            </Text>
+          </BulletItem>
+          <BulletItem>
+            <Text style={styles.bulletText}>
               <Text style={styles.bold}>Non è consulenza</Text>: Nessun dato o risposta IA costituisce, né può essere inteso come,
               una consulenza finanziaria, legale, fiscale o d'investimento.
             </Text>
@@ -108,8 +113,7 @@ export default function TermsScreen() {
         <Section title="4. Requisiti e Account" icon="person-outline" iconColor="#8B5CF6" iconBg="#F3EFFF">
           <BulletItem>
             <Text style={styles.bulletText}>
-              <Text style={styles.bold}>Età minima</Text>: L'uso dell'applicazione è consentito esclusivamente a utenti
-              che abbiano compiuto almeno 14 anni.
+              <Text style={styles.bold}>Età minima</Text>: L'applicazione è destinata a persone che abbiano compiuto almeno 16 anni. L'uso da parte di soggetti di età inferior non è consentito.
             </Text>
           </BulletItem>
           <BulletItem>
@@ -131,8 +135,7 @@ export default function TermsScreen() {
           </BulletItem>
           <BulletItem>
             <Text style={styles.bulletText}>
-              Gli account utente contrassegnati come abusivi, o che superano le soglie di utilizzo previste (ad esempio,
-              il limite di 500 richieste mensili all'IA), possono essere sospesi o limitati per preservare la stabilità del servizio.
+              Gli account utente contrassegnati come abusivi, o che superano le soglie di utilizzo ed eventuali limiti previsti e comunicati dall'applicazione, possono essere sospesi o limitati per preservare la stabilità del servizio.
             </Text>
           </BulletItem>
         </Section>
@@ -144,7 +147,7 @@ export default function TermsScreen() {
             e perpetuo di utilizzare tali informazioni per migliorare l'applicazione, senza alcun obbligo di compenso o attribuzione.
           </Text>
           <Text style={[styles.bodyText, { marginTop: 8 }]}>
-            Tutti i marchi, la grafica, i loghi e il codice sorgente di Wolly sono di proprietà esclusiva dello sviluppatore.
+            Salvo ove diversamente indicato, i contenuti, la grafica, il design e il software di Wolly sono protetti dalla normativa sul diritto d'autore e non possono essere copiati, distribuiti o utilizzati senza preventiva autorizzazione scritta.
           </Text>
         </Section>
 
@@ -155,12 +158,16 @@ export default function TermsScreen() {
             o cambi nel modello di servizio.
           </Text>
           <Text style={[styles.bodyText, { marginTop: 8 }]}>
-            L'uso continuato dell'app dopo la pubblicazione delle modifiche costituisce accettazione dei nuovi termini.
+            In caso di modifiche sostanziali, gli utenti saranno informati tramite l'applicazione o tramite email. L'uso dell'app dopo la pubblicazione delle modifiche costituisce accettazione dei nuovi termini.
           </Text>
         </Section>
 
         {/* ─── 8. CONTATTI ─── */}
-        <Section title="8. Contatti" icon="mail-outline" iconColor="#8E8E93" iconBg="#F2F2F7">
+        <Section title="8. Contatti e Titolare" icon="mail-outline" iconColor="#8E8E93" iconBg="#F2F2F7">
+          <View style={{ gap: 4, marginBottom: 8 }}>
+            <Text style={styles.bodyText}><Text style={styles.bold}>Titolare</Text>: Alessandro Gentile</Text>
+            <Text style={styles.bodyText}><Text style={styles.bold}>Località</Text>: Monza, Italia</Text>
+          </View>
           <Text style={styles.bodyText}>
             Per qualsiasi comunicazione, segnalazione o richiesta relativa ai presenti Termini di Utilizzo,
             puoi scrivere a:
