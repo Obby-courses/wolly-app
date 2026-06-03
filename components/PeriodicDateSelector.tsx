@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, TYPOGRAPHY, SPACING } from '../constants/Theme';
 
 const MONTHS_IT = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
@@ -110,9 +111,17 @@ export default function PeriodicDateSelector({
                 onPress={() => handleWeekdayToggle(i)}
                 style={[
                   styles.dayCell,
-                  isSelected && styles.dayCellSelected
+                  isSelected && styles.dayCellSelectedContainer
                 ]}
               >
+                {isSelected && (
+                  <LinearGradient
+                    colors={['#6CA5DD', '#CBE2F4']}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                  />
+                )}
                 <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{d}</Text>
               </Pressable>
             );
@@ -160,7 +169,15 @@ export default function PeriodicDateSelector({
                     onPress={() => onChange(String(i), dateStr)}
                     style={styles.calendarCell}
                   >
-                    <View style={[styles.calendarDayCircle, isSelected && styles.calendarDayCircleSelected]}>
+                    <View style={[styles.calendarDayCircle, isSelected && styles.calendarDayCircleSelectedContainer]}>
+                      {isSelected && (
+                        <LinearGradient
+                          colors={['#6CA5DD', '#CBE2F4']}
+                          style={StyleSheet.absoluteFill}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 0, y: 1 }}
+                        />
+                      )}
                       <Text style={[styles.calendarDayText, isSelected && styles.calendarDayTextSelected]}>{i}</Text>
                     </View>
                   </Pressable>
@@ -211,9 +228,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  dayCellSelected: {
-    backgroundColor: COLORS.primary,
+  dayCellSelectedContainer: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
   },
   dayText: {
     fontSize: TYPOGRAPHY.sizes.sm,
@@ -269,9 +288,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  calendarDayCircleSelected: {
-    backgroundColor: COLORS.primary,
+  calendarDayCircleSelectedContainer: {
+    backgroundColor: 'transparent',
   },
   calendarDayText: {
     fontSize: 14,
