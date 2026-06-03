@@ -1,17 +1,37 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../services/supabase';
-import { clearProfile } from '../services/profileStore';
+import { getProfile, clearProfile } from '../services/profileStore';
 import { TYPOGRAPHY, SHADOWS } from '../constants/Theme';
 
 export default function BlockedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isNotWhitelisted, setIsNotWhitelisted] = React.useState(false);
+  const [isChecking, setIsChecking] = React.useState(true);
+
+  React.useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const profile = await getProfile();
+        if (!profile) {
+          setIsNotWhitelisted(true);
+        } else if (profile.role === 'blocked') {
+          setIsNotWhitelisted(false);
+        }
+      } catch (e) {
+        console.warn('[BlockedScreen] Errore verifica profilo:', e);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+    checkStatus();
+  }, []);
 
   const handleLogout = async () => {
     Alert.alert(
@@ -39,10 +59,18 @@ export default function BlockedScreen() {
     );
   };
 
+  if (isChecking) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#0A74FF" />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
       <LinearGradient
-        colors={['#FEF2F2', '#FFFFFF']}
+        colors={isNotWhitelisted ? ['#FFF7ED', '#FFFFFF'] : ['#FEF2F2', '#FFFFFF']}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 0.5 }}
@@ -51,33 +79,53 @@ export default function BlockedScreen() {
       <View style={styles.content}>
         {/* Icona */}
         <View style={styles.iconContainer}>
-          <LinearGradient colors={['#FCA5A5', '#EF4444']} style={styles.iconBg}>
-            <Ionicons name="lock-closed" size={40} color="#FFFFFF" />
+          <LinearGradient 
+            colors={isNotWhitelisted ? ['#FDBA74', '#F97316'] : ['#FCA5A5', '#EF4444']} 
+            style={styles.iconBg}
+          >
+            <Ionicons name={isNotWhitelisted ? "alert-circle" : "lock-closed"} size={44} color="#FFFFFF" />
           </LinearGradient>
         </View>
 
-        <Text style={styles.title}>Accesso sospeso</Text>
+        <Text style={styles.title}>
+          {isNotWhitelisted ? 'Account non abilitato' : 'Accesso sospeso'}
+        </Text>
         <Text style={styles.subtitle}>
-          Il tuo account è stato temporaneamente sospeso.{'\n'}
-          Per assistenza contatta il supporto Wolly.
+          {isNotWhitelisted 
+            ? 'Ci dispiace, questa email non è inserita nella lista dei beta tester abilitati.\nPer richiedere l\'accesso o per assistenza contatta il supporto.'
+            : 'Il tuo account è stato temporaneamente sospeso.\nPer assistenza contatta il supporto Wolly.'
+          }
         </Text>
 
         {/* Card info */}
-        <View style={styles.infoCard}>
-          <Ionicons name="mail-outline" size={18} color="#EF4444" style={{ marginRight: 10 }} />
-          <Text style={styles.infoText}>supporto@wolly.app</Text>
+        <View style={[styles.infoCard, isNotWhitelisted && { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' }]}>
+          <Ionicons 
+            name="mail-outline" 
+            size={18} 
+            color={isNotWhitelisted ? '#F97316' : '#EF4444'} 
+            style={{ marginRight: 10 }} 
+          />
+          <Text style={[styles.infoText, isNotWhitelisted && { color: '#F97316' }]}>supporto@wolly.app</Text>
         </View>
       </View>
 
       {/* Pulsante Esci */}
       <Pressable
-        style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.75 }]}
+        style={({ pressed }) => [
+          styles.logoutButton,
+          isNotWhitelisted && { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+          pressed && { opacity: 0.75 }
+        ]}
         onPress={handleLogout}
         disabled={isLoading}
       >
-        <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-        <Text style={styles.logoutText}>
-          {isLoading ? 'Uscita in corso...' : 'Esci dall\'account'}
+        <Ionicons 
+          name="log-out-outline" 
+          size={18} 
+          color={isNotWhitelisted ? '#475569' : '#EF4444'} 
+        />
+        <Text style={[styles.logoutText, isNotWhitelisted && { color: '#475569' }]}>
+          {isLoading ? 'Uscita in corso...' : isNotWhitelisted ? 'Torna al Login' : 'Esci dall\'account'}
         </Text>
       </Pressable>
     </View>

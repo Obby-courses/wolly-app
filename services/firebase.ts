@@ -1,99 +1,58 @@
-import Constants from 'expo-constants';
-
-// Determina se l'app sta girando dentro Expo Go (dove le librerie native Firebase non sono disponibili)
-const isExpoGo = Constants.appOwnership === 'expo';
-
-// Inizializza analytics in modo dinamico solo se NON siamo su Expo Go
-let getAnalytics: any = () => null;
-
-if (!isExpoGo) {
-  // L'import dinamico (require) evita il crash in Expo Go perché il modulo nativo
-  // viene richiesto solo nel client standalone.
-  const analyticsModule = require('@react-native-firebase/analytics').default;
-  getAnalytics = () => analyticsModule();
-}
+/**
+ * firebase.ts
+ *
+ * PRIVACY AUDIT — Wolly Beta (2026-06)
+ *
+ * Firebase Analytics è stato disabilitato nella fase beta per ridurre la
+ * superficie GDPR e la complessità del doppio sistema di identità
+ * (Firebase UID ↔ Supabase UUID).
+ *
+ * Tutte le funzioni sono stub no-op: non inviano dati, non profilano,
+ * non richiedono consenso aggiuntivo.
+ *
+ * Quando sarà necessario riattivare Firebase Analytics (post-beta),
+ * rimuovere i commenti "DISABLED" e ripristinare le implementazioni.
+ */
 
 /**
- * Logs a custom event to Firebase Analytics.
- * @param eventName Name of the event (use underscores, max 40 chars)
- * @param params Optional key-value pairs of event parameters
+ * [DISABLED] Logs a custom event to Firebase Analytics.
+ * Kept as a no-op stub to avoid breaking existing call-sites.
  */
-export const logCustomEvent = async (eventName: string, params?: Record<string, any>) => {
-  if (isExpoGo) {
-    console.log(`[Firebase Analytics (Expo Go Bypass)] Event: ${eventName}`, params || '');
-    return;
-  }
-  try {
-    const analytics = getAnalytics();
-    if (analytics) {
-      await analytics.logEvent(eventName, params);
-      console.log(`[Firebase Analytics] Event logged: ${eventName}`, params || '');
-    }
-  } catch (error) {
-    console.error(`[Firebase Analytics] Error logging event ${eventName}:`, error);
-  }
+export const logCustomEvent = async (
+  _eventName: string,
+  _params?: Record<string, any>
+): Promise<void> => {
+  // Firebase Analytics disabled in beta — nessun dato inviato
 };
 
 /**
- * Tracks a screen view in Firebase Analytics.
- * @param screenName The name of the screen being viewed
- * @param screenClass The class name of the screen activity/controller
+ * [DISABLED] Tracks a screen view in Firebase Analytics.
+ * Kept as a no-op stub to avoid breaking existing call-sites.
  */
-export const logScreenView = async (screenName: string, screenClass?: string) => {
-  if (isExpoGo) {
-    console.log(`[Firebase Analytics (Expo Go Bypass)] Screen view: ${screenName}`);
-    return;
-  }
-  try {
-    const analytics = getAnalytics();
-    if (analytics) {
-      await analytics.logScreenView({
-        screen_name: screenName,
-        screen_class: screenClass || screenName,
-      });
-      console.log(`[Firebase Analytics] Screen view logged: ${screenName}`);
-    }
-  } catch (error) {
-    console.error(`[Firebase Analytics] Error logging screen view ${screenName}:`, error);
-  }
+export const logScreenView = async (
+  _screenName: string,
+  _screenClass?: string
+): Promise<void> => {
+  // Firebase Analytics disabled in beta — nessun dato inviato
 };
 
 /**
- * Sets user properties for Firebase Analytics.
- * @param properties Key-value pairs of user attributes
+ * [DISABLED] Sets user properties for Firebase Analytics.
+ * Removed: profilazione utente non necessaria in fase beta.
  */
-export const setUserProperties = async (properties: Record<string, string | null>) => {
-  if (isExpoGo) {
-    console.log('[Firebase Analytics (Expo Go Bypass)] User properties:', properties);
-    return;
-  }
-  try {
-    const analytics = getAnalytics();
-    if (analytics) {
-      await analytics.setUserProperties(properties);
-      console.log('[Firebase Analytics] User properties updated', properties);
-    }
-  } catch (error) {
-    console.error('[Firebase Analytics] Error setting user properties:', error);
-  }
+export const setUserProperties = async (
+  _properties: Record<string, string | null>
+): Promise<void> => {
+  // Firebase Analytics disabled in beta — nessun dato inviato
 };
 
 /**
- * Sets the user ID for the current session.
- * @param userId Unique identifier for the user
+ * [DISABLED] Sets the user ID for Firebase Analytics.
+ * Removed: collegare Firebase UID a Supabase UUID crea profilazione
+ * cross-platform e aumenta la superficie GDPR inutilmente in beta.
  */
-export const setAnalyticsUserId = async (userId: string | null) => {
-  if (isExpoGo) {
-    console.log(`[Firebase Analytics (Expo Go Bypass)] User ID: ${userId}`);
-    return;
-  }
-  try {
-    const analytics = getAnalytics();
-    if (analytics) {
-      await analytics.setUserId(userId);
-      console.log(`[Firebase Analytics] User ID set to: ${userId}`);
-    }
-  } catch (error) {
-    console.error('[Firebase Analytics] Error setting user ID:', error);
-  }
+export const setAnalyticsUserId = async (
+  _userId: string | null
+): Promise<void> => {
+  // Firebase Analytics disabled in beta — nessun dato inviato
 };

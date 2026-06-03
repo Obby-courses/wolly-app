@@ -3,7 +3,6 @@ import { executeQueryIntent, ExecutionResult, DistributionItem, periodToDateRang
 import { SubscriptionRepository, Subscription } from './database/repositories/SubscriptionRepository';
 import { translateSocialContext, translateLocationType, translateTimeOfDay } from '../constants/i18n';
 import { supabase } from './supabase';
-import { analytics } from './analytics';
 import uuid from 'react-native-uuid';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -591,7 +590,6 @@ export async function askAiChat(
   inputMethod: 'voice' | 'text' = 'text'
 ): Promise<AiChatResponse> {
   const startTime = Date.now();
-  const currentDeviceId = await analytics.getDeviceId();
   
   console.log('\n' + '='.repeat(60));
   console.log('🤖 [WOLLY AI — NUOVA ARCHITETTURA]');
@@ -709,7 +707,7 @@ export async function askAiChat(
           },
           cost_usd: computedCost,
           app_version: '0.0.1',
-          device_id: currentDeviceId
+          // GDPR: device_id rimosso — log completamente anonimi
         });
       if (error) throw error;
       console.log(`📊 [ANALYTICS] AI Query logged successfully. Cost: $${computedCost.toFixed(6)}, Tokens: ${totalTotal}`);
@@ -755,7 +753,7 @@ export async function askAiChat(
         active_filters: activeFiltersStr,
         app_version: '0.0.1',
         cost_usd: computedCost,
-        device_id: currentDeviceId
+        // GDPR: device_id rimosso — log completamente anonimi
       });
       if (analysisError) console.warn('❌ [ANALYTICS] Failed to save analysis_logs:', analysisError.message);
 
@@ -792,7 +790,7 @@ export async function askAiChat(
           },
           cost_usd: 0.0,
           app_version: '0.0.1',
-          device_id: currentDeviceId
+          // GDPR: device_id rimosso — log completamente anonimi
         });
       if (dbErr) throw dbErr;
       console.log('📊 [ANALYTICS] AI error logged successfully');
@@ -833,7 +831,7 @@ export async function askAiChat(
         active_filters: activeFiltersStr,
         app_version: '0.0.1',
         cost_usd: 0.0,
-        device_id: currentDeviceId
+        // GDPR: device_id rimosso — log completamente anonimi
       });
       if (analysisError) console.warn('❌ [ANALYTICS] Failed to save error in analysis_logs:', analysisError.message);
 

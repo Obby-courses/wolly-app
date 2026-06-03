@@ -10,7 +10,7 @@ import { View, LogBox } from 'react-native';
 import { usePathname } from 'expo-router';
 import { voiceStore } from '../services/voiceStore';
 import { networkStore } from '../services/networkStore';
-import { logScreenView } from '../services/firebase';
+
 import { popupStore } from '../services/popupStore';
 import RemotePopupModal from '../components/RemotePopupModal';
 import { supabase } from '../services/supabase';
@@ -53,7 +53,8 @@ export default function RootLayout() {
         const profile = await getProfile();
 
         if (!profile) {
-          // Profilo non trovato (non ancora creato dal trigger) → lascia passare
+          // Profilo non trovato (non in whitelist / non esistente nel DB)
+          router.replace('/blocked');
           return;
         }
 
@@ -81,28 +82,33 @@ export default function RootLayout() {
 
   // ── Listener cambio sessione (login/logout in tempo reale) ───────────────
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
-        router.replace('/login');
-        return;
-      }
-
-      if (event === 'SIGNED_IN' && session?.user) {
-        // Nuovo login → ricontrolla profilo
-        const profile = await getProfile();
-        if (!profile) return;
-
-        if (profile.role === 'blocked') {
-          router.replace('/blocked');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setTimeout(async () => {
+        if (event === 'SIGNED_OUT') {
+          router.replace('/login');
           return;
         }
-        if (profile.role === 'beta_tester' && isBetaExpired(profile)) {
-          router.replace('/paywall');
-          return;
+
+        if (event === 'SIGNED_IN' && session?.user) {
+          // Nuovo login → ricontrolla profilo (attende eventuali trigger remoti)
+          const profile = await getProfile(true);
+          if (!profile) {
+            router.replace('/blocked');
+            return;
+          }
+
+          if (profile.role === 'blocked') {
+            router.replace('/blocked');
+            return;
+          }
+          if (profile.role === 'beta_tester' && isBetaExpired(profile)) {
+            router.replace('/paywall');
+            return;
+          }
+          // Accesso valido: vai alla home
+          router.replace('/');
         }
-        // Accesso valido: vai alla home
-        router.replace('/');
-      }
+      }, 0);
     });
 
     return () => subscription.unsubscribe();
@@ -119,22 +125,21 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Track screen navigation automatically in Firebase Analytics and check for popups
+  // Controlla popup attivi ad ogni cambio rotta
   useEffect(() => {
     if (pathname) {
-      logScreenView(pathname);
-      popupStore.checkRoute(pathname); // Controlla se ci sono popup attivi per questa rotta
+      popupStore.checkRoute(pathname);
     }
   }, [pathname]);
 
   useEffect(() => {
-    if (loaded || error) {
+    if ((loaded || error) && authChecked) {
       SplashScreen.hideAsync().catch(() => {
         // Ignora silenziosamente l'errore se lo splash screen è già stato nascosto
         // o se non è supportato nel controller corrente (frequente in Expo Go durante i refresh)
       });
     }
-  }, [loaded, error]);
+  }, [loaded, error, authChecked]);
 
   if (!loaded && !error) {
     return null;

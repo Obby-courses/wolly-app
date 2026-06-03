@@ -1,7 +1,5 @@
 import { getDBConnection } from '../db';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../../supabase';
-import { analytics } from '../../analytics';
 
 
 export class NetWorthRepository {
@@ -25,8 +23,6 @@ export class NetWorthRepository {
     if (diff === 0) return;
     const now = new Date().toISOString();
     await db.runAsync(`UPDATE net_worth SET amount = ?, updated_at = ?`, [newAmount, now]);
-    // Log to Supabase (fire-and-forget, non-blocking)
-    this._logAdjustmentToSupabase(currentTotal, newAmount, diff, 'onboarding').catch(() => {});
   }
 
   /**
@@ -41,29 +37,8 @@ export class NetWorthRepository {
     if (diff === 0) return;
     const now = new Date().toISOString();
     await db.runAsync(`UPDATE net_worth SET amount = ?, updated_at = ?`, [newAmount, now]);
-    // Log to Supabase (fire-and-forget, non-blocking)
-    this._logAdjustmentToSupabase(currentTotal, newAmount, diff, 'manual').catch(() => {});
   }
 
-  private static async _logAdjustmentToSupabase(
-    oldAmount: number,
-    newAmount: number,
-    diff: number,
-    source: string
-  ): Promise<void> {
-    try {
-      const deviceId = await analytics.getDeviceId();
-      await supabase.from('net_worth_adjustments_log').insert({
-        device_id: deviceId,
-        old_amount: oldAmount,
-        new_amount: newAmount,
-        diff: diff,
-        source: source,
-      });
-    } catch (e) {
-      console.warn('[NetWorthRepository] Failed to log adjustment to Supabase:', e);
-    }
-  }
 
   static async incrementTotal(amountDelta: number): Promise<void> {
      const db = await getDBConnection();

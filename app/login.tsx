@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { getProfile, isBetaExpired } from '../services/profileStore';
 import { TYPOGRAPHY, SHADOWS } from '../constants/Theme';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -19,13 +20,24 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
-  // Controlla se c'è già una sessione attiva → redirect immediato alla home
+  // Controlla se c'è già una sessione attiva → redirect corretto
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          router.replace('/');
+          const profile = await getProfile();
+          if (profile) {
+            if (profile.role === 'blocked') {
+              router.replace('/blocked');
+            } else if (profile.role === 'beta_tester' && isBetaExpired(profile)) {
+              router.replace('/paywall');
+            } else {
+              router.replace('/');
+            }
+          } else {
+            router.replace('/blocked');
+          }
           return;
         }
       } catch (e) {
@@ -48,7 +60,8 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const redirectUrl = makeRedirectUri({ scheme: 'wolly', path: 'auth/callback' });
+      const redirectUrl = makeRedirectUri({ path: 'auth/callback' });
+      console.log('[Google Login] redirectUrl generato:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -58,13 +71,24 @@ export default function LoginScreen() {
         },
       });
 
-      if (error) throw error;
-      if (!data?.url) throw new Error('URL OAuth non ricevuto da Supabase');
+      if (error) {
+        console.error('[Google Login] Errore signInWithOAuth:', error);
+        throw error;
+      }
+      if (!data?.url) {
+        console.error('[Google Login] URL OAuth non ricevuto da Supabase');
+        throw new Error('URL OAuth non ricevuto da Supabase');
+      }
 
-      // Apre il browser in-app per il login Google
+      console.log('[Google Login] data.url (OAuth):', data.url);
+
+      // Abre il browser in-app per il login Google
+      console.log('[Google Login] Apertura WebBrowser session...');
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      console.log('[Google Login] Risultato WebBrowser:', result);
 
       if (result.type === 'success' && result.url) {
+        console.log('[Google Login] Login successo! Callback URL:', result.url);
         // Estrai i parametri dalla URL di callback e completa la sessione
         const url = new URL(result.url);
         const accessToken = url.searchParams.get('access_token');
@@ -77,34 +101,37 @@ export default function LoginScreen() {
           const access = params.get('access_token');
           const refresh = params.get('refresh_token');
           if (access) {
+            console.log('[Google Login] Impostazione sessione da fragment...');
             await supabase.auth.setSession({
               access_token: access,
               refresh_token: refresh ?? '',
             });
-            router.replace('/');
+            console.log('[Google Login] Sessione impostata con successo.');
             return;
           }
         }
 
         if (accessToken) {
+          console.log('[Google Login] Impostazione sessione da query params...');
           await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken ?? '',
           });
-          router.replace('/');
+          console.log('[Google Login] Sessione impostata con successo.');
         } else {
-          // L'utente ha annullato il login o qualcosa è andato storto
-          console.warn('[Login] Nessun token ricevuto nella callback URL:', result.url);
+          console.warn('[Google Login] Nessun token ricevuto nella callback URL:', result.url);
         }
+      } else {
+        console.log('[Google Login] WebBrowser chiuso o annullato:', result.type);
       }
-      // result.type === 'cancel' → l'utente ha chiuso il browser, non fare nulla
     } catch (e: any) {
-      console.error('[Login] Errore Google OAuth:', e);
+      console.error('[Google Login] Errore Google OAuth:', e);
       Alert.alert(
         'Errore di accesso',
         'Impossibile completare il login con Google. Controlla la connessione e riprova.',
       );
     } finally {
+      console.log('[Google Login] Fine flusso login. Imposto isLoading a false.');
       setIsLoading(false);
     }
   };
@@ -118,76 +145,52 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
-      {/* Background gradient */}
-      <LinearGradient
-        colors={['#EFF6FF', '#FFFFFF']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 0.6 }}
-      />
-
-      {/* Top: Logo & Branding */}
-      <View style={styles.topSection}>
+    <View style={styles.container}>
+      {/* Top Half: Light blue background with centered logo */}
+      <View style={styles.topHalf}>
         <View style={styles.logoContainer}>
           <LinearGradient
             colors={['#0A74FF', '#005FCC']}
             style={styles.logoBg}
           >
-            <Ionicons name="sparkles" size={36} color="#FFFFFF" />
+            <Ionicons name="sparkles" size={44} color="#FFFFFF" />
           </LinearGradient>
         </View>
+      </View>
 
-        <Text style={styles.appName}>Wolly</Text>
-        <View style={styles.betaBadge}>
-          <Text style={styles.betaBadgeText}>Beta v.0.0.1</Text>
+      {/* Bottom Half: White background with content */}
+      <View style={[styles.bottomHalf, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={styles.textSection}>
+          <Text style={styles.appName}>Wolly</Text>
+          <Text style={styles.versionText}>Beta v0.0.1</Text>
+          <Text style={styles.tagline}>
+            L'app per scoprire dove finiscono i tuoi soldi
+          </Text>
         </View>
 
-        <Text style={styles.tagline}>
-          Il tuo assistente finanziario{'\n'}personale basato sull'AI
-        </Text>
-      </View>
+        <View style={styles.bottomSection}>
+          <Pressable
+            style={({ pressed }) => [styles.googleButton, pressed && styles.googleButtonPressed]}
+            onPress={handleGoogleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#1C1C1E" />
+            ) : (
+              <>
+                <View style={styles.googleIconContainer}>
+                  <Text style={styles.googleG}>G</Text>
+                </View>
+                <Text style={styles.googleButtonText}>Continua con Google</Text>
+              </>
+            )}
+          </Pressable>
 
-      {/* Center: Features highlight */}
-      <View style={styles.featuresSection}>
-        {[
-          { icon: 'shield-checkmark-outline', text: 'Dati protetti sul tuo dispositivo' },
-          { icon: 'mic-outline', text: 'Registra le spese con la voce' },
-          { icon: 'bar-chart-outline', text: 'Statistiche e analisi avanzate' },
-        ].map((item, i) => (
-          <View key={i} style={styles.featureRow}>
-            <View style={styles.featureIconBg}>
-              <Ionicons name={item.icon as any} size={18} color="#0A74FF" />
-            </View>
-            <Text style={styles.featureText}>{item.text}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Bottom: Login Button */}
-      <View style={styles.bottomSection}>
-        <Pressable
-          style={({ pressed }) => [styles.googleButton, pressed && styles.googleButtonPressed]}
-          onPress={handleGoogleLogin}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color="#1C1C1E" />
-          ) : (
-            <>
-              {/* Google "G" logo SVG-like using text */}
-              <View style={styles.googleIconContainer}>
-                <Text style={styles.googleG}>G</Text>
-              </View>
-              <Text style={styles.googleButtonText}>Continua con Google</Text>
-            </>
-          )}
-        </Pressable>
-
-        <Text style={styles.disclaimer}>
-          Continuando accetti i Termini di Utilizzo e la{'\n'}
-          Privacy Policy di Wolly.
-        </Text>
+          <Text style={styles.disclaimer}>
+            Continuando accetti i Termini di Utilizzo e la{'\n'}
+            Privacy Policy di Wolly.
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -197,9 +200,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
   },
   loadingContainer: {
     flex: 1,
@@ -207,78 +207,54 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
   },
-  topSection: {
+  topHalf: {
+    flex: 1,
+    backgroundColor: '#E0F2FE', // Azzurro chiaro premium
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 40,
   },
   logoContainer: {
-    marginBottom: 16,
     ...SHADOWS.medium,
   },
   logoBg: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
+    width: 96,
+    height: 96,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  bottomHalf: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 28,
+    paddingTop: 32,
+    justifyContent: 'space-between',
+  },
+  textSection: {
+    alignItems: 'center',
+    width: '100%',
+  },
   appName: {
-    fontSize: 36,
+    fontSize: 38,
     fontFamily: TYPOGRAPHY.fontBold,
     color: '#0F172A',
     letterSpacing: -0.5,
+    marginBottom: 4,
+    textAlign: 'center',
   },
-  betaBadge: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    marginTop: 6,
-    marginBottom: 16,
-  },
-  betaBadgeText: {
-    fontSize: 11,
+  versionText: {
+    fontSize: 12,
     fontFamily: TYPOGRAPHY.fontBold,
     color: '#2563EB',
-    letterSpacing: 0.3,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   tagline: {
     fontSize: 15,
     fontFamily: TYPOGRAPHY.fontFamily,
     color: '#64748B',
-    textAlign: 'center',
     lineHeight: 22,
-  },
-  featuresSection: {
-    width: '100%',
-    gap: 12,
-    paddingVertical: 16,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    gap: 12,
-  },
-  featureIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureText: {
-    fontSize: 14,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    color: '#334155',
-    flex: 1,
+    textAlign: 'center',
   },
   bottomSection: {
     width: '100%',

@@ -73,37 +73,56 @@ export async function clearProfile(): Promise<void> {
  * In caso di errore di rete, ritorna il profilo dalla cache locale.
  * Ritorna null se l'utente non è autenticato o se non esiste un profilo.
  */
-export async function getProfile(): Promise<UserProfile | null> {
+export async function getProfile(shouldRetry: boolean = false): Promise<UserProfile | null> {
   if (!isSupabaseConfigured()) {
     console.warn('[profileStore] Supabase non configurato — impossibile caricare il profilo.');
     return null;
   }
 
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return null;
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  const maxAttempts = shouldRetry ? 3 : 1;
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return null;
 
-    if (error) {
-      console.warn('[profileStore] Errore fetch profilo da Supabase:', error.message);
-      // Fallback alla cache locale
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!error && data) {
+        const profile = data as UserProfile;
+        // Aggiorna la cache con i dati più recenti
+        await cacheProfile(profile);
+        return profile;
+      }
+
+      // Se c'è un errore e non è l'ultimo tentativo, attendiamo e riproviamo
+      if (error && attempt < maxAttempts) {
+        console.log(`[profileStore] Profilo non trovato (tentativo ${attempt}/${maxAttempts}), attesa trigger...`);
+        await delay(600);
+        continue;
+      }
+
+      if (error) {
+        console.warn('[profileStore] Errore fetch profilo dopo tentativi:', error.message);
+        // Fallback alla cache locale
+        return await getCachedProfile();
+      }
+    } catch (e) {
+      if (attempt < maxAttempts) {
+        await delay(600);
+        continue;
+      }
+      console.warn('[profileStore] Errore di rete — uso cache locale:', e);
       return await getCachedProfile();
     }
-
-    const profile = data as UserProfile;
-    // Aggiorna la cache con i dati più recenti
-    await cacheProfile(profile);
-    return profile;
-
-  } catch (e) {
-    console.warn('[profileStore] Errore di rete — uso cache locale:', e);
-    return await getCachedProfile();
   }
+
+  return null;
 }
 
 // ─── Helper per controllo accessi ─────────────────────────────────────────────

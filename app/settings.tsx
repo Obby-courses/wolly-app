@@ -121,8 +121,8 @@ export default function SettingsScreen() {
                       if (!result.success) {
                         console.warn('[Settings] deleteUserAccount completato con errori:', result.errors);
                       }
-                      // Redirect all'onboarding dopo la pulizia
-                      router.replace('/onboarding');
+                      // Redirect al login dopo la pulizia e disconnessione
+                      router.replace('/login');
                     } catch (e: any) {
                       console.error('[Settings] Errore critico deleteUserAccount:', e);
                       Alert.alert(

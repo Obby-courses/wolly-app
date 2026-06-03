@@ -491,7 +491,7 @@ export interface DeleteAccountResult {
  *
  * Cancella nell'ordine:
  *  1. Tabelle SQLite locali (transactions, subscriptions, net_worth, recurring_payments)
- *  2. Log Supabase associati al device_id (parsing_logs, analysis_logs, analytics_events, net_worth_adjustments_log)
+ *  2. Log Supabase (parsing_logs, analysis_logs) — ora anonimi, pulizia opzionale
  *  3. AsyncStorage (device_id, onboarding, preferenze)
  *
  * I fallimenti su Supabase non bloccano la pulizia locale.
@@ -523,8 +523,43 @@ export async function deleteUserAccount(): Promise<DeleteAccountResult> {
     errors.push(msg);
   }
 
-  // ── Step 2: Pulizia log Supabase (per device_id) ──────────────────────────
+  // ── Step 2: Pulizia log Supabase (per device_id) e Profilo utente ──────────
   if (isSupabaseConfigured()) {
+    // 1. Elimina Profilo e effettua Logout se loggato
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const userId = session.user.id;
+        
+        // 1. Cancella esplicitamente il profilo remoto dalla tabella 'profiles'
+        const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
+        if (profileError) {
+          console.warn('[deleteUserAccount] ⚠️ Errore cancellazione profilo remoto:', profileError.message);
+        } else {
+          console.log('[deleteUserAccount] ✅ Profilo remoto eliminato con successo');
+        }
+        
+        // 2. Cancella l'utente e l'email da auth.users tramite RPC (GDPR self-deletion)
+        const { error: rpcError } = await supabase.rpc('delete_current_user');
+        if (rpcError) {
+          console.warn('[deleteUserAccount] ⚠️ Errore RPC delete_current_user:', rpcError.message);
+        } else {
+          console.log('[deleteUserAccount] ✅ Utente ed email eliminati da auth.users su Supabase via RPC');
+        }
+        
+        // Cancella cache locale profilo
+        const { clearProfile } = await import('./profileStore');
+        await clearProfile();
+        
+        // Logout
+        await supabase.auth.signOut();
+        console.log('[deleteUserAccount] ✅ Utente disconnesso da Supabase Auth');
+      }
+    } catch (e: any) {
+      console.warn('[deleteUserAccount] ⚠️ Errore durante pulizia profilo/auth:', e.message);
+    }
+
+    // 2. Elimina log per device_id
     let deviceId: string | null = null;
     try {
       deviceId = await AsyncStorage.getItem('@wolly_device_id');
@@ -536,7 +571,7 @@ export async function deleteUserAccount(): Promise<DeleteAccountResult> {
       const supabaseTables = [
         'parsing_logs',
         'analysis_logs',
-        'net_worth_adjustments_log',
+        // net_worth_adjustments_log rimosso: non viene più scritto in cloud (GDPR audit 2026-06)
       ] as const;
 
       for (const table of supabaseTables) {
