@@ -51,11 +51,28 @@ interface AiResponseViewProps {
 function renderFormattedText(text: string, queryIntent: QueryIntent | undefined, fontSize: number) {
   if (!text) return null;
 
+  // Rimuoviamo le doppie virgolette dal testo per evitare che vengano visualizzate intorno a categorie/domini
+  const cleanText = text.replace(/"/g, '');
+
   const escapeRegExp = (str: string) => {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   };
 
   const boldTerms = new Set<string>();
+
+  // Categorie & Domini (vengono visualizzati in bianco bold senza virgolette)
+  if (queryIntent?.category_filter) boldTerms.add(queryIntent.category_filter.toLowerCase().replace(/_/g, ' '));
+  if (queryIntent?.domain_filter) boldTerms.add(queryIntent.domain_filter.toLowerCase().replace(/_/g, ' '));
+  DOMAINS_CONFIG.forEach(d => {
+    boldTerms.add(d.label.toLowerCase());
+    d.categories.forEach(c => {
+      boldTerms.add(c.label.toLowerCase());
+      c.label.split(',').forEach(p => {
+        const clean = p.trim().toLowerCase();
+        if (clean.length > 3) boldTerms.add(clean);
+      });
+    });
+  });
 
   // Merchants / Shops (metriche/valori)
   const merchants = ['esselunga', 'coop', 'conad', 'carrefour', 'lidl', 'amazon', 'netflix', 'spotify', 'starbucks', 'mcdonald', 'mcdonalds', 'apple', 'uber', 'shein', 'zara', 'h&m'];
@@ -97,7 +114,7 @@ function renderFormattedText(text: string, queryIntent: QueryIntent | undefined,
 
   const finalRegex = new RegExp('(' + patterns.join('|') + ')', 'gi');
 
-  const parts = text.split(finalRegex);
+  const parts = cleanText.split(finalRegex);
   return (
     <Text style={{ textAlign: 'left', fontSize, lineHeight: fontSize * 1.25 }}>
       {parts.map((part, index) => {
