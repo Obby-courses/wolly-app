@@ -15,7 +15,7 @@ import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
 import TransactionPreview from '../components/TransactionPreview';
-import PeriodicDateSelector, { Frequency } from '../components/PeriodicDateSelector';
+import PeriodicDateSelector from '../components/PeriodicDateSelector';
 
 const FREQUENCIES: { key: Frequency; label: string }[] = [
   { key: 'monthly',       label: 'Mensile' },

@@ -116,7 +116,7 @@ export default function PeriodicDateSelector({
               >
                 {isSelected && (
                   <LinearGradient
-                    colors={['#6CA5DD', '#CBE2F4']}
+                    colors={['#B3D9FF', '#E6F2FF']}
                     style={StyleSheet.absoluteFill}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
@@ -172,7 +172,7 @@ export default function PeriodicDateSelector({
                     <View style={[styles.calendarDayCircle, isSelected && styles.calendarDayCircleSelectedContainer]}>
                       {isSelected && (
                         <LinearGradient
-                          colors={['#6CA5DD', '#CBE2F4']}
+                          colors={['#B3D9FF', '#E6F2FF']}
                           style={StyleSheet.absoluteFill}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 0, y: 1 }}
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
   },
   dayTextSelected: {
-    color: '#FFFFFF',
+    color: COLORS.brandBlue,
   },
   calendarContainer: {
     backgroundColor: COLORS.surface,
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamily,
   },
   calendarDayTextSelected: {
-    color: '#FFF',
+    color: COLORS.brandBlue,
     fontFamily: TYPOGRAPHY.fontBold,
   },
 });
