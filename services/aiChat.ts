@@ -700,7 +700,7 @@ export async function askAiChat(
             prompt: totalPrompt,
             completion: totalCompletion,
             total: totalTotal,
-            query_text: userMessage,
+            // GDPR: query_text rimosso — non salviamo il contenuto delle domande utente
             archetype: intent.archetype,
             category_filter: intent.category_filter || null,
             domain_filter: intent.domain_filter || null,
@@ -783,7 +783,7 @@ export async function askAiChat(
             prompt: 0,
             completion: 0,
             total: 0,
-            query_text: userMessage,
+            // GDPR: query_text rimosso — non salviamo il contenuto delle domande utente
             archetype: parsedIntent?.archetype || 'text',
             category_filter: null,
             domain_filter: null,

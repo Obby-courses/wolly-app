@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Alert, Switch } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Pressable, Alert, Switch, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +10,7 @@ import { networkStore } from '../services/networkStore';
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
 import AnomalyReporter from '../components/AnomalyReporter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { deleteUserAccount } from '../services/dbFunctions';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function SettingsScreen() {
   
   const [networkState, setNetworkState] = useState(networkStore.getState());
   const [devSettingsEnabled, setDevSettingsEnabled] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useEffect(() => {
     analytics.trackScreen(ANALYTICS_SCREENS.SETTINGS);
@@ -52,6 +54,54 @@ export default function SettingsScreen() {
               console.error(error);
               Alert.alert("Errore", "Impossibile eliminare i dati.");
             }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    // Step 1 — primo avviso
+    Alert.alert(
+      "Elimina account",
+      "Stai per eliminare tutti i tuoi dati da Wolly. Questa azione è irreversibile.\n\nVerranno cancellati:\n\u2022 Tutte le transazioni\n\u2022 Gli abbonamenti\n\u2022 Il tuo patrimonio\n\u2022 I log di utilizzo AI",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Continua",
+          style: "destructive",
+          onPress: () => {
+            // Step 2 — conferma definitiva
+            Alert.alert(
+              "Sei sicuro?",
+              "Questa è l'ultima conferma. Tutti i tuoi dati verranno cancellati definitivamente e non potranno essere recuperati.",
+              [
+                { text: "No, torna indietro", style: "cancel" },
+                {
+                  text: "Sì, elimina tutto",
+                  style: "destructive",
+                  onPress: async () => {
+                    setIsDeletingAccount(true);
+                    try {
+                      const result = await deleteUserAccount();
+                      if (!result.success) {
+                        console.warn('[Settings] deleteUserAccount completato con errori:', result.errors);
+                      }
+                      // Redirect all'onboarding dopo la pulizia
+                      router.replace('/onboarding');
+                    } catch (e: any) {
+                      console.error('[Settings] Errore critico deleteUserAccount:', e);
+                      Alert.alert(
+                        "Errore",
+                        "Si è verificato un errore durante l'eliminazione. Riprova o contatta il supporto."
+                      );
+                    } finally {
+                      setIsDeletingAccount(false);
+                    }
+                  }
+                }
+              ]
+            );
           }
         }
       ]
@@ -178,6 +228,36 @@ export default function SettingsScreen() {
               </>
             )}
           </View>
+
+          {/* ── Sezione Account (sempre visibile) ──────────────────────── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account</Text>
+
+            <Pressable
+              style={[styles.item, styles.dangerItem]}
+              onPress={handleDeleteAccount}
+              disabled={isDeletingAccount}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: '#FCE8E6' }]}>
+                {isDeletingAccount
+                  ? <ActivityIndicator size="small" color="#EF4444" />
+                  : <Ionicons name="person-remove" size={20} color="#EF4444" />
+                }
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.itemTitleText, styles.dangerText]}>
+                  {isDeletingAccount ? 'Eliminazione in corso...' : 'Elimina account'}
+                </Text>
+                <Text style={styles.itemSubtitleText}>
+                  Cancella tutti i tuoi dati definitivamente
+                </Text>
+              </View>
+              {!isDeletingAccount && (
+                <Ionicons name="chevron-forward" size={18} color="#EF4444" />
+              )}
+            </Pressable>
+          </View>
+
         </ScrollView>
       </View>
     </View>

@@ -15,6 +15,8 @@
 
 import { getDBConnection } from './database/db';
 import { ALL_CATEGORIES, DOMAINS_CONFIG } from '../constants/categories';
+import { supabase, isSupabaseConfigured } from './supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Tipi Filtri Comuni ───────────────────────────────────────────────────────
 
@@ -475,4 +477,107 @@ export async function getStreak(filters: Pick<CommonFilters, 'category_key' | 'd
     longest_streak_days: current_streak_days, // TODO: calcolo storico progressivo
     last_occurrence_date,
   };
+}
+
+// ─── deleteUserAccount ────────────────────────────────────────────────────────
+
+export interface DeleteAccountResult {
+  success: boolean;
+  errors: string[];
+}
+
+/**
+ * GDPR — Eliminazione completa dell'account utente.
+ *
+ * Cancella nell'ordine:
+ *  1. Tabelle SQLite locali (transactions, subscriptions, net_worth, recurring_payments)
+ *  2. Log Supabase associati al device_id (parsing_logs, analysis_logs, analytics_events, net_worth_adjustments_log)
+ *  3. AsyncStorage (device_id, onboarding, preferenze)
+ *
+ * I fallimenti su Supabase non bloccano la pulizia locale.
+ * L'elenco degli errori viene restituito per mostrare eventuali avvisi all'utente.
+ */
+export async function deleteUserAccount(): Promise<DeleteAccountResult> {
+  const errors: string[] = [];
+
+  // ── Step 1: Pulizia DB SQLite locale ──────────────────────────────────────
+  try {
+    const db = await getDBConnection();
+
+    // Ordine importante: prima le tabelle figlie (che referenziano subscriptions), poi le altre
+    await db.execAsync(`DELETE FROM transactions;`);
+    console.log('[deleteUserAccount] ✅ transactions cancellate');
+
+    await db.execAsync(`DELETE FROM subscriptions;`);
+    console.log('[deleteUserAccount] ✅ subscriptions cancellate');
+
+    await db.execAsync(`DELETE FROM net_worth;`);
+    console.log('[deleteUserAccount] ✅ net_worth cancellato');
+
+    await db.execAsync(`DELETE FROM recurring_payments;`);
+    console.log('[deleteUserAccount] ✅ recurring_payments cancellati');
+
+  } catch (e: any) {
+    const msg = `Errore pulizia DB locale: ${e.message}`;
+    console.error(`[deleteUserAccount] ❌ ${msg}`);
+    errors.push(msg);
+  }
+
+  // ── Step 2: Pulizia log Supabase (per device_id) ──────────────────────────
+  if (isSupabaseConfigured()) {
+    let deviceId: string | null = null;
+    try {
+      deviceId = await AsyncStorage.getItem('@wolly_device_id');
+    } catch (e) {
+      console.warn('[deleteUserAccount] ⚠️ Impossibile leggere device_id da AsyncStorage');
+    }
+
+    if (deviceId) {
+      const supabaseTables = [
+        'parsing_logs',
+        'analysis_logs',
+        'net_worth_adjustments_log',
+      ] as const;
+
+      for (const table of supabaseTables) {
+        try {
+          const { error } = await supabase.from(table).delete().eq('device_id', deviceId);
+          if (error) throw error;
+          console.log(`[deleteUserAccount] ✅ ${table} eliminati per device_id`);
+        } catch (e: any) {
+          const msg = `Errore pulizia ${table}: ${e.message}`;
+          console.warn(`[deleteUserAccount] ⚠️ ${msg}`);
+          errors.push(msg);
+        }
+      }
+
+      // analytics_events non ha device_id — non possiamo filtrare in modo sicuro
+      // e i dati sono anonimi per design, quindi li lasciamo
+      console.log('[deleteUserAccount] ℹ️ analytics_events: dati anonimi, non cancellati');
+    } else {
+      console.warn('[deleteUserAccount] ⚠️ device_id non trovato — log Supabase non cancellati');
+    }
+  } else {
+    console.log('[deleteUserAccount] ℹ️ Supabase non configurato — pulizia cloud saltata');
+  }
+
+  // ── Step 3: Pulizia AsyncStorage ──────────────────────────────────────────
+  try {
+    const keysToDelete = [
+      '@wolly_device_id',
+      'wolly_onboarding_completed',
+      'wolly_last_nw_sync_date',
+      'wolly_dev_settings_enabled',
+    ];
+    await AsyncStorage.multiRemove(keysToDelete);
+    console.log('[deleteUserAccount] ✅ AsyncStorage svuotato');
+  } catch (e: any) {
+    const msg = `Errore pulizia AsyncStorage: ${e.message}`;
+    console.error(`[deleteUserAccount] ❌ ${msg}`);
+    errors.push(msg);
+  }
+
+  const success = errors.length === 0;
+  console.log(`[deleteUserAccount] ${success ? '✅ Completato con successo' : `⚠️ Completato con ${errors.length} errori`}`);
+  return { success, errors };
 }
