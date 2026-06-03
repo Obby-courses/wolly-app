@@ -63,13 +63,13 @@ export default function PrivacyScreen() {
 
           <SectionSubtitle>B) Dati raccolti automaticamente</SectionSubtitle>
           <BulletItem>
-            <Text style={styles.bulletText}><Text style={styles.bold}>Indirizzo IP</Text> — tramite Supabase, solo per sicurezza e prevenzione abusi.</Text>
+            <Text style={styles.bulletText}><Text style={styles.bold}>Dati tecnici di connessione</Text> (ad esempio indirizzo IP e metadati di sicurezza) — trattati dai fornitori infrastrutturali per finalità di sicurezza e prevenzione degli abusi.</Text>
           </BulletItem>
           <BulletItem>
-            <Text style={styles.bulletText}><Text style={styles.bold}>Log AI anonimi</Text> — numero di richieste all'IA (senza il testo), per monitorare i costi del servizio. Non includono device ID né user ID.</Text>
+            <Text style={styles.bulletText}><Text style={styles.bold}>Log AI anonimi</Text> — numero di richieste all'IA (senza il testo delle domande o i parametri), per monitorare i costi del servizio. Non includono device ID né user ID.</Text>
           </BulletItem>
           <BulletItem>
-            <Text style={styles.bulletText}><Text style={styles.bold}>Dati finanziari</Text> — transazioni, patrimonio, abbonamenti — salvati <Text style={styles.bold}>esclusivamente in locale</Text> sul dispositivo (SQLite). Non vengono mai inviati al cloud.</Text>
+            <Text style={styles.bulletText}><Text style={styles.bold}>Dati finanziari</Text> — conservati localmente sul dispositivo (SQLite). Alcune informazioni inserite tramite testo o voce possono essere trasmesse temporaneamente ai fornitori AI (Groq) per consentire l'elaborazione della richiesta e non vengono archiviate nei sistemi cloud di Wolly.</Text>
           </BulletItem>
 
           <InfoBox>
@@ -81,9 +81,8 @@ export default function PrivacyScreen() {
         {/* ─── 3. FINALITÀ ─── */}
         <Section title="3. Finalità del Trattamento" icon="shield-checkmark-outline" iconColor="#059669" iconBg="#ECFDF5">
           <TableHeader col1="Finalità" col2="Base giuridica" />
-          <TableRow col1="Accesso all'app" col2="Esecuzione contratto" />
-          <TableRow col1="Autenticazione Google" col2="Consenso esplicito" />
-          <TableRow col1="Log anonimi AI" col2="Interesse legittimo (costi)" isLast />
+          <TableRow col1="Accesso all'app e autenticazione" col2="Esecuzione del contratto (necessario per erogare il servizio)" />
+          <TableRow col1="Log anonimi AI" col2="Interesse legittimo (monitoraggio dei costi e prevenzione abusi)" isLast />
         </Section>
 
         {/* ─── 4. CONSERVAZIONE ─── */}
@@ -107,7 +106,7 @@ export default function PrivacyScreen() {
           <InfoBox>❌ Non vendiamo mai i tuoi dati a terzi.</InfoBox>
           <Text style={[styles.bodyText, { marginBottom: 10 }]}>Condividiamo i dati esclusivamente con i seguenti fornitori tecnici:</Text>
           <TableHeader col1="Fornitore" col2="Finalità" />
-          <TableRow col1="Supabase (USA)" col2="Autenticazione e database cloud" />
+          <TableRow col1="Supabase (Irlanda, UE)" col2="Autenticazione e database cloud" />
           <TableRow col1="Google OAuth" col2="Accesso con account Google" />
           <TableRow col1="Groq (USA)" col2="Elaborazione richieste AI (solo transito)" isLast />
         </Section>
@@ -115,8 +114,7 @@ export default function PrivacyScreen() {
         {/* ─── 6. TRASFERIMENTO EXTRA-UE ─── */}
         <Section title="6. Trasferimento Dati Extra-UE" icon="globe-outline" iconColor="#06B6D4" iconBg="#ECFEFF">
           <InfoBox type="warning">
-            ⚠️ Alcuni fornitori (Supabase, Google, Groq) hanno server negli USA. Il trasferimento è
-            garantito da Clausole Contrattuali Standard UE e dalle certificazioni DPF (Data Privacy Framework).
+            ⚠️ Il database principale dell'app (Supabase) è ospitato all'interno dell'Unione Europea (Irlanda). Alcuni servizi ausiliari o API (es. Groq, Google OAuth) possono comportare trasferimenti al di fuori dello Spazio Economico Europeo (USA), regolati da Clausole Contrattuali Standard (SCC) e dal Data Privacy Framework (DPF).
           </InfoBox>
           <BulletItem>
             <Text style={styles.bulletText}><Text style={styles.bold}>Supabase</Text>: Privacy Policy su supabase.com/privacy</Text>
@@ -134,7 +132,7 @@ export default function PrivacyScreen() {
           <BulletItem><Text style={styles.bulletText}><Text style={styles.bold}>Accesso</Text> — Puoi chiederci quali dati abbiamo su di te.</Text></BulletItem>
           <BulletItem><Text style={styles.bulletText}><Text style={styles.bold}>Cancellazione</Text> — "Diritto all'oblio": elimina tutto tramite Impostazioni → Elimina account.</Text></BulletItem>
           <BulletItem><Text style={styles.bulletText}><Text style={styles.bold}>Rettifica</Text> — Puoi richiedere la correzione di dati errati.</Text></BulletItem>
-          <BulletItem><Text style={styles.bulletText}><Text style={styles.bold}>Portabilità</Text> — Ricevi una copia dei tuoi dati in formato leggibile.</Text></BulletItem>
+          <BulletItem><Text style={styles.bulletText}><Text style={styles.bold}>Portabilità</Text> — Puoi richiedere una copia dei dati personali trattati da Wolly.</Text></BulletItem>
           <BulletItem><Text style={styles.bulletText}><Text style={styles.bold}>Opposizione</Text> — Puoi opporti al trattamento in qualsiasi momento.</Text></BulletItem>
 
           {/* CTA contatto */}
@@ -155,10 +153,10 @@ export default function PrivacyScreen() {
         <Section title="8. Sicurezza dei Dati" icon="lock-closed-outline" iconColor="#34C759" iconBg="#EDFAF1">
           <BulletItem><Text style={styles.bulletText}>Crittografia TLS per tutti i dati in transito.</Text></BulletItem>
           <BulletItem><Text style={styles.bulletText}>Database cloud con autenticazione sicura (Row Level Security su Supabase).</Text></BulletItem>
-          <BulletItem><Text style={styles.bulletText}>Dati finanziari mai trasmessi al cloud.</Text></BulletItem>
+          <BulletItem><Text style={styles.bulletText}>Dati finanziari archiviati localmente (tranne il transito temporaneo per l'elaborazione AI).</Text></BulletItem>
           <BulletItem><Text style={styles.bulletText}>Accesso ai dati cloud limitato al solo sviluppatore.</Text></BulletItem>
           <InfoBox type="warning">
-            Nessun sistema è sicuro al 100%. In caso di violazione significativa, sarai notificato entro 72 ore.
+            Nessun sistema è sicuro al 100%. In caso di violazione dei dati personali che comporti un rischio elevato per gli utenti, verranno fornite tempestivamente le comunicazioni previste dalla normativa applicabile.
           </InfoBox>
         </Section>
 
