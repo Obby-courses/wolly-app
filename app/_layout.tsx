@@ -162,6 +162,7 @@ export default function RootLayout() {
           <Stack.Screen name="seed-data" />
           <Stack.Screen name="subscriptions" />
           <Stack.Screen name="ai-chat" options={{ animation: 'none' }} />
+          <Stack.Screen name="privacy" />
         </Stack>
       </SwipeNavigator>
 

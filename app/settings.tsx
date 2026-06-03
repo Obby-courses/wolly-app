@@ -173,6 +173,14 @@ export default function SettingsScreen() {
                 </Pressable>
               )}
             />
+
+            <Pressable style={[styles.item, { marginTop: 8 }]} onPress={() => router.push('/privacy')}>
+              <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+                <Ionicons name="shield-checkmark" size={20} color="#0284C7" />
+              </View>
+              <Text style={styles.itemText}>Informativa sulla Privacy</Text>
+              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+            </Pressable>
           </View>
 
           <View style={styles.section}>
