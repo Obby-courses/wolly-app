@@ -720,7 +720,7 @@ export async function askAiChat(
       if (intent.is_scheduled_filter) filtersList.push('scheduled');
       const activeFiltersStr = filtersList.length > 0 ? filtersList.join(',') : null;
       
-      let chartTypeValue = finalResponse.chart ? finalResponse.chart.type : null;
+      let chartTypeValue: any = finalResponse.chart ? finalResponse.chart.type : null;
       if (!chartTypeValue && (finalResponse.total_data || intent.archetype === 'total')) {
           chartTypeValue = 'big_number';
       }

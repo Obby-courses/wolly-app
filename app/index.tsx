@@ -398,7 +398,7 @@ export default function Home() {
         <View style={{ flex: 1 }}>
           {/* PARTE SUPERIORE: Sfumatura blu elettrico premium */}
           <LinearGradient
-            colors={['#0A74FF', '#0857C3']}
+            colors={['#5CB5FF', '#0078FF']}
             style={[styles.topSection, { paddingTop: insets.top + 16 }]}
           >
             {/* Patrimonio totale (Sinistra allineato, stile premium) */}

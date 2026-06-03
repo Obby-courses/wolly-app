@@ -19,7 +19,7 @@ export default function StatsHubScreen() {
     <View style={styles.container}>
       {/* Header Sfumato Blu Premium */}
       <LinearGradient
-        colors={['#0A74FF', '#0857C3']}
+        colors={['#5CB5FF', '#0078FF']}
         style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
       >
         <View style={styles.header}>

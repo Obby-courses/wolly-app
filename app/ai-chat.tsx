@@ -173,7 +173,7 @@ export default function AiChatPage() {
   };
 
   return (
-    <LinearGradient colors={['#0A74FF', '#0857C3']} style={styles.gradientRoot}>
+    <LinearGradient colors={['#5CB5FF', '#0078FF']} style={styles.gradientRoot}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.headerTop}>
           <Pressable
@@ -299,9 +299,9 @@ const styles = StyleSheet.create({
   },
   inputBoxRound: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    borderRadius: 9999,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
     justifyContent: 'center',
     borderWidth: 0,
     shadowColor: '#000',
@@ -309,14 +309,15 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
+    minHeight: 52,
   },
   bottomInput: {
     flex: 1,
     fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: 18,
+    fontSize: 16,
     color: '#1C1C1E',
     maxHeight: 120,
-    minHeight: 40,
+    minHeight: 32,
     paddingTop: Platform.OS === 'ios' ? 4 : 2,
     paddingBottom: Platform.OS === 'ios' ? 4 : 2,
   },
