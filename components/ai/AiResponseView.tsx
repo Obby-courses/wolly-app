@@ -126,10 +126,29 @@ export default function AiResponseView({
 
   const isTextOnly = answer.intent === 'text' || answer.intent === 'advice';
 
-  // Calcolo dinamico del font size basato sulla larghezza dello schermo e la parola più lunga
-  const { width } = Dimensions.get('window');
-  // Consideriamo un padding di sicurezza di circa 48px totali (24px per lato)
+  // Calcolo dinamico del font size basato sulla larghezza dello schermo, altezza dello schermo, JIT widget e parola più lunga
+  const { width, height } = Dimensions.get('window');
+  // Consideriamo un padding di sicurezza orizzontale di circa 48px totali (24px per lato)
   const availableWidth = width - 48;
+
+  // Stima dell'altezza occupata da safe-area, pulsanti e spazi fissi (circa 240px in totale)
+  const verticalOffsets = 240;
+  const availableHeight = height - verticalOffsets;
+
+  // Stima dell'altezza dell'eventuale JIT widget attivo
+  let widgetHeight = 0;
+  if (answer.intent === 'distribution') widgetHeight = 280;
+  else if (answer.intent === 'list') widgetHeight = 240;
+  else if (answer.intent === 'timeline') widgetHeight = 200;
+  else if (answer.intent === 'subscriptions') widgetHeight = 220;
+
+  // Altezza target disponibile per il testo della risposta (escludendo la domanda di circa 30px)
+  const targetTextHeight = Math.max(80, availableHeight - 30 - widgetHeight);
+  const totalLength = answer.text_response.length;
+  
+  // Formula matematica: F <= Math.sqrt((targetTextHeight * availableWidth) / (totalLength * 0.65))
+  // per fare in modo che tutto il testo entri verticalmente nello schermo senza scrolling.
+  const maxFontForHeight = Math.sqrt((targetTextHeight * availableWidth) / (totalLength * 0.65));
   
   const words = answer.text_response.split(/[\s,.\n]+/);
   const maxWordLength = Math.max(...words.map(w => w.length), 1);
@@ -138,9 +157,9 @@ export default function AiResponseView({
   const charWidthFactor = 0.58;
   const maxFontForWord = availableWidth / (maxWordLength * charWidthFactor);
   
-  // Impostiamo la dimensione massima desiderata a 45px (come da richiesta precedente), 
-  // ridimensionandola solo se la parola più lunga non c'entrerebbe altrimenti.
-  let dynamicFontSize = Math.min(45, maxFontForWord);
+  // Impostiamo la dimensione massima desiderata a 45px, ridimensionando se la parola più lunga
+  // non c'entrerebbe in una riga o se l'intero testo non ci starebbe verticalmente.
+  let dynamicFontSize = Math.min(45, maxFontForWord, maxFontForHeight);
   dynamicFontSize = Math.max(18, Math.floor(dynamicFontSize)); // Minimo di sicurezza 18px
 
   const body = (
