@@ -332,7 +332,7 @@ export default function BottomMenu() {
             <Ionicons
               name="chevron-up"
               size={20}
-              color={isSlidingToCancel ? COLORS.danger : COLORS.secondary}
+              color={isSlidingToCancel ? COLORS.danger : '#FFFFFF'}
             />
           </Animated.View>
           <Text style={[styles.cancelText, isSlidingToCancel && { color: COLORS.danger }]}>
