@@ -37,40 +37,61 @@ function getCategoryColor(key: string): string {
 
 function nextOccurrenceLabel(sub: Subscription): string {
   const today = new Date();
-  const result = new Date(today);
+  today.setHours(0, 0, 0, 0);
   const day = sub.recurrence_day;
 
   switch (sub.frequency) {
     case 'monthly': {
-      if (day != null) {
-        result.setDate(day);
-        if (result <= today) result.setMonth(result.getMonth() + 1);
+      if (day == null) break;
+      // Try current month first, if already passed try next month
+      const tryDate = (year: number, month: number) => {
+        const maxDay = new Date(year, month + 1, 0).getDate();
+        const effectiveDay = Math.min(day, maxDay);
+        return new Date(year, month, effectiveDay);
+      };
+      let year = today.getFullYear();
+      let month = today.getMonth();
+      let candidate = tryDate(year, month);
+      if (candidate <= today) {
+        month++;
+        if (month > 11) { month = 0; year++; }
+        candidate = tryDate(year, month);
       }
-      break;
+      return candidate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
     }
     case 'yearly': {
       const start = new Date(sub.start_date);
-      result.setMonth(start.getMonth());
-      result.setDate(start.getDate());
-      if (result <= today) result.setFullYear(result.getFullYear() + 1);
-      break;
+      const startMonth = start.getMonth();
+      const startDay = start.getDate();
+      let year = today.getFullYear();
+      const maxDay = new Date(year, startMonth + 1, 0).getDate();
+      const effectiveDay = Math.min(startDay, maxDay);
+      let candidate = new Date(year, startMonth, effectiveDay);
+      if (candidate <= today) {
+        year++;
+        const maxDayNext = new Date(year, startMonth + 1, 0).getDate();
+        candidate = new Date(year, startMonth, Math.min(startDay, maxDayNext));
+      }
+      return candidate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
     }
     case 'weekly': {
       const targetDow = day ?? 0;
       const currentDow = (today.getDay() + 6) % 7;
       const diff = (targetDow - currentDow + 7) % 7 || 7;
+      const result = new Date(today);
       result.setDate(today.getDate() + diff);
-      break;
+      return result.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
     }
     case 'biweekly': {
       const targetDow = day ?? 0;
       const currentDow = (today.getDay() + 6) % 7;
       const diff = (targetDow - currentDow + 14) % 14 || 14;
+      const result = new Date(today);
       result.setDate(today.getDate() + diff);
-      break;
+      return result.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
     }
   }
-  return result.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  return '—';
 }
 
 function monthlyEquivalent(sub: Subscription): number {
@@ -282,10 +303,17 @@ function SubModal({
           </View>
 
           <Text style={modal.label}>
-            {form.frequency === 'monthly' || form.frequency === 'yearly'
+            {form.frequency === 'monthly'
               ? 'Giorno del mese (1–31)'
+              : form.frequency === 'yearly'
+              ? 'Giorno del mese (da data inizio)'
               : 'Giorno della settimana (0=Lun…6=Dom)'}
           </Text>
+          {(form.frequency === 'monthly' || form.frequency === 'yearly') && (
+            <Text style={modal.fieldHint}>
+              Per giorni oltre il 28°: se il mese è più corto, il rinnovo avviene l'ultimo giorno disponibile (es. il 31 in aprile → 30 apr).
+            </Text>
+          )}
           <TextInput
             style={modal.input}
             keyboardType="number-pad"
@@ -873,5 +901,13 @@ const modal = StyleSheet.create({
     fontSize: 16,
     fontFamily: TYPOGRAPHY.fontBold,
     fontWeight: '700',
+  },
+  fieldHint: {
+    fontSize: 11,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    lineHeight: 16,
+    marginBottom: SPACING.sm,
+    fontStyle: 'italic',
   },
 });

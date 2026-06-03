@@ -20,40 +20,58 @@ import TransactionPreview from '../components/TransactionPreview';
 
 function getNextOccurrenceDate(sub: any): Date {
   const today = new Date();
-  const result = new Date(today);
+  today.setHours(0, 0, 0, 0);
   const day = sub.recurrence_day;
+
+  // Helper: effective day clamped to month length
+  const clampDay = (desiredDay: number, year: number, month: number) =>
+    Math.min(desiredDay, new Date(year, month + 1, 0).getDate());
 
   switch (sub.frequency) {
     case 'monthly': {
       if (day != null) {
-        result.setDate(day);
-        if (result <= today) result.setMonth(result.getMonth() + 1);
+        let year = today.getFullYear();
+        let month = today.getMonth();
+        let candidate = new Date(year, month, clampDay(day, year, month));
+        if (candidate <= today) {
+          month++;
+          if (month > 11) { month = 0; year++; }
+          candidate = new Date(year, month, clampDay(day, year, month));
+        }
+        return candidate;
       }
       break;
     }
     case 'yearly': {
       const start = new Date(sub.start_date);
-      result.setMonth(start.getMonth());
-      result.setDate(start.getDate());
-      if (result <= today) result.setFullYear(result.getFullYear() + 1);
-      break;
+      const startMonth = start.getMonth();
+      const startDay = start.getDate();
+      let year = today.getFullYear();
+      let candidate = new Date(year, startMonth, clampDay(startDay, year, startMonth));
+      if (candidate <= today) {
+        year++;
+        candidate = new Date(year, startMonth, clampDay(startDay, year, startMonth));
+      }
+      return candidate;
     }
     case 'weekly': {
       const targetDow = day ?? 0;
       const currentDow = (today.getDay() + 6) % 7;
       const diff = (targetDow - currentDow + 7) % 7 || 7;
+      const result = new Date(today);
       result.setDate(today.getDate() + diff);
-      break;
+      return result;
     }
     case 'biweekly': {
       const targetDow = day ?? 0;
       const currentDow = (today.getDay() + 6) % 7;
       const diff = (targetDow - currentDow + 14) % 14 || 14;
+      const result = new Date(today);
       result.setDate(today.getDate() + diff);
-      break;
+      return result;
     }
   }
-  return result;
+  return new Date(today);
 }
 
 export default function Home() {

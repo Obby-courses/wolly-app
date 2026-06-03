@@ -6,6 +6,23 @@ import uuid from 'react-native-uuid';
 // ─── Date Helpers ────────────────────────────────────────────────────────────
 
 /**
+ * Returns the number of days in a given month.
+ * month is 0-based (0 = January).
+ */
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+/**
+ * For a monthly subscription with recurrence_day = X:
+ * if the current month has fewer than X days, fire on the last day of the month.
+ * This complies with Italian Law 172/2017 (real monthly billing cycles).
+ */
+function effectiveMonthlyDay(desiredDay: number, year: number, month: number): number {
+  return Math.min(desiredDay, daysInMonth(year, month));
+}
+
+/**
  * Given a subscription, returns the cycle date (YYYY-MM-DD) that would fall
  * on or within the current cycle relative to `today`.
  * Returns null if today is not the cycle day.
@@ -19,10 +36,10 @@ function getCycleDateForToday(sub: Subscription, today: Date): string | null {
 
   switch (sub.frequency) {
     case 'monthly': {
-      // Fire on the specified day-of-month each month
-      if (recurrenceDay != null && todayDay === recurrenceDay) {
-        return todayISO;
-      }
+      if (recurrenceDay == null) return null;
+      // Clamp to last day of current month (e.g. day 31 → 30 in April)
+      const effective = effectiveMonthlyDay(recurrenceDay, today.getFullYear(), today.getMonth());
+      if (todayDay === effective) return todayISO;
       return null;
     }
 
@@ -30,9 +47,10 @@ function getCycleDateForToday(sub: Subscription, today: Date): string | null {
       // Fire on the same day+month as startDate
       const startMonth = startDate.getMonth(); // 0-based
       const startDay = startDate.getDate();
-      if (today.getMonth() === startMonth && todayDay === startDay) {
-        return todayISO;
-      }
+      if (today.getMonth() !== startMonth) return null;
+      // Clamp for Feb 29 → Feb 28 in non-leap years
+      const effectiveDay = effectiveMonthlyDay(startDay, today.getFullYear(), startMonth);
+      if (todayDay === effectiveDay) return todayISO;
       return null;
     }
 
