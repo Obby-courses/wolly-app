@@ -568,6 +568,10 @@ export async function deleteUserAccount(): Promise<DeleteAccountResult> {
       'wolly_onboarding_completed',
       'wolly_last_nw_sync_date',
       'wolly_dev_settings_enabled',
+      'wolly_privacy_version',
+      'wolly_accepted_privacy_at',
+      'wolly_terms_version',
+      'wolly_accepted_terms_at'
     ];
     await AsyncStorage.multiRemove(keysToDelete);
     console.log('[deleteUserAccount] ✅ AsyncStorage svuotato');

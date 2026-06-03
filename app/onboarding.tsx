@@ -22,6 +22,10 @@ export default function OnboardingScreen() {
   const [isNegative, setIsNegative] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Consensi Legali
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -121,6 +125,16 @@ export default function OnboardingScreen() {
   };
 
   const handleNext = async () => {
+    if (step === 1 && (!privacyAccepted || !termsAccepted)) {
+      import('react-native').then(({ Alert }) => {
+        Alert.alert(
+          "Consenso richiesto",
+          "Devi prendere visione della Privacy Policy e accettare i Termini di Utilizzo per poter continuare e usare Wolly."
+        );
+      });
+      return;
+    }
+
     if (step < totalSteps - 1) {
       changeStep(step + 1);
     } else {
@@ -137,6 +151,12 @@ export default function OnboardingScreen() {
         // Mark onboarding completed in storage
         await AsyncStorage.setItem('wolly_onboarding_completed', 'true');
         await AsyncStorage.setItem('wolly_last_nw_sync_date', new Date().toISOString().split('T')[0]);
+
+        // Save Legal Consents
+        await AsyncStorage.setItem('wolly_privacy_version', '1.0');
+        await AsyncStorage.setItem('wolly_accepted_privacy_at', new Date().toISOString());
+        await AsyncStorage.setItem('wolly_terms_version', '1.0');
+        await AsyncStorage.setItem('wolly_accepted_terms_at', new Date().toISOString());
 
         analytics.trackEvent('onboarding_completed', { success: true });
 
@@ -233,6 +253,33 @@ export default function OnboardingScreen() {
             </Text>
           </View>
         </View>
+      </View>
+
+      {/* Sezione Consensi (obbligatori) */}
+      <View style={styles.consentsContainer}>
+        <Pressable 
+          style={styles.consentRow} 
+          onPress={() => setPrivacyAccepted(!privacyAccepted)}
+        >
+          <View style={[styles.checkbox, privacyAccepted && styles.checkboxActive]}>
+            {privacyAccepted && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+          </View>
+          <Text style={styles.consentText}>
+            Ho preso visione della Privacy Policy
+          </Text>
+        </Pressable>
+
+        <Pressable 
+          style={styles.consentRow} 
+          onPress={() => setTermsAccepted(!termsAccepted)}
+        >
+          <View style={[styles.checkbox, termsAccepted && styles.checkboxActive]}>
+            {termsAccepted && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+          </View>
+          <Text style={styles.consentText}>
+            Accetto i Termini di Utilizzo Beta
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -698,5 +745,36 @@ const styles = StyleSheet.create({
     color: '#64748B',
     lineHeight: 18,
     fontFamily: TYPOGRAPHY.fontFamily,
+  },
+  consentsContainer: {
+    marginTop: 24,
+    width: '100%',
+    paddingHorizontal: 8,
+    gap: 16,
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  checkboxActive: {
+    backgroundColor: '#0A74FF',
+    borderColor: '#0A74FF',
+  },
+  consentText: {
+    fontSize: 14,
+    color: '#334155',
+    fontFamily: TYPOGRAPHY.fontFamily,
+    flex: 1,
   },
 });
