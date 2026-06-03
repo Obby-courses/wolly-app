@@ -58,22 +58,23 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
   // Migrate legacy Italian taxonomy values to English
   try {
     await db.execAsync(`
-      UPDATE transactions SET social_context = 'friends' WHERE social_context = 'amici';
-      UPDATE transactions SET social_context = 'family' WHERE social_context = 'famiglia';
-      UPDATE transactions SET social_context = 'colleagues' WHERE social_context = 'colleghi';
-      UPDATE transactions SET social_context = 'couple' WHERE social_context = 'coppia';
-      UPDATE transactions SET social_context = 'alone' WHERE social_context = 'solo';
-      UPDATE transactions SET social_context = 'strangers' WHERE social_context = 'sconosciuti';
+      UPDATE transactions SET social_context = 'friends' WHERE LOWER(social_context) IN ('amici', 'friends');
+      UPDATE transactions SET social_context = 'family' WHERE LOWER(social_context) IN ('famiglia', 'family');
+      UPDATE transactions SET social_context = 'colleagues' WHERE LOWER(social_context) IN ('colleghi', 'colleagues');
+      UPDATE transactions SET social_context = 'couple' WHERE LOWER(social_context) IN ('coppia', 'couple');
+      UPDATE transactions SET social_context = 'alone' WHERE LOWER(social_context) IN ('solo', 'da solo', 'alone');
+      UPDATE transactions SET social_context = 'strangers' WHERE LOWER(social_context) IN ('sconosciuti', 'strangers');
 
-      UPDATE transactions SET location_type = 'physical_store' WHERE location_type = 'negozio_fisico';
-      UPDATE transactions SET location_type = 'work' WHERE location_type = 'lavoro';
-      UPDATE transactions SET location_type = 'restaurant' WHERE location_type = 'ristorante';
-      UPDATE transactions SET location_type = 'home' WHERE location_type = 'casa';
-      UPDATE transactions SET location_type = 'transport' WHERE location_type = 'trasporti';
-      UPDATE transactions SET location_type = 'travel' WHERE location_type = 'viaggio';
-      UPDATE transactions SET location_type = 'abroad' WHERE location_type = 'estero';
+      UPDATE transactions SET location_type = 'physical_store' WHERE LOWER(location_type) IN ('negozio_fisico', 'negozio fisico', 'physical_store');
+      UPDATE transactions SET location_type = 'work' WHERE LOWER(location_type) IN ('lavoro', 'work');
+      UPDATE transactions SET location_type = 'restaurant' WHERE LOWER(location_type) IN ('ristorante', 'restaurant');
+      UPDATE transactions SET location_type = 'home' WHERE LOWER(location_type) IN ('casa', 'home');
+      UPDATE transactions SET location_type = 'transport' WHERE LOWER(location_type) IN ('trasporti', 'trasporto', 'transport');
+      UPDATE transactions SET location_type = 'travel' WHERE LOWER(location_type) IN ('viaggio', 'travel');
+      UPDATE transactions SET location_type = 'abroad' WHERE LOWER(location_type) IN ('estero', 'abroad');
     `);
   } catch (e) {}
+
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS net_worth (
