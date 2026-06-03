@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../constants/Theme';
 import AiResponseView from '../components/ai/AiResponseView';
 import { askAiChat, AiChatResponse, ChatMessage, aiChatStore } from '../services/aiChat';
@@ -172,81 +173,84 @@ export default function AiChatPage() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.headerTop}>
-        <Pressable
-          onPress={() => {
-            if (isTyping && qa) {
-              Keyboard.dismiss();
-              aiChatStore.setIsTyping(false);
-            } else {
-              router.back();
-            }
-          }}
-          style={styles.closeBtnTop}
+    <LinearGradient colors={['#0A74FF', '#0857C3']} style={styles.gradientRoot}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.headerTop}>
+          <Pressable
+            onPress={() => {
+              if (isTyping && qa) {
+                Keyboard.dismiss();
+                aiChatStore.setIsTyping(false);
+              } else {
+                router.back();
+              }
+            }}
+            style={styles.closeBtnTop}
+          >
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.flex}
         >
-          <Ionicons name="close" size={28} color={COLORS.secondary} />
-        </Pressable>
-      </View>
+          <View style={styles.qaContainer}>
+            {/* Answer area */}
+            <View style={styles.mainAnswerArea}>
+              {isLoading ? (
+                <View style={styles.loadingWrapper}>
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                  <Text style={styles.loadingText}>Wolly sta analizzando...</Text>
+                </View>
+              ) : qa?.answer ? (
+                <AiResponseView
+                  question={qa.question}
+                  answer={qa.answer}
+                  onRerun={reRunQuery}
+                  scrollable={true}
+                />
+              ) : null}
+            </View>
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flex}
-      >
-        <View style={styles.qaContainer}>
-          {/* Answer area */}
-          <View style={styles.mainAnswerArea}>
-            {isLoading ? (
-              <View style={styles.loadingWrapper}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.loadingText}>Wolly sta analizzando...</Text>
+            {/* Bottom Bar Input */}
+            <View style={styles.bottomBarContainer}>
+              <View style={[styles.inputBoxRound, isLoading && { opacity: 0.6 }]}>
+                <TextInput
+                  autoFocus={isTyping}
+                  multiline={false}
+                  maxLength={500}
+                  style={styles.bottomInput}
+                  placeholder="Chiedi a Wolly..."
+                  placeholderTextColor="#9CA3AF"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  editable={!isLoading}
+                  onFocus={() => {
+                    if (!isLoading) {
+                      aiChatStore.setIsTyping(true);
+                    }
+                  }}
+                  returnKeyType="send"
+                  onSubmitEditing={() => {
+                    if (inputText.trim().length > 0) {
+                      Keyboard.dismiss();
+                      sendMessage(inputText);
+                    }
+                  }}
+                />
               </View>
-            ) : qa?.answer ? (
-              <AiResponseView
-                question={qa.question}
-                answer={qa.answer}
-                onRerun={reRunQuery}
-                scrollable={true}
-              />
-            ) : null}
-          </View>
-
-          {/* Bottom Bar Input */}
-          <View style={styles.bottomBarContainer}>
-            <View style={[styles.inputBoxRound, isLoading && { opacity: 0.6 }]}>
-              <TextInput
-                autoFocus={isTyping}
-                multiline={false}
-                maxLength={500}
-                style={styles.bottomInput}
-                placeholder="Chiedi a Wolly..."
-                placeholderTextColor={COLORS.secondary + '80'}
-                value={inputText}
-                onChangeText={setInputText}
-                editable={!isLoading}
-                onFocus={() => {
-                  if (!isLoading) {
-                    aiChatStore.setIsTyping(true);
-                  }
-                }}
-                returnKeyType="send"
-                onSubmitEditing={() => {
-                  if (inputText.trim().length > 0) {
-                    Keyboard.dismiss();
-                    sendMessage(inputText);
-                  }
-                }}
-              />
             </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
+  gradientRoot: { flex: 1 },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   flex: { flex: 1 },
 
   fullScreenInputContainer: {
@@ -263,7 +267,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -279,7 +283,7 @@ const styles = StyleSheet.create({
     width: '100%',
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 32,
-    color: COLORS.primary,
+    color: '#FFFFFF',
     textAlign: 'center',
     paddingVertical: 40,
   },
@@ -291,26 +295,30 @@ const styles = StyleSheet.create({
   bottomBarContainer: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   inputBoxRound: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 16,
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#CBD5E1',
+    borderWidth: 0,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   bottomInput: {
     flex: 1,
     fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: 16,
-    color: COLORS.primary,
+    fontSize: 18,
+    color: '#1C1C1E',
     maxHeight: 120,
-    minHeight: 32,
-    paddingTop: Platform.OS === 'ios' ? 8 : 4,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 4,
+    minHeight: 40,
+    paddingTop: Platform.OS === 'ios' ? 4 : 2,
+    paddingBottom: Platform.OS === 'ios' ? 4 : 2,
   },
   sendBtn: {
     width: 36,
@@ -335,7 +343,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontFamily: TYPOGRAPHY.fontFamily,
     fontSize: TYPOGRAPHY.sizes.base,
-    color: COLORS.secondary,
+    color: '#FFFFFF',
   },
   debugBox: {
     marginTop: 40,

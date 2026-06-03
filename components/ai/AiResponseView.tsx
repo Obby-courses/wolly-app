@@ -114,7 +114,7 @@ function renderFormattedText(text: string, queryIntent?: QueryIntent) {
     .sort((a, b) => b.text.length - a.text.length);
 
   if (allTerms.length === 0) {
-    return <Text style={{ color: '#8E8E93' }}>{text}</Text>;
+    return <Text style={{ color: '#BADBFF' }}>{text}</Text>;
   }
 
   // Build combined regex using escaped patterns
@@ -126,22 +126,21 @@ function renderFormattedText(text: string, queryIntent?: QueryIntent) {
     <Text style={{ textAlign: 'left' }}>
       {parts.map((part, index) => {
         if (index % 2 === 0) {
-          // Testo naturale (leggermente grigio)
-          return <Text key={index} style={{ color: '#8E8E93' }}>{part}</Text>;
+          // Testo naturale (azzurro opaco)
+          return <Text key={index} style={{ color: '#BADBFF' }}>{part}</Text>;
         } else {
-          // Voce evidenziata (nero con icona colorata)
+          // Voce evidenziata (bianco bold)
           const lowerPart = part.toLowerCase();
           const match = allTerms.find(t => t.text === lowerPart || lowerPart.includes(t.text) || t.text.includes(lowerPart));
           
           if (match) {
             return (
-              <Text key={index} style={{ color: '#1C1C1E', fontWeight: 'bold' }}>
-                <Ionicons name={match.icon as any} size={14} color={match.color} />
-                {' '}{part}
+              <Text key={index} style={{ color: '#FFFFFF', fontWeight: 'bold' }}>
+                {part}
               </Text>
             );
           }
-          return <Text key={index} style={{ color: '#8E8E93' }}>{part}</Text>;
+          return <Text key={index} style={{ color: '#BADBFF' }}>{part}</Text>;
         }
       })}
     </Text>
@@ -165,13 +164,7 @@ export default function AiResponseView({
         <Text style={styles.questionText}>{question}</Text>
       </View>
 
-      {/* FeedbackBar — solo per intent con dati e se onRerun è disponibile */}
-      {!isTextOnly && onRerun && answer.queryIntent && (
-        <FeedbackBar
-          intent={answer.queryIntent}
-          onUpdate={onRerun}
-        />
-      )}
+      {/* FeedbackBar — hidden per richiesta utente */}
 
       {/* Testo risposta principale */}
       <Text style={[isTextOnly ? styles.bigAnswerText : styles.answerContextText, textStyle]}>
@@ -262,24 +255,25 @@ const styles = StyleSheet.create({
   },
   questionText: {
     fontFamily: TYPOGRAPHY.fontFamily,
-    fontSize: 13,
-    color: COLORS.secondary,
+    fontSize: 14,
+    color: '#BADBFF',
     textAlign: 'left',
     opacity: 0.8,
   },
   bigAnswerText: {
     fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 26,
-    color: COLORS.primary,
+    fontSize: 34,
+    color: '#FFFFFF',
     textAlign: 'left',
-    lineHeight: 36,
+    lineHeight: 44,
     marginTop: 8,
   },
   answerContextText: {
     fontFamily: TYPOGRAPHY.fontBold,
-    fontSize: 18,
-    color: COLORS.secondary,
+    fontSize: 24,
+    color: '#BADBFF',
     textAlign: 'left',
+    lineHeight: 32,
     marginTop: 4,
   },
   jitWrapper: {
