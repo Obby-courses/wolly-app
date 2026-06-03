@@ -193,6 +193,7 @@ export default function AiChatPage() {
 
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
           style={styles.flex}
         >
           <View style={styles.qaContainer}>
