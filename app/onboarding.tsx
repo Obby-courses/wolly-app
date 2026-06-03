@@ -265,7 +265,10 @@ export default function OnboardingScreen() {
             {privacyAccepted && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
           </View>
           <Text style={styles.consentText}>
-            Ho preso visione della Privacy Policy
+            Ho preso visione della{' '}
+            <Text style={styles.linkText} onPress={(e) => { e.stopPropagation(); router.push('/privacy'); }}>
+              Privacy Policy
+            </Text>
           </Text>
         </Pressable>
 
@@ -277,7 +280,10 @@ export default function OnboardingScreen() {
             {termsAccepted && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
           </View>
           <Text style={styles.consentText}>
-            Accetto i Termini di Utilizzo Beta
+            Accetto i{' '}
+            <Text style={styles.linkText} onPress={(e) => { e.stopPropagation(); router.push('/terms'); }}>
+              Termini di Utilizzo Beta
+            </Text>
           </Text>
         </Pressable>
       </View>
@@ -776,5 +782,10 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontFamily: TYPOGRAPHY.fontFamily,
     flex: 1,
+  },
+  linkText: {
+    color: '#0A74FF',
+    textDecorationLine: 'underline',
+    fontFamily: TYPOGRAPHY.fontBold,
   },
 });

@@ -4,7 +4,7 @@ import { parseFromManual } from '../modules/registration/manualParser';
 import { DOMAINS_CONFIG, ALL_CATEGORIES, getDomainForCategory } from '../constants/categories';
 import { COMUNI_ITALIANI } from '../constants/comuni';
 import { supabase } from '../services/supabase';
-import { analytics } from '../services/analytics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface SubscriptionSuggestion {
   suggest_subscription: boolean;
@@ -23,8 +23,6 @@ export async function parseExpenseWithAI(
 ): Promise<ParsedExpenseWithSuggestion> {
   const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
   if (!apiKey) throw new Error('Missing Groq API Key (EXPO_PUBLIC_GROQ_FINANCE_API)');
-
-  const currentDeviceId = await analytics.getDeviceId();
 
   const now = new Date();
   const currentTimestamp = now.toISOString();
@@ -127,29 +125,29 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
   Se "suggest_subscription" è true, "subscription_name" NON deve mai essere null o vuoto. Se il nome dell'abbonamento o stipendio non è specificato esplicitamente dall'utente, deducilo sempre dalla categoria o dal contesto (ad es. "Palestra" se inerente a sport/palestre, "Bolletta" se inerente a utenze/bollette/luce/gas, "Affitto" per spese di casa/affitto, "Stipendio" per entrate ricorrenti, "Abbonamento" o nome servizio come "Netflix" o "Spotify" per tv/musica/streaming).
 `;
 
-  // ─── Anti-abuso: limite mensile 500 richieste per device ────────────────────
+  // ─── Anti-abuso: limite mensile 500 richieste per device (locale per Privacy) ────────────────────
   try {
-    const { isSupabaseConfigured: isConfigured } = await import('./supabase');
-    if (isConfigured() && currentDeviceId) {
-      const firstDayOfMonth = new Date();
-      firstDayOfMonth.setDate(1);
-      firstDayOfMonth.setHours(0, 0, 0, 0);
-
-      const { count } = await (await import('./supabase')).supabase
-        .from('parsing_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('device_id', currentDeviceId)
-        .gte('start_time', firstDayOfMonth.toISOString());
-
-      const MONTHLY_LIMIT = 500;
-      if (count !== null && count >= MONTHLY_LIMIT) {
-        const { Alert } = await import('react-native');
-        Alert.alert(
-          '⚡ Limite mensile raggiunto',
-          `Hai effettuato ${count} analisi AI questo mese. Il limite è di ${MONTHLY_LIMIT} richieste. Riprova il mese prossimo!`,
-        );
-        throw new Error(`[Anti-abuso] Limite mensile raggiunto: ${count}/${MONTHLY_LIMIT}`);
+    const firstDayOfMonth = new Date();
+    const currentMonthKey = `${firstDayOfMonth.getFullYear()}-${(firstDayOfMonth.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    const usageStr = await AsyncStorage.getItem('wolly_ai_usage_monthly');
+    let localCount = 0;
+    
+    if (usageStr) {
+      const usageData = JSON.parse(usageStr);
+      if (usageData.month === currentMonthKey) {
+        localCount = usageData.count || 0;
       }
+    }
+    
+    const MONTHLY_LIMIT = 500;
+    if (localCount >= MONTHLY_LIMIT) {
+      const { Alert } = await import('react-native');
+      Alert.alert(
+        '⚡ Limite mensile raggiunto',
+        `Hai effettuato ${localCount} analisi AI questo mese. Il limite è di ${MONTHLY_LIMIT} richieste. Riprova il mese prossimo!`,
+      );
+      throw new Error(`[Anti-abuso] Limite mensile raggiunto: ${localCount}/${MONTHLY_LIMIT}`);
     }
   } catch (abuseError: any) {
     if (abuseError.message?.startsWith('[Anti-abuso]')) throw abuseError;
@@ -364,6 +362,23 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
         }
         if (context === 'receipt') computedCost += 0.0015; // Stimiamo 0.0015 per OCR esterno eventuale
 
+        // Incrementa contatore locale per controllo anti-abuso (GDPR compliant)
+        try {
+          const firstDayOfMonth = new Date();
+          const currentMonthKey = `${firstDayOfMonth.getFullYear()}-${(firstDayOfMonth.getMonth() + 1).toString().padStart(2, '0')}`;
+          const usageStr = await AsyncStorage.getItem('wolly_ai_usage_monthly');
+          let currentUsage = { month: currentMonthKey, count: 1 };
+          if (usageStr) {
+            const parsed = JSON.parse(usageStr);
+            if (parsed.month === currentMonthKey) {
+              currentUsage.count = (parsed.count || 0) + 1;
+            }
+          }
+          await AsyncStorage.setItem('wolly_ai_usage_monthly', JSON.stringify(currentUsage));
+        } catch (e) {
+          console.warn('[groqParser] Failed to increment AI usage counter:', e);
+        }
+
         try {
           const { data: logData, error: logError } = await supabase.from('parsing_logs').insert({
             method_used: context === 'receipt' ? 'photo' : context,
@@ -373,7 +388,7 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
             tokens: tokenUsage,
             cost_usd: computedCost,
             app_version: '0.0.1',
-            device_id: currentDeviceId
+            // GDPR: device_id rimosso — log completamente anonimi
           }).select('id').single();
           
           if (logError) {
@@ -429,7 +444,7 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
         tokens: null,
         cost_usd: 0,
         app_version: '0.0.1',
-        device_id: currentDeviceId
+        // GDPR: device_id rimosso — log completamente anonimi
       }).select('id').single();
       
       if (logError) {

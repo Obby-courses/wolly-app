@@ -97,7 +97,7 @@ export default function PrivacyScreen() {
             <Text style={styles.bulletText}><Text style={styles.bold}>Dati finanziari</Text> — solo locali, rimangono sul dispositivo finché non cancelli l'app o richiedi la cancellazione dell'account.</Text>
           </BulletItem>
           <InfoBox>
-            Dopo la cancellazione dell'account, tutti i dati cloud vengono eliminati entro 48 ore.
+            I dati cloud associati all'account vengono eliminati senza ingiustificato ritardo e comunque entro i tempi tecnici necessari all'esecuzione della richiesta.
           </InfoBox>
         </Section>
 
@@ -108,7 +108,7 @@ export default function PrivacyScreen() {
           <TableHeader col1="Fornitore" col2="Finalità" />
           <TableRow col1="Supabase (Irlanda, UE)" col2="Autenticazione e database cloud" />
           <TableRow col1="Google OAuth" col2="Accesso con account Google" />
-          <TableRow col1="Groq (USA)" col2="Elaborazione richieste AI (solo transito)" isLast />
+          <TableRow col1="Groq (USA)" col2="Elaborazione temporanea delle richieste AI" isLast />
         </Section>
 
         {/* ─── 6. TRASFERIMENTO EXTRA-UE ─── */}
@@ -160,10 +160,10 @@ export default function PrivacyScreen() {
           </InfoBox>
         </Section>
 
-        {/* ─── 9. COOKIE ─── */}
-        <Section title="9. Cookie e Tracciamento" icon="radio-button-off-outline" iconColor="#8E8E93" iconBg="#F2F2F7">
-          <BulletItem><Text style={styles.bulletText}>Nessun cookie di profilazione o marketing.</Text></BulletItem>
-          <BulletItem><Text style={styles.bulletText}>Usiamo solo token tecnici di sessione (Supabase Auth), necessari per il funzionamento dell'accesso.</Text></BulletItem>
+        {/* ─── 9. TRACCIAMENTO E SESSIONI ─── */}
+        <Section title="9. Tracciamento e Sessioni" icon="radio-button-off-outline" iconColor="#8E8E93" iconBg="#F2F2F7">
+          <BulletItem><Text style={styles.bulletText}>Nessun tracciamento per finalità di profilazione o marketing.</Text></BulletItem>
+          <BulletItem><Text style={styles.bulletText}>Usiamo solo identificativi tecnici temporanei di sessione (Supabase Auth), necessari per erogare il servizio.</Text></BulletItem>
           <BulletItem><Text style={styles.bulletText}>Firebase Analytics: <Text style={styles.bold}>disabilitato</Text> in questa versione beta.</Text></BulletItem>
         </Section>
 

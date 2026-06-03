@@ -181,6 +181,14 @@ export default function SettingsScreen() {
               <Text style={styles.itemText}>Informativa sulla Privacy</Text>
               <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
             </Pressable>
+
+            <Pressable style={[styles.item, { marginTop: 8 }]} onPress={() => router.push('/terms')}>
+              <View style={[styles.iconContainer, { backgroundColor: '#F3EFFF' }]}>
+                <Ionicons name="document-text" size={20} color="#8B5CF6" />
+              </View>
+              <Text style={styles.itemText}>Termini di Utilizzo Beta</Text>
+              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+            </Pressable>
           </View>
 
           <View style={styles.section}>
