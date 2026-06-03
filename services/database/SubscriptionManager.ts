@@ -55,19 +55,32 @@ function getCycleDateForToday(sub: Subscription, today: Date): string | null {
     }
 
     case 'weekly': {
-      // Fire on the specified day-of-week (0=Mon…6=Sun)
-      if (recurrenceDay != null && todayDow === recurrenceDay) {
+      // Fire on the selected days-of-week (bitmask: 0=Mon…6=Sun)
+      if (recurrenceDay == null) return null;
+      if ((recurrenceDay & (1 << todayDow)) !== 0) {
         return todayISO;
       }
       return null;
     }
 
     case 'biweekly': {
-      // Fire every 14 days from startDate, on the correct day-of-week
-      if (recurrenceDay != null && todayDow !== recurrenceDay) return null;
-      const msPerDay = 86400000;
-      const daysSinceStart = Math.floor((today.getTime() - startDate.getTime()) / msPerDay);
-      if (daysSinceStart >= 0 && daysSinceStart % 14 === 0) {
+      // Fire on the selected days-of-week, every 2 weeks
+      if (recurrenceDay == null) return null;
+      if ((recurrenceDay & (1 << todayDow)) === 0) return null;
+      
+      const getMonday = (d: Date) => {
+        const date = new Date(d);
+        const dow = (date.getDay() + 6) % 7;
+        date.setDate(date.getDate() - dow);
+        date.setHours(0,0,0,0);
+        return date;
+      };
+      
+      const startMonday = getMonday(startDate);
+      const todayMonday = getMonday(today);
+      const weeksSinceStart = Math.round((todayMonday.getTime() - startMonday.getTime()) / (7 * 86400000));
+      
+      if (weeksSinceStart >= 0 && weeksSinceStart % 2 === 0) {
         return todayISO;
       }
       return null;

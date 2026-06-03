@@ -55,17 +55,46 @@ function getNextOccurrenceDate(sub: any): Date {
       return candidate;
     }
     case 'weekly': {
-      const targetDow = day ?? 0;
+      if (day == null) break;
       const currentDow = (today.getDay() + 6) % 7;
-      const diff = (targetDow - currentDow + 7) % 7 || 7;
+      let diff = 7;
+      for (let i = 1; i <= 7; i++) {
+        const d = (currentDow + i) % 7;
+        if ((day & (1 << d)) !== 0) {
+          diff = i;
+          break;
+        }
+      }
       const result = new Date(today);
       result.setDate(today.getDate() + diff);
       return result;
     }
     case 'biweekly': {
-      const targetDow = day ?? 0;
-      const currentDow = (today.getDay() + 6) % 7;
-      const diff = (targetDow - currentDow + 14) % 14 || 14;
+      if (day == null) break;
+      let diff = 14;
+      for (let i = 1; i <= 14; i++) {
+        const futureDate = new Date(today);
+        futureDate.setDate(today.getDate() + i);
+        
+        const fDow = (futureDate.getDay() + 6) % 7;
+        if ((day & (1 << fDow)) === 0) continue;
+        
+        const getMonday = (d: Date) => {
+          const date = new Date(d);
+          const dow = (date.getDay() + 6) % 7;
+          date.setDate(date.getDate() - dow);
+          date.setHours(0,0,0,0);
+          return date;
+        };
+        const startMonday = getMonday(new Date(sub.start_date));
+        const futureMonday = getMonday(futureDate);
+        const weeksSinceStart = Math.round((futureMonday.getTime() - startMonday.getTime()) / (7 * 86400000));
+        
+        if (weeksSinceStart >= 0 && weeksSinceStart % 2 === 0) {
+          diff = i;
+          break;
+        }
+      }
       const result = new Date(today);
       result.setDate(today.getDate() + diff);
       return result;
