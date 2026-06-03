@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 10,
-    color: COLORS.secondary,
+    color: '#BADBFF',
     letterSpacing: 1.5,
     marginBottom: SPACING.sm,
     marginLeft: SPACING.sm,

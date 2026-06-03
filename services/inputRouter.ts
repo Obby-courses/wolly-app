@@ -41,6 +41,7 @@ const EXPENSE_VERB_PATTERNS = [
 // ─── Pattern per QUERY (analisi AI) ───────────────────────────────────────────
 const QUERY_PATTERNS = [
   /\b(quanto|quante|quanti|quanta|quant'era|quant'è)\b/i,
+  /\b(quando|quand'è|quand'era)\b/i,
   /\b(come\s+ho\s+speso|dove\s+spendo|cosa\s+ho\s+speso)\b/i,
   /\b(mostrami|dimmi|analizza|fammi\s+vedere|mostra)\b/i,
   /\b(media|totale|somma|conteggio|confronta|comparazione)\b/i,
@@ -59,7 +60,8 @@ const QUERY_PATTERNS = [
 // Pattern interrogativi o analitici STRETTI (che definiscono una query anche se c'è un importo)
 const STRICT_QUERY_PATTERNS = [
   /\b(quanto|quante|quanti|quanta|quant'era|quant'è)\b/i,
-  /\b(come\s+ho\s+speso|dove\s+spendo|cosa\s+ho\s+speso)\b/i,
+  /\b(quando|quand'è|quand'era)\b/i,
+  /\b(come\s+ho\s+speso|dove\s+spendo|cosa\s+ho\s+speso|dove\s+ho\s+speso|quando\s+ho\s+speso)\b/i,
   /\b(mostrami|dimmi|analizza|fammi\s+vedere|mostra)\b/i,
   /\b(media|somma|conteggio|confronta|comparazione|grafico|andamento|distribuzione)\b/i,
   /\bqual[ei]?\b/i,

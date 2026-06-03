@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
   periodLabel: {
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 12,
-    color: COLORS.secondary,
+    color: '#BADBFF',
     letterSpacing: 2,
     marginBottom: SPACING.md,
   },
@@ -63,14 +63,14 @@ const styles = StyleSheet.create({
   currency: {
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 32,
-    color: COLORS.primary,
+    color: '#FFFFFF',
     marginTop: 10,
     marginRight: 4,
   },
   value: {
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 72,
-    color: COLORS.primary,
+    color: '#FFFFFF',
     letterSpacing: -2,
   },
   comparisonRow: {
