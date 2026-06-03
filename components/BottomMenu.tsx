@@ -341,7 +341,7 @@ export default function BottomMenu() {
         </View>
       )}
 
-      <View style={styles.container}>
+      <View style={[styles.container, isVoiceChat && styles.containerVoiceChat]}>
         <View style={styles.navRow}>
             {NAV_ITEMS.map((item) => {
               if (item.isPlus) {
@@ -373,10 +373,10 @@ export default function BottomMenu() {
                           ]}
                         >
                           <Ionicons 
-                            name={isVoiceChat ? "mic" : "add"} 
-                            size={isVoiceChat ? 28 : 28} 
-                            color="#FFF" 
-                          />
+                             name={isVoiceChat ? "mic" : "add"} 
+                             size={isVoiceChat ? 28 : 28} 
+                             color={isVoiceChat ? '#0078FF' : '#FFF'} 
+                           />
                         </Animated.View>
                       )}
                     </View>
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: COLORS.brandBlue,
+    backgroundColor: '#FFFFFF',
     ...SHADOWS.soft,
   },
   micBtnCancel: {
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
   cancelText: {
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 13,
-    color: COLORS.secondary,
+    color: '#FFFFFF',
     marginTop: 4,
   },
   progressCircleContainer: {
@@ -571,5 +571,13 @@ const styles = StyleSheet.create({
     color: '#F1F5F9',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  containerVoiceChat: {
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
+    borderTopColor: 'transparent',
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, TYPOGRAPHY, SPACING } from '../../constants/Theme';
 import { voiceStore } from '../../services/voiceStore';
 import { askAiChat } from '../../services/aiChat';
@@ -91,13 +92,17 @@ export default function VoiceChatOverlay() {
       ]}
       pointerEvents={voiceState.isOpen ? 'auto' : 'none'}
     >
+      <LinearGradient
+        colors={['#5CB5FF', '#0078FF']}
+        style={StyleSheet.absoluteFillObject}
+      />
       {/* Spacer per respiro visivo in alto */}
       <View style={{ height: insets.top + 16 }} />
 
       {qa && (
         <View style={{ alignItems: 'center', width: '100%', marginBottom: 16 }}>
           <Pressable onPress={handleClose} style={styles.topCloseBtn}>
-            <Ionicons name="close" size={28} color={COLORS.secondary} />
+            <Ionicons name="close" size={28} color="#FFFFFF" />
           </Pressable>
         </View>
       )}
@@ -108,7 +113,7 @@ export default function VoiceChatOverlay() {
           <>
             {isLoading ? (
               <View style={styles.loadingWrapper}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
+                <ActivityIndicator size="large" color="#FFFFFF" />
                 <Text style={styles.loadingText}>Wolly sta analizzando...</Text>
               </View>
             ) : qa.answer && (
@@ -124,7 +129,7 @@ export default function VoiceChatOverlay() {
         ) : (
           <View style={styles.emptyCenter}>
             <Text style={styles.emptyTitle}>
-              {isRecording ? 'Ti ascolto...' : 'Tieni premuto per iniziare'}
+              {isRecording ? 'In ascolto...' : 'Tieni premuto per iniziare'}
             </Text>
           </View>
         )}
@@ -140,7 +145,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
     zIndex: 100,
   },
   header: {
@@ -153,7 +158,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -166,7 +171,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontFamily: TYPOGRAPHY.fontBold,
     fontSize: 24,
-    color: COLORS.secondary,
+    color: '#FFFFFF',
     textAlign: 'center',
     paddingHorizontal: SPACING.xl,
   },
@@ -179,6 +184,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontFamily: TYPOGRAPHY.fontFamily,
     fontSize: 14,
-    color: COLORS.secondary,
+    color: '#FFFFFF',
   },
 });
