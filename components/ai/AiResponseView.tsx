@@ -18,6 +18,7 @@ import { COLORS, TYPOGRAPHY, SPACING } from '../../constants/Theme';
 import { AiChatResponse } from '../../services/aiChat';
 import { QueryIntent } from '../../services/aiQueryParser';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DOMAINS_CONFIG } from '../../constants/categories';
 
 import JitTotal        from './JitTotal';
@@ -126,13 +127,15 @@ export default function AiResponseView({
 
   const isTextOnly = answer.intent === 'text' || answer.intent === 'advice';
 
+  const insets = useSafeAreaInsets();
+
   // Calcolo dinamico del font size basato sulla larghezza dello schermo, altezza dello schermo, JIT widget e parola più lunga
   const { width, height } = Dimensions.get('window');
   // Consideriamo un padding di sicurezza orizzontale di circa 48px totali (24px per lato)
   const availableWidth = width - 48;
 
-  // Stima dell'altezza occupata da safe-area, pulsanti e spazi fissi (circa 240px in totale)
-  const verticalOffsets = 240;
+  // Altezza occupata da safe-area, pulsante di chiusura superiore, padding del ScrollView e menu microfono inferiore
+  const verticalOffsets = insets.top + insets.bottom + 200;
   const availableHeight = height - verticalOffsets;
 
   // Stima dell'altezza dell'eventuale JIT widget attivo
