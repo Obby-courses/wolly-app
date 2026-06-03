@@ -47,7 +47,7 @@ interface AiResponseViewProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-function renderFormattedText(text: string, queryIntent?: QueryIntent) {
+function renderFormattedText(text: string, queryIntent: QueryIntent | undefined, fontSize: number) {
   if (!text) return null;
 
   const escapeRegExp = (str: string) => {
@@ -98,15 +98,15 @@ function renderFormattedText(text: string, queryIntent?: QueryIntent) {
 
   const parts = text.split(finalRegex);
   return (
-    <Text style={{ textAlign: 'left' }}>
+    <Text style={{ textAlign: 'left', fontSize, lineHeight: fontSize * 1.25 }}>
       {parts.map((part, index) => {
         if (index % 2 === 0) {
           // Testo naturale (azzurro opaco)
-          return <Text key={index} style={{ color: '#BADBFF' }}>{part}</Text>;
+          return <Text key={index} style={{ color: '#BADBFF', fontSize }}>{part}</Text>;
         } else {
           // Voce evidenziata/metrica (bianco bold)
           return (
-            <Text key={index} style={{ color: '#FFFFFF', fontWeight: 'bold' }}>
+            <Text key={index} style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize }}>
               {part}
             </Text>
           );
@@ -126,6 +126,22 @@ export default function AiResponseView({
 
   const isTextOnly = answer.intent === 'text' || answer.intent === 'advice';
 
+  // Calcolo dinamico del font size per evitare parole tagliate e per far entrare tutto nello schermo
+  const words = answer.text_response.split(/[\s,.\n]+/);
+  const maxWordLength = Math.max(...words.map(w => w.length), 1);
+  
+  // Se la parola più lunga è > 10 caratteri, riduciamo il font size da 45px fino a un minimo di 20px
+  let dynamicFontSize = 45;
+  if (maxWordLength > 10) {
+    dynamicFontSize = Math.max(20, 45 - (maxWordLength - 10) * 3);
+  }
+  
+  // Se l'intero testo è molto lungo, lo riduciamo ulteriormente per adattarlo allo schermo
+  const totalLength = answer.text_response.length;
+  if (totalLength > 120) {
+    dynamicFontSize = Math.min(dynamicFontSize, Math.max(20, 45 - (totalLength - 120) * 0.15));
+  }
+
   const body = (
     <>
       {/* Domanda utente — piccola in cima */}
@@ -135,9 +151,13 @@ export default function AiResponseView({
 
       {/* FeedbackBar — hidden per richiesta utente */}
 
-      {/* Testo risposta principale */}
-      <Text style={[isTextOnly ? styles.bigAnswerText : styles.answerContextText, textStyle]}>
-        {renderFormattedText(answer.text_response, answer.queryIntent)}
+      {/* Testo risposta principale con font size dinamico */}
+      <Text style={[
+        isTextOnly ? styles.bigAnswerText : styles.answerContextText, 
+        textStyle, 
+        { fontSize: dynamicFontSize, lineHeight: dynamicFontSize * 1.25 }
+      ]}>
+        {renderFormattedText(answer.text_response, answer.queryIntent, dynamicFontSize)}
       </Text>
 
       {/* ── JIT Widgets ──────────────────────────────────────────────────── */}
