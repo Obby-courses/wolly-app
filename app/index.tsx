@@ -100,8 +100,10 @@ function getNextOccurrenceDate(sub: any): Date {
       return result;
     }
   }
-  return new Date(today);
+  return today;
 }
+
+let homeScrollY = 0;
 
 export default function Home() {
   const router = useRouter();
@@ -122,6 +124,17 @@ export default function Home() {
   const [editNetWorthValue, setEditNetWorthValue] = useState('');
   const [editIsNegative, setEditIsNegative] = useState(false);
   const editInputRef = useRef<TextInput>(null);
+  const flatListRef = useRef<FlatList>(null);
+
+  // Ripristina la posizione dello scroll quando la lista viene caricata
+  useEffect(() => {
+    if (transactions.length > 0 && homeScrollY > 0) {
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: homeScrollY, animated: false });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [transactions]);
 
   useEffect(() => {
     AsyncStorage.getItem('wolly_nw_hidden').then(val => {
@@ -291,9 +304,7 @@ export default function Home() {
       // Limite preciso di elementi che possono starci
       const maxPossibleItems = Math.max(1, Math.floor(availableListHeight / itemHeight));
 
-      console.log(`📊 [Home Layout] ScreenHeight: ${screenHeight}px, ListStartOffset: ${listStartOffset}px, BottomMenuOffset: ${bottomMenuOffset}px, AvailableListHeight: ${availableListHeight}px, MaxItems: ${maxPossibleItems}`);
-
-      setTransactions(filteredTrans.slice(0, maxPossibleItems));
+      setTransactions(filteredTrans.slice(0, 100));
 
       // Load Net Worth
       const currentNw = await NetWorthRepository.getCurrentTotal();
@@ -528,17 +539,22 @@ export default function Home() {
 
             <View style={styles.sectionHeaderCompact}>
               <Text style={styles.sectionTitle}>Ultime spese</Text>
-              <Pressable onPress={() => router.push('/stats/expenses')}>
+              <Pressable onPress={() => router.push({ pathname: '/stats/expenses', params: { range: 'Tutto' } })}>
                 <Text style={styles.seeAllText}>Vedi tutto</Text>
               </Pressable>
             </View>
 
             <FlatList
+              ref={flatListRef}
               data={transactions}
               keyExtractor={(item) => item.id.toString()}
               renderItem={renderTransaction}
               showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
+              scrollEnabled={true}
+              onScroll={(event) => {
+                homeScrollY = event.nativeEvent.contentOffset.y;
+              }}
+              scrollEventThrottle={16}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <View style={styles.emptyIconBackground}>
@@ -709,8 +725,9 @@ const styles = StyleSheet.create({
   },
   upcomingList: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: 4,
+    marginTop: 4,
   },
   upcomingItem: {
     flexDirection: 'row',

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, Dimensions, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { G, Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Rect, Text as SvgText } from 'react-native-svg';
@@ -231,16 +231,19 @@ export default function ExpensesScreen() {
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
+  const params = useLocalSearchParams();
+
   // Automatic reset when entering the screen
   useFocusEffect(
     useCallback(() => {
       analytics.trackScreen(ANALYTICS_SCREENS.STATS_EXPENSES);
-      setTimeRange('Mese');
+      const initialRange = (params.range as TimeRange) || 'Mese';
+      setTimeRange(initialRange);
       setBaseDate(new Date().toISOString().split('T')[0]);
       setSelectedDomains([]);
       setSelectedCategories([]);
       setSortBy('date');
-    }, [])
+    }, [params.range])
   );
 
   // Load stats when filters change

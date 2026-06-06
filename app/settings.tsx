@@ -20,8 +20,6 @@ export default function SettingsScreen() {
   
   const [networkState, setNetworkState] = useState(networkStore.getState());
   const [devSettingsEnabled, setDevSettingsEnabled] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -42,33 +40,6 @@ export default function SettingsScreen() {
   const handleToggleDevSettings = async (val: boolean) => {
     setDevSettingsEnabled(val);
     await AsyncStorage.setItem('wolly_dev_settings_enabled', String(val));
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Esci da Wolly',
-      'Sei sicuro di voler uscire? Potrai rientrare in qualsiasi momento con il tuo account Google.',
-      [
-        { text: 'Annulla', style: 'cancel' },
-        {
-          text: 'Esci',
-          style: 'destructive',
-          onPress: async () => {
-            setIsLoggingOut(true);
-            try {
-              await clearProfile();
-              await supabase.auth.signOut();
-              router.replace('/login');
-            } catch (e) {
-              console.error('[Settings] Errore logout:', e);
-              Alert.alert('Errore', 'Impossibile effettuare il logout. Riprova.');
-            } finally {
-              setIsLoggingOut(false);
-            }
-          },
-        },
-      ]
-    );
   };
 
   const handleDeleteAll = () => {
@@ -94,54 +65,6 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleDeleteAccount = () => {
-    // Step 1 — primo avviso
-    Alert.alert(
-      "Elimina account",
-      "Stai per eliminare tutti i tuoi dati da Wolly. Questa azione è irreversibile.\n\nVerranno cancellati:\n\u2022 Tutte le transazioni\n\u2022 Gli abbonamenti\n\u2022 Il tuo patrimonio\n\u2022 I log di utilizzo AI",
-      [
-        { text: "Annulla", style: "cancel" },
-        {
-          text: "Continua",
-          style: "destructive",
-          onPress: () => {
-            // Step 2 — conferma definitiva
-            Alert.alert(
-              "Sei sicuro?",
-              "Questa è l'ultima conferma. Tutti i tuoi dati verranno cancellati definitivamente e non potranno essere recuperati.",
-              [
-                { text: "No, torna indietro", style: "cancel" },
-                {
-                  text: "Sì, elimina tutto",
-                  style: "destructive",
-                  onPress: async () => {
-                    setIsDeletingAccount(true);
-                    try {
-                      const result = await deleteUserAccount();
-                      if (!result.success) {
-                        console.warn('[Settings] deleteUserAccount completato con errori:', result.errors);
-                      }
-                      // Redirect al login dopo la pulizia e disconnessione
-                      router.replace('/login');
-                    } catch (e: any) {
-                      console.error('[Settings] Errore critico deleteUserAccount:', e);
-                      Alert.alert(
-                        "Errore",
-                        "Si è verificato un errore durante l'eliminazione. Riprova o contatta il supporto."
-                      );
-                    } finally {
-                      setIsDeletingAccount(false);
-                    }
-                  }
-                }
-              ]
-            );
-          }
-        }
-      ]
-    );
-  };
-
   return (
     <View style={styles.container}>
       {/* Header Sfumato Blu Premium */}
@@ -159,8 +82,31 @@ export default function SettingsScreen() {
       <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 48 }]}>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Sezione Profilo in alto */}
+          {userProfile && (
+            <Pressable 
+              style={styles.profileCard} 
+              onPress={() => router.push('/profile')}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name="person-circle-outline" size={22} color="#0A74FF" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.itemTitleText} numberOfLines={1}>{userProfile.email}</Text>
+                <View style={[styles.roleBadge, { backgroundColor: getRoleColor(userProfile.role) + '20' }]}>
+                  <View style={[styles.roleDot, { backgroundColor: getRoleColor(userProfile.role) }]} />
+                  <Text style={[styles.roleText, { color: getRoleColor(userProfile.role) }]}>
+                    {getRoleLabel(userProfile.role)}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+            </Pressable>
+          )}
+
+          {/* Opzioni Tecniche */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Supporto & Feedback</Text>
+            <Text style={styles.sectionTitle}>Opzioni Tecniche</Text>
             
             <AnomalyReporter
               renderTrigger={(open) => (
@@ -173,8 +119,13 @@ export default function SettingsScreen() {
                 </Pressable>
               )}
             />
+          </View>
 
-            <Pressable style={[styles.item, { marginTop: 8 }]} onPress={() => router.push('/privacy')}>
+          {/* Opzioni Informative */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Informazioni e Note Legali</Text>
+
+            <Pressable style={styles.item} onPress={() => router.push('/privacy')}>
               <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
                 <Ionicons name="shield-checkmark" size={20} color="#0284C7" />
               </View>
@@ -191,6 +142,7 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
 
+          {/* Impostazioni di Sviluppo */}
           {userProfile?.role === 'admin' && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Impostazioni di Sviluppo</Text>
@@ -273,87 +225,16 @@ export default function SettingsScreen() {
                     <View style={[styles.iconContainer, { backgroundColor: '#FCE8E6' }]}>
                       <Ionicons name="trash" size={20} color="#EF4444" />
                     </View>
-                    <Text style={[styles.itemText, styles.dangerText]}>Elimina tutte le transazioni</Text>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[styles.itemTitleText, styles.dangerText]}>Elimina tutte le transazioni</Text>
+                      <Text style={styles.itemSubtitleText}>Svuota database transazioni e resetta patrimonio</Text>
+                    </View>
                     <Ionicons name="chevron-forward" size={18} color="#EF4444" />
                   </Pressable>
                 </>
               )}
             </View>
           )}
-
-          {/* ── Sezione Account (sempre visibile) ──────────────────────────── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Account</Text>
-
-            {/* Info profilo utente */}
-            {userProfile && (
-              <View style={styles.profileCard}>
-                <View style={[styles.iconContainer, { backgroundColor: '#EFF6FF' }]}>
-                  <Ionicons name="person-circle-outline" size={22} color="#0A74FF" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.itemTitleText} numberOfLines={1}>{userProfile.email}</Text>
-                  <View style={[styles.roleBadge, { backgroundColor: getRoleColor(userProfile.role) + '20' }]}>
-                    <View style={[styles.roleDot, { backgroundColor: getRoleColor(userProfile.role) }]} />
-                    <Text style={[styles.roleText, { color: getRoleColor(userProfile.role) }]}>
-                      {getRoleLabel(userProfile.role)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Pulsante Esci */}
-            <Pressable
-              style={[styles.item, styles.logoutItem]}
-              onPress={handleLogout}
-              disabled={isLoggingOut}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: '#FFF7ED' }]}>
-                {isLoggingOut
-                  ? <ActivityIndicator size="small" color="#F97316" />
-                  : <Ionicons name="log-out-outline" size={20} color="#F97316" />
-                }
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={[styles.itemTitleText, { color: '#F97316' }]}>
-                  {isLoggingOut ? 'Uscita in corso...' : 'Esci'}
-                </Text>
-                <Text style={styles.itemSubtitleText}>
-                  Disconnetti il tuo account Google
-                </Text>
-              </View>
-              {!isLoggingOut && (
-                <Ionicons name="chevron-forward" size={18} color="#F97316" />
-              )}
-            </Pressable>
-
-            {/* Elimina account */}
-            <Pressable
-              style={[styles.item, styles.dangerItem]}
-              onPress={handleDeleteAccount}
-              disabled={isDeletingAccount}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: '#FCE8E6' }]}>
-                {isDeletingAccount
-                  ? <ActivityIndicator size="small" color="#EF4444" />
-                  : <Ionicons name="person-remove" size={20} color="#EF4444" />
-                }
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={[styles.itemTitleText, styles.dangerText]}>
-                  {isDeletingAccount ? 'Eliminazione in corso...' : 'Elimina account'}
-                </Text>
-                <Text style={styles.itemSubtitleText}>
-                  Cancella tutti i tuoi dati definitivamente
-                </Text>
-              </View>
-              {!isDeletingAccount && (
-                <Ionicons name="chevron-forward" size={18} color="#EF4444" />
-              )}
-            </Pressable>
-          </View>
-
         </ScrollView>
       </View>
     </View>

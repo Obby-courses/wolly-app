@@ -3,9 +3,18 @@
  * Speech-to-Text service using Groq Whisper.
  */
 
+let activeAbortController: AbortController | null = null;
+
 export async function transcribeAudio(uri: string): Promise<string> {
   const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
   if (!apiKey) throw new Error('Missing Groq API Key (EXPO_PUBLIC_GROQ_FINANCE_API)');
+
+  // Abort any pending transcription request
+  if (activeAbortController) {
+    console.log('[stt] Aborting previous pending transcription request...');
+    activeAbortController.abort();
+    activeAbortController = null;
+  }
 
   console.log("🎙️ Start transcription for:", uri);
 
@@ -16,13 +25,14 @@ export async function transcribeAudio(uri: string): Promise<string> {
     attempt++;
     let isTimeout = false;
     const controller = new AbortController();
+    activeAbortController = controller;
     
-    // 15 seconds timeout per attempt (faster failover for retries)
+    // 30 seconds timeout per attempt (more robust for mobile connections/heavy server load)
     const timeoutId = setTimeout(() => {
       isTimeout = true;
       console.warn(`⚠️ Groq STT Request timed out on attempt ${attempt}!`);
       controller.abort();
-    }, 15000);
+    }, 30000);
 
     try {
       const formData = new FormData();
@@ -53,6 +63,11 @@ export async function transcribeAudio(uri: string): Promise<string> {
         throw new Error(`Groq STT Error: ${response.status} - ${JSON.stringify(errorData)}`);
       }
 
+      // Clear reference since we are done
+      if (activeAbortController === controller) {
+        activeAbortController = null;
+      }
+
       const data = await response.json();
       console.log("📝 Transcription result:", data.text);
       return data.text;
@@ -61,7 +76,12 @@ export async function transcribeAudio(uri: string): Promise<string> {
       clearTimeout(timeoutId);
       console.error(`❌ Attempt ${attempt}/${MAX_RETRIES} failed:`, err.message || err);
 
-      if (attempt >= MAX_RETRIES) {
+      const wasCancelled = err.name === 'AbortError' && !isTimeout;
+      if (wasCancelled || attempt >= MAX_RETRIES) {
+        // Clear reference if this call failed/finished
+        if (activeAbortController === controller) {
+          activeAbortController = null;
+        }
         if (isTimeout) {
           throw new Error('Timeout');
         }

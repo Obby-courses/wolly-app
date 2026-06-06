@@ -413,15 +413,7 @@ function buildResponseFromResult(intent: QueryIntent, result: ExecutionResult): 
     if (count === 0) {
       text_response = `Per quanto riguarda ${formattedLabel}, non ho trovato nessuna transazione.`;
     } else {
-      text_response = `Per quanto riguarda ${formattedLabel}, ho trovato ${count} transazioni in totale. Ecco le più rilevanti:`;
-      const txDetails = tx.map((t: any) => {
-        const dateFormatted = new Date(t.date).toLocaleDateString('it-IT');
-        const desc = t.description || t.category_key.replace(/_/g, ' ');
-        const sign = t.direction === 'in' ? '+' : '-';
-        const cityStr = t.city ? ` a ${t.city}` : '';
-        return `- ${dateFormatted}: ${desc} (${sign}€${Math.abs(t.amount).toFixed(2)})${cityStr}`;
-      }).join('\n');
-      text_response += `\n${txDetails}`;
+      text_response = `Per quanto riguarda ${formattedLabel}, ho trovato ${count} transazioni in totale.`;
     }
 
     return {
@@ -534,6 +526,7 @@ Il tuo compito è prendere una risposta generata automaticamente (il "Draft tecn
 Se il draft riporta 0 transazioni o nessun dato, dillo chiaramente.
 NON aggiungere considerazioni personali, consigli non richiesti o chiacchiere inutili. Rispondi in modo diretto alla domanda.
 NON inventare dati o cifre che non sono nel draft tecnico. Mantieni i numeri e i concetti esatti.
+NON elencare o ripetere in forma testuale le singole transazioni o voci di una lista (con data, descrizione o importo) se presenti, poiché queste informazioni verranno già visualizzate graficamente in un widget o in una lista sotto la tua risposta. Limitati ad introdurre la lista o a indicare il totale e il numero di elementi.
 
 Draft tecnico: "${draft}"
 Domanda utente: "${userMessage}"

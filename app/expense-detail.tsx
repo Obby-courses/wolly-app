@@ -20,6 +20,7 @@ import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill, { getCategoryColor } from '../components/CategoryPill';
 import { LinearGradient } from 'expo-linear-gradient';
 import PeriodicDateSelector from '../components/PeriodicDateSelector';
+import { COMUNI_ITALIANI, ComuneItem } from '../constants/comuni';
 const sanitizeLocationField = (val: string | null | undefined): string => {
   if (!val) return '';
   const blacklist = [
@@ -404,6 +405,12 @@ export default function ExpenseDetail() {
             recurrence_day: clampedDay,
             start_date: expenseToSave.date,
             auto_detected: false,
+            description: expenseToSave.description || expenseToSave.reason || null,
+            tags: Array.isArray(expenseToSave.tags) ? expenseToSave.tags.join(',') : (expenseToSave.tags || null),
+            location_name: expenseToSave.location_name || null,
+            location_type: expenseToSave.location_type || null,
+            city: expenseToSave.city || null,
+            address: expenseToSave.address || null,
           });
           subscription_id = subId;
         } else if (isSubscriptionActive && subscription?.suggest_subscription) {
@@ -417,6 +424,12 @@ export default function ExpenseDetail() {
             recurrence_day: subscription.subscription_day || null,
             start_date: expenseToSave.date,
             auto_detected: true,
+            description: expenseToSave.description || expenseToSave.reason || null,
+            tags: Array.isArray(expenseToSave.tags) ? expenseToSave.tags.join(',') : (expenseToSave.tags || null),
+            location_name: expenseToSave.location_name || null,
+            location_type: expenseToSave.location_type || null,
+            city: expenseToSave.city || null,
+            address: expenseToSave.address || null,
           });
           subscription_id = subId;
         }
@@ -659,7 +672,7 @@ export default function ExpenseDetail() {
           <View style={styles.amountContainer}>
              <Text style={[styles.currency, { color: isIncome ? COLORS.success : COLORS.primary }]}>€</Text>
              <TextInput 
-                ref={ref => inputRefs.current['amount'] = ref}
+                ref={ref => { inputRefs.current['amount'] = ref; }}
                 style={[styles.amountInput, { color: isIncome ? COLORS.success : COLORS.primary }]}
                 value={amountInputText}
                 onChangeText={(val) => {
@@ -843,7 +856,7 @@ export default function ExpenseDetail() {
                 <View style={styles.periodicForm}>
                   <Text style={styles.periodicLabel}>Nome abbonamento *</Text>
                   <TextInput
-                    ref={ref => inputRefs.current['periodicName'] = ref}
+                    ref={ref => { inputRefs.current['periodicName'] = ref; }}
                     style={[styles.periodicInput, !periodicName.trim() && { borderColor: '#FCA5A5', borderWidth: 1 }]}
                     placeholder="es. Netflix, Stipendio, Affitto"
                     placeholderTextColor={COLORS.secondary}
@@ -1037,7 +1050,7 @@ export default function ExpenseDetail() {
               <View style={styles.searchRow}>
                 <Ionicons name="search" size={18} color={COLORS.secondary} style={{ marginRight: 8 }} />
                 <TextInput
-                  ref={ref => inputRefs.current['citySearch'] = ref}
+                  ref={ref => { inputRefs.current['citySearch'] = ref; }}
                   style={styles.cityInput}
                   placeholder="Cerca comune italiano (es. Vimercate, Milano...)"
                   placeholderTextColor={COLORS.secondary}
@@ -1067,7 +1080,7 @@ export default function ExpenseDetail() {
 
               <Text style={[styles.editorLabel, { marginTop: 15 }]}>Via / Indirizzo specifico</Text>
               <TextInput
-                ref={ref => inputRefs.current['address'] = ref}
+                ref={ref => { inputRefs.current['address'] = ref; }}
                 style={styles.inlineTextInput}
                 placeholder="es. Via Garibaldi, 10"
                 placeholderTextColor={COLORS.secondary}
@@ -1099,7 +1112,7 @@ export default function ExpenseDetail() {
               <View style={styles.detailTextContainer}>
                 <View style={styles.textInputFadeContainer}>
                   <TextInput
-                    ref={ref => inputRefs.current['description'] = ref}
+                    ref={ref => { inputRefs.current['description'] = ref; }}
                     style={styles.rowTextInput}
                     placeholder="----"
                     placeholderTextColor={COLORS.primary}
@@ -1144,7 +1157,7 @@ export default function ExpenseDetail() {
               <View style={styles.detailTextContainer}>
                 <View style={styles.textInputFadeContainer}>
                   <TextInput
-                    ref={ref => inputRefs.current['location_name'] = ref}
+                    ref={ref => { inputRefs.current['location_name'] = ref; }}
                     style={styles.rowTextInput}
                     placeholder="----"
                     placeholderTextColor={COLORS.primary}
@@ -1374,7 +1387,7 @@ export default function ExpenseDetail() {
                   {showNewPersonInput && (
                     <View style={styles.inlineTagInputContainer}>
                       <TextInput
-                        ref={ref => inputRefs.current['newPersonInput'] = ref}
+                        ref={ref => { inputRefs.current['newPersonInput'] = ref; }}
                         style={styles.inlineTagInput}
                         placeholder="Nome (es. Mario, Elena...)"
                         placeholderTextColor={COLORS.secondary}
@@ -1536,7 +1549,7 @@ export default function ExpenseDetail() {
           {showNewTagInput && (
             <View style={styles.inlineTagInputContainer}>
               <TextInput
-                ref={ref => inputRefs.current['newTagInput'] = ref}
+                ref={ref => { inputRefs.current['newTagInput'] = ref; }}
                 style={styles.inlineTagInput}
                 placeholder="Nome nuovo tag (es. regali, auto...)"
                 placeholderTextColor={COLORS.secondary}

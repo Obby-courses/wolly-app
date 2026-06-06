@@ -82,7 +82,7 @@ export default function RootLayout() {
 
   // ── Listener cambio sessione (login/logout in tempo reale) ───────────────
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
       setTimeout(async () => {
         if (event === 'SIGNED_OUT') {
           router.replace('/login');

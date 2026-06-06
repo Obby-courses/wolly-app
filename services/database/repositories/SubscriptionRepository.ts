@@ -17,6 +17,12 @@ export interface Subscription {
   end_date?: string | null;        // null = still active
   auto_detected?: boolean;
   is_active?: boolean;
+  description?: string | null;
+  tags?: string | null;
+  location_name?: string | null;
+  location_type?: string | null;
+  city?: string | null;
+  address?: string | null;
 }
 
 export class SubscriptionRepository {
@@ -30,8 +36,9 @@ export class SubscriptionRepository {
     await db.runAsync(
       `INSERT INTO subscriptions (
         id, created_at, name, amount, currency, direction, category_key,
-        frequency, recurrence_day, start_date, end_date, auto_detected, is_active, synced_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        frequency, recurrence_day, start_date, end_date, auto_detected, is_active, synced_at,
+        description, tags, location_name, location_type, city, address
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         now,
@@ -47,6 +54,12 @@ export class SubscriptionRepository {
         sub.auto_detected ? 1 : 0,
         sub.is_active !== false ? 1 : 0,
         null,
+        sub.description ?? null,
+        sub.tags ?? null,
+        sub.location_name ?? null,
+        sub.location_type ?? null,
+        sub.city ?? null,
+        sub.address ?? null,
       ]
     );
 
@@ -67,6 +80,12 @@ export class SubscriptionRepository {
     if (fields.start_date !== undefined)       { updates.push('start_date = ?');       values.push(fields.start_date); }
     if (fields.end_date !== undefined)         { updates.push('end_date = ?');         values.push(fields.end_date); }
     if (fields.is_active !== undefined)            { updates.push('is_active = ?');            values.push(fields.is_active ? 1 : 0); }
+    if (fields.description !== undefined)       { updates.push('description = ?');       values.push(fields.description); }
+    if (fields.tags !== undefined)              { updates.push('tags = ?');              values.push(fields.tags); }
+    if (fields.location_name !== undefined)     { updates.push('location_name = ?');     values.push(fields.location_name); }
+    if (fields.location_type !== undefined)     { updates.push('location_type = ?');     values.push(fields.location_type); }
+    if (fields.city !== undefined)              { updates.push('city = ?');              values.push(fields.city); }
+    if (fields.address !== undefined)           { updates.push('address = ?');           values.push(fields.address); }
 
     if (updates.length === 0) return;
     values.push(id);
@@ -191,5 +210,11 @@ function mapRow(row: any): Subscription {
     end_date: row.end_date ?? null,
     auto_detected: row.auto_detected === 1,
     is_active: row.is_active === 1,
+    description: row.description ?? null,
+    tags: row.tags ?? null,
+    location_name: row.location_name ?? null,
+    location_type: row.location_type ?? null,
+    city: row.city ?? null,
+    address: row.address ?? null,
   };
 }

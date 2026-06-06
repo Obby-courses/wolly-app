@@ -1,6 +1,6 @@
 import { SubscriptionRepository, Subscription, Frequency } from './repositories/SubscriptionRepository';
 import { TransactionRepository } from './repositories/TransactionRepository';
-import { ParsedExpense } from '../../modules/registration/types';
+import { ParsedExpense, LocationType } from '../../modules/registration/types';
 import uuid from 'react-native-uuid';
 
 // ─── Date Helpers ────────────────────────────────────────────────────────────
@@ -131,14 +131,14 @@ export class SubscriptionManager {
           people_mentioned: [],
           group_size: null,
           is_social: false,
-          location_type: null,
-          location_name: null,
-          city: null,
-          address: null,
+          location_type: (sub.location_type || null) as LocationType,
+          location_name: sub.location_name || null,
+          city: sub.city || null,
+          address: sub.address || null,
           is_travel: false,
-          is_online: true,
+          is_online: !sub.location_name, // online se non c'è un luogo specifico impostato
           is_recurring_pattern: true,
-          reason: null,
+          reason: sub.description || null,
           description: sub.name,
           refund: null,
           split: null,
@@ -147,7 +147,7 @@ export class SubscriptionManager {
           is_deleted: false,
           synced_at: null,
           holiday: null,
-          tags: [],
+          tags: sub.tags ? sub.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
         };
 
         await TransactionRepository.insert(newTx, sub.id);

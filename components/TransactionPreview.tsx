@@ -23,7 +23,9 @@ export default function TransactionPreview({ item, onPress }: TransactionPreview
   const displayCategory = category ? category.label : categoryKey.replace(/_/g, ' ');
 
   // Display Name / Title
-  const displayName = item.description || item.name || displayCategory;
+  const displayName = (item.isSubscription || item.frequency)
+    ? (item.name || item.description || displayCategory)
+    : (item.description || item.name || displayCategory);
 
   // Date Formatting
   let dateStr = item.displayDate || '';
@@ -94,11 +96,34 @@ export default function TransactionPreview({ item, onPress }: TransactionPreview
               </Text>
             </>
           )}
-          {item.tags && item.tags.split(',').map((tag: string, idx: number) => (
-            <View key={idx} style={styles.tagBadge}>
-              <Text style={styles.tagText}>{tag.trim()}</Text>
-            </View>
-          ))}
+          {(() => {
+            const rawTags = item.tags;
+            let tagsArray: string[] = [];
+            if (Array.isArray(rawTags)) {
+              tagsArray = rawTags;
+            } else if (typeof rawTags === 'string') {
+              tagsArray = rawTags.split(',').map((t: string) => t.trim()).filter(Boolean);
+            }
+            
+            const TAGS_LIMIT = 2;
+            const visibleTags = tagsArray.slice(0, TAGS_LIMIT);
+            const remainingCount = tagsArray.length - TAGS_LIMIT;
+
+            return (
+              <>
+                {visibleTags.map((tag: string, idx: number) => (
+                  <View key={idx} style={styles.tagBadge}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
+                {remainingCount > 0 && (
+                  <View style={[styles.tagBadge, { opacity: 0.55 }]}>
+                    <Text style={styles.tagText}>+{remainingCount}</Text>
+                  </View>
+                )}
+              </>
+            );
+          })()}
         </View>
       </View>
 

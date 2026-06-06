@@ -134,6 +134,12 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
 
   // Migrations on subscriptions (for future fields)
   try { await db.execAsync(`ALTER TABLE subscriptions ADD COLUMN end_date TEXT;`); } catch (e) {}
+  try { await db.execAsync(`ALTER TABLE subscriptions ADD COLUMN description TEXT;`); } catch (e) {}
+  try { await db.execAsync(`ALTER TABLE subscriptions ADD COLUMN tags TEXT;`); } catch (e) {}
+  try { await db.execAsync(`ALTER TABLE subscriptions ADD COLUMN location_name TEXT;`); } catch (e) {}
+  try { await db.execAsync(`ALTER TABLE subscriptions ADD COLUMN location_type TEXT;`); } catch (e) {}
+  try { await db.execAsync(`ALTER TABLE subscriptions ADD COLUMN city TEXT;`); } catch (e) {}
+  try { await db.execAsync(`ALTER TABLE subscriptions ADD COLUMN address TEXT;`); } catch (e) {}
 
 }
 

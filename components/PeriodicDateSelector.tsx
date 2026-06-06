@@ -89,7 +89,21 @@ export default function PeriodicDateSelector({
           placeholder="es. 15"
           placeholderTextColor={COLORS.secondary}
           value={recurrenceDay}
-          onChangeText={(v) => onChange(v, startDate)}
+          onChangeText={(v) => {
+            const clean = v.replace(/[^0-9]/g, '');
+            if (clean === '') {
+              onChange('', startDate);
+              return;
+            }
+            const num = parseInt(clean, 10);
+            if (num > 31) {
+              onChange('31', startDate);
+            } else if (num < 1) {
+              onChange('1', startDate);
+            } else {
+              onChange(String(num), startDate);
+            }
+          }}
         />
       </View>
     );
@@ -167,19 +181,9 @@ export default function PeriodicDateSelector({
                   <Pressable 
                     key={`day-${i}`} 
                     onPress={() => onChange(String(i), dateStr)}
-                    style={styles.calendarCell}
+                    style={[styles.calendarCell, isSelected && styles.calendarCellSelected]}
                   >
-                    <View style={[styles.calendarDayCircle, isSelected && styles.calendarDayCircleSelectedContainer]}>
-                      {isSelected && (
-                        <LinearGradient
-                          colors={['#B3D9FF', '#E6F2FF']}
-                          style={StyleSheet.absoluteFill}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 0, y: 1 }}
-                        />
-                      )}
-                      <Text style={[styles.calendarDayText, isSelected && styles.calendarDayTextSelected]}>{i}</Text>
-                    </View>
+                    <Text style={[styles.calendarDayText, isSelected && styles.calendarDayTextSelected]}>{i}</Text>
                   </Pressable>
                 );
               }
@@ -281,6 +285,10 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 8,
+  },
+  calendarCellSelected: {
+    backgroundColor: '#0A74FF',
   },
   calendarDayCircle: {
     width: 32,
@@ -296,10 +304,10 @@ const styles = StyleSheet.create({
   calendarDayText: {
     fontSize: 14,
     color: COLORS.primary,
-    fontFamily: TYPOGRAPHY.fontFamily,
+    fontFamily: TYPOGRAPHY.fontBold,
   },
   calendarDayTextSelected: {
-    color: COLORS.brandBlue,
+    color: '#FFFFFF',
     fontFamily: TYPOGRAPHY.fontBold,
   },
 });

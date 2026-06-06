@@ -1,8 +1,17 @@
+let activeAbortController: AbortController | null = null;
+
 export async function transcribeAudio(audioUri: string): Promise<string> {
   const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
   if (!apiKey) {
     console.warn('Missing Groq API Key (EXPO_PUBLIC_GROQ_FINANCE_API)');
     return '';
+  }
+
+  // Abort any pending transcription request
+  if (activeAbortController) {
+    console.log('[GroqWhisper] Aborting previous pending transcription request...');
+    activeAbortController.abort();
+    activeAbortController = null;
   }
 
   const MAX_RETRIES = 3;
@@ -12,11 +21,13 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
     attempt++;
     let isTimeout = false;
     const controller = new AbortController();
+    activeAbortController = controller;
+
     const timeoutId = setTimeout(() => {
       isTimeout = true;
       console.warn(`[GroqWhisper] Request timed out on attempt ${attempt}!`);
       controller.abort();
-    }, 15000); // 15 seconds timeout per attempt
+    }, 30000); // 30 seconds timeout per attempt (more robust for mobile connections)
 
     try {
       console.log(`[GroqWhisper] Transcribing audio from URI (Attempt ${attempt}/${MAX_RETRIES}): ${audioUri.substring(0, 50)}...`);
@@ -50,6 +61,10 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
         throw new Error(`Groq API Error status ${response.status}`);
       }
 
+      if (activeAbortController === controller) {
+        activeAbortController = null;
+      }
+
       const text = await response.text();
       console.log(`[GroqWhisper] Transcription result: "${text.trim()}"`);
       return text.trim();
@@ -58,7 +73,11 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
       clearTimeout(timeoutId);
       console.error(`[GroqWhisper] Attempt ${attempt}/${MAX_RETRIES} failed:`, error.message || error);
 
-      if (attempt >= MAX_RETRIES) {
+      const wasCancelled = error.name === 'AbortError' && !isTimeout;
+      if (wasCancelled || attempt >= MAX_RETRIES) {
+        if (activeAbortController === controller) {
+          activeAbortController = null;
+        }
         return '';
       }
       

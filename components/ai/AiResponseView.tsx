@@ -12,8 +12,8 @@
  * applicata automaticamente a entrambi i canali (voce + testo).
  */
 
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Animated } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING } from '../../constants/Theme';
 import { AiChatResponse } from '../../services/aiChat';
 import { QueryIntent } from '../../services/aiQueryParser';
@@ -115,9 +115,9 @@ function renderFormattedText(text: string, queryIntent: QueryIntent | undefined,
   if (termList.length > 0) {
     patterns.push('\\b(?:' + termList.map(t => escapeRegExp(t)).join('|') + ')\\b');
   }
-  patterns.push('\\b\\d+(?:[.,]\\d+)?\\s*€');
-  patterns.push('€\\s*\\d+(?:[.,]\\d+)?');
-  patterns.push('\\b\\d+(?:[.,]\\d+)?\\s*(?:euro|eur|EURO|EUR)\\b');
+  patterns.push('[+-]?\\s*\\b\\d+(?:[.,]\\d+)?\\s*€');
+  patterns.push('[+-]?\\s*€\\s*[+-]?\\s*\\d+(?:[.,]\\d+)?');
+  patterns.push('[+-]?\\s*\\b\\d+(?:[.,]\\d+)?\\s*(?:euro|eur|EURO|EUR)\\b');
   patterns.push('\\b20\\d{2}\\b');
 
   const finalRegex = new RegExp('(' + patterns.join('|') + ')', 'gi');
@@ -153,6 +153,26 @@ export default function AiResponseView({
   const isTextOnly = answer.intent === 'text' || answer.intent === 'advice';
 
   const insets = useSafeAreaInsets();
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(10)).current;
+
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(10);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [answer.text_response]);
 
   // Calcolo dinamico del font size basato sulla larghezza dello schermo, altezza dello schermo, JIT widget e parola più lunga
   const { width, height } = Dimensions.get('window');
@@ -200,13 +220,15 @@ export default function AiResponseView({
       {/* FeedbackBar — hidden per richiesta utente */}
 
       {/* Testo risposta principale con font size dinamico */}
-      <Text style={[
-        isTextOnly ? styles.bigAnswerText : styles.answerContextText, 
-        textStyle, 
-        { fontSize: dynamicFontSize, lineHeight: dynamicFontSize * 1.25 }
-      ]}>
-        {renderFormattedText(answer.text_response, answer.queryIntent, dynamicFontSize)}
-      </Text>
+      <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], width: '100%' }}>
+        <Text style={[
+          isTextOnly ? styles.bigAnswerText : styles.answerContextText, 
+          textStyle, 
+          { fontSize: dynamicFontSize, lineHeight: dynamicFontSize * 1.25 }
+        ]}>
+          {renderFormattedText(answer.text_response, answer.queryIntent, dynamicFontSize)}
+        </Text>
+      </Animated.View>
 
       {/* ── JIT Widgets ──────────────────────────────────────────────────── */}
       <View style={styles.jitWrapper}>
