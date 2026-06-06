@@ -17,6 +17,7 @@ import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { getCategory } from '../constants/categories';
 import { getCategoryColor } from '../components/CategoryPill';
 import TransactionPreview from '../components/TransactionPreview';
+import WollyFeatureTour from '../components/onboarding/WollyFeatureTour';
 
 function getNextOccurrenceDate(sub: any): Date {
   const today = new Date();
@@ -532,6 +533,7 @@ export default function Home() {
                 </View>
               </View>
             </View>
+            <WollyFeatureTour />
           </LinearGradient>
 
           {/* PARTE INFERIORE: Overlapping Bottom Sheet in Off-white */}

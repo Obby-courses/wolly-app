@@ -168,12 +168,25 @@ export default function SettingsScreen() {
                   {/* Inizializza Onboarding */}
                   <Pressable style={[styles.item, { marginTop: 8 }]} onPress={async () => {
                     await AsyncStorage.setItem('wolly_onboarding_completed', 'false');
+                    await AsyncStorage.removeItem('wolly_feature_tour_v1');
                     router.push('/onboarding');
                   }}>
                     <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
                       <Ionicons name="rocket" size={20} color="#0284C7" />
                     </View>
                     <Text style={styles.itemText}>Inizializza Onboarding</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                  </Pressable>
+
+                  {/* Inizializza Tour AI */}
+                  <Pressable style={styles.item} onPress={async () => {
+                    await AsyncStorage.removeItem('wolly_feature_tour_v1');
+                    Alert.alert("Completato", "Il tour delle funzionalità AI è stato resettato e riapparirà al prossimo avvio della Home.");
+                  }}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#FDF2F8' }]}>
+                      <Ionicons name="sparkles" size={20} color="#DB2777" />
+                    </View>
+                    <Text style={styles.itemText}>Inizializza Tour AI</Text>
                     <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
                   </Pressable>
 
