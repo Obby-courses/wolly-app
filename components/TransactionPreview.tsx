@@ -102,8 +102,19 @@ export default function TransactionPreview({ item, onPress }: TransactionPreview
             if (Array.isArray(rawTags)) {
               tagsArray = rawTags;
             } else if (typeof rawTags === 'string') {
-              tagsArray = rawTags.split(',').map((t: string) => t.trim()).filter(Boolean);
+              const trimmed = rawTags.trim();
+              if (trimmed.startsWith('[')) {
+                try {
+                  const parsed = JSON.parse(trimmed);
+                  tagsArray = Array.isArray(parsed) ? parsed : [trimmed];
+                } catch {
+                  tagsArray = trimmed.split(',');
+                }
+              } else {
+                tagsArray = trimmed.split(',');
+              }
             }
+            tagsArray = tagsArray.map((t: string) => String(t).trim().toLowerCase()).filter(Boolean);
             
             const TAGS_LIMIT = 2;
             const visibleTags = tagsArray.slice(0, TAGS_LIMIT);
@@ -112,7 +123,7 @@ export default function TransactionPreview({ item, onPress }: TransactionPreview
             return (
               <>
                 {visibleTags.map((tag: string, idx: number) => (
-                  <View key={idx} style={styles.tagBadge}>
+                  <View key={`tag-${idx}`} style={styles.tagBadge}>
                     <Text style={styles.tagText}>{tag}</Text>
                   </View>
                 ))}
@@ -123,6 +134,35 @@ export default function TransactionPreview({ item, onPress }: TransactionPreview
                 )}
               </>
             );
+          })()}
+
+          {(() => {
+            const rawPeople = item.people_mentioned;
+            let peopleArray: string[] = [];
+            if (Array.isArray(rawPeople)) {
+              peopleArray = rawPeople;
+            } else if (typeof rawPeople === 'string') {
+              const trimmed = rawPeople.trim();
+              if (trimmed.startsWith('[')) {
+                try {
+                  const parsed = JSON.parse(trimmed);
+                  peopleArray = Array.isArray(parsed) ? parsed : [trimmed];
+                } catch {
+                  peopleArray = trimmed.split(',');
+                }
+              } else {
+                peopleArray = trimmed.split(',');
+              }
+            }
+            peopleArray = peopleArray.map((p: string) => String(p).trim().toLowerCase()).filter(Boolean);
+            
+            return peopleArray.map((person: string, idx: number) => (
+              <View key={`person-${idx}`} style={[styles.tagBadge, { backgroundColor: '#E0F2FE' }]}>
+                <Text style={[styles.tagText, { color: '#0369A1', fontFamily: TYPOGRAPHY.fontBold }]}>
+                  {person.charAt(0).toUpperCase() + person.slice(1)}
+                </Text>
+              </View>
+            ));
           })()}
         </View>
       </View>

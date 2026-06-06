@@ -485,14 +485,30 @@ export class TransactionRepository {
    */
   static async getDistinctPeople(): Promise<string[]> {
     const db = await getDBConnection();
-    const results = await db.getAllAsync('SELECT DISTINCT people_mentioned FROM transactions WHERE people_mentioned IS NOT NULL AND people_mentioned != "" AND is_deleted = 0');
+    const results = await db.getAllAsync('SELECT people_mentioned FROM transactions WHERE people_mentioned IS NOT NULL AND people_mentioned != "" AND is_deleted = 0');
     
     const allPeople = new Set<string>();
     results.forEach((r: any) => {
-      r.people_mentioned.split(',').forEach((p: string) => allPeople.add(p.trim()));
+      let parts: string[] = [];
+      const raw = r.people_mentioned.trim();
+      if (raw.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(raw);
+          parts = Array.isArray(parsed) ? parsed : [raw];
+        } catch {
+          parts = raw.split(',');
+        }
+      } else {
+        parts = raw.split(',');
+      }
+      
+      parts.forEach((p: any) => {
+        const clean = String(p).trim().toLowerCase().replace(/^["']|["']$/g, '');
+        if (clean) allPeople.add(clean);
+      });
     });
     
-    return Array.from(allPeople);
+    return Array.from(allPeople).sort();
   }
 
   /**
@@ -537,18 +553,36 @@ export class TransactionRepository {
   }
 
   /**
-   * Retrieves all unique tags present in the database.
+   * Retrieves all unique user-defined tags present in the database.
+   * Excludes auto-managed tags like 'weekend'.
    */
   static async getDistinctTags(): Promise<string[]> {
     const db = await getDBConnection();
-    const results = await db.getAllAsync('SELECT DISTINCT tags FROM transactions WHERE tags IS NOT NULL AND tags != "" AND is_deleted = 0');
+    const results = await db.getAllAsync('SELECT tags FROM transactions WHERE tags IS NOT NULL AND tags != "" AND is_deleted = 0');
     
+    const AUTO_TAGS = new Set(['weekend']); // tag gestiti automaticamente dal sistema
     const allTags = new Set<string>();
     results.forEach((r: any) => {
-      r.tags.split(',').forEach((t: string) => allTags.add(t.trim()));
+      let parts: string[] = [];
+      const raw = r.tags.trim();
+      if (raw.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(raw);
+          parts = Array.isArray(parsed) ? parsed : [raw];
+        } catch {
+          parts = raw.split(',');
+        }
+      } else {
+        parts = raw.split(',');
+      }
+      
+      parts.forEach((t: any) => {
+        const clean = String(t).trim().toLowerCase().replace(/^["']|["']$/g, '');
+        if (clean && !AUTO_TAGS.has(clean)) allTags.add(clean);
+      });
     });
     
-    return Array.from(allTags);
+    return Array.from(allTags).sort();
   }
 
   /**
@@ -837,10 +871,47 @@ export class TransactionRepository {
 
     let finalTags: string[] = [];
     if (updates.tags !== undefined) {
-      finalTags = Array.isArray(updates.tags) ? [...updates.tags] : (updates.tags ? updates.tags.split(',') : []);
-    } else {
-      finalTags = oldTx.tags ? oldTx.tags.split(',') : [];
+      if (Array.isArray(updates.tags)) {
+        finalTags = [...updates.tags];
+      } else if (updates.tags) {
+        const raw = updates.tags.trim();
+        if (raw.startsWith('[')) {
+          try { finalTags = JSON.parse(raw); } catch { finalTags = raw.split(','); }
+        } else {
+          finalTags = raw.split(',');
+        }
+      }
+    } else if (oldTx.tags) {
+      const raw = oldTx.tags.trim();
+      if (raw.startsWith('[')) {
+        try { finalTags = JSON.parse(raw); } catch { finalTags = raw.split(','); }
+      } else {
+        finalTags = raw.split(',');
+      }
     }
+    finalTags = finalTags.map((t: string) => t.trim().toLowerCase()).filter(Boolean);
+
+    let finalPeople: string[] = [];
+    if (updates.people_mentioned !== undefined) {
+      if (Array.isArray(updates.people_mentioned)) {
+        finalPeople = [...updates.people_mentioned];
+      } else if (updates.people_mentioned) {
+        const raw = updates.people_mentioned.trim();
+        if (raw.startsWith('[')) {
+          try { finalPeople = JSON.parse(raw); } catch { finalPeople = raw.split(','); }
+        } else {
+          finalPeople = raw.split(',');
+        }
+      }
+    } else if (oldTx.people_mentioned) {
+      const raw = oldTx.people_mentioned.trim();
+      if (raw.startsWith('[')) {
+        try { finalPeople = JSON.parse(raw); } catch { finalPeople = raw.split(','); }
+      } else {
+        finalPeople = raw.split(',');
+      }
+    }
+    finalPeople = finalPeople.map((p: string) => p.trim().toLowerCase()).filter(Boolean);
 
     const isWeekendVal = updates.is_weekend !== undefined 
       ? updates.is_weekend 
@@ -859,7 +930,8 @@ export class TransactionRepository {
         date = ?, time = ?, amount = ?, net_amount = ?, currency = ?, direction = ?,
         payment_method = ?, category_key = ?, subcategory_key = ?, description = ?,
         social_context = ?, location_type = ?, location_name = ?, city = ?, address = ?,
-        is_travel = ?, is_online = ?, split_people = ?, subscription_id = ?, holiday = ?, tags = ?
+        is_travel = ?, is_online = ?, split_people = ?, subscription_id = ?, holiday = ?, tags = ?,
+        people_mentioned = ?
       WHERE id = ?
     `, [
       updates.date || oldTx.date,
@@ -883,6 +955,7 @@ export class TransactionRepository {
       updates.subscription_id !== undefined ? updates.subscription_id : oldTx.subscription_id,
       updates.holiday !== undefined ? updates.holiday : oldTx.holiday,
       finalTags.length > 0 ? finalTags.join(',') : null,
+      finalPeople.length > 0 ? finalPeople.join(',') : null,
       id
     ]);
 
@@ -897,7 +970,7 @@ export class TransactionRepository {
   static async getRecentForAi(limit: number = 50): Promise<any[]> {
     const db = await getDBConnection();
     return db.getAllAsync(`
-      SELECT date, amount, direction, category_key, description, city, location_name, holiday, tags
+      SELECT date, amount, direction, category_key, description, city, location_name, holiday, tags, people_mentioned
       FROM transactions
       WHERE is_deleted = 0
       ORDER BY date DESC, time DESC

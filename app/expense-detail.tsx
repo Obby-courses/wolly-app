@@ -40,6 +40,22 @@ const sanitizeLocationField = (val: string | null | undefined): string => {
     .join(', ');
 };
 
+const parseStringArray = (val: string | null | undefined): string[] => {
+  if (!val) return [];
+  const trimmed = val.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item: any) => String(item).trim().toLowerCase()).filter(Boolean);
+      }
+    } catch (e) {
+      // Fallback
+    }
+  }
+  return trimmed.split(',').map(item => item.trim().toLowerCase()).filter(Boolean);
+};
+
 const capitalizeProperNoun = (val: string | null | undefined): string => {
   if (!val) return '';
   return val.trim().replace(/\b\w/g, c => c.toUpperCase());
@@ -145,15 +161,15 @@ export default function ExpenseDetail() {
   const [newTagInput, setNewTagInput] = useState('');
   const [showNewTagInput, setShowNewTagInput] = useState(false);
 
-  // Dynamic Tags List State
-  const [availableTags, setAvailableTags] = useState<string[]>(['lavoro', 'trasferta']);
+  // Dynamic Tags List State — popolata solo dal DB, nessun default hardcodato
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   // Custom Person Creation State
   const [newPersonInput, setNewPersonInput] = useState('');
   const [showNewPersonInput, setShowNewPersonInput] = useState(false);
 
-  // Dynamic People List State
-  const [availablePeople, setAvailablePeople] = useState<string[]>(['mamma', 'papà']);
+  // Dynamic People List State — popolata solo dal DB, nessun default hardcodato
+  const [availablePeople, setAvailablePeople] = useState<string[]>([]);
 
   const handleBack = () => {
     if (!isEditingExisting && returnTo) {
@@ -163,19 +179,15 @@ export default function ExpenseDetail() {
     }
   };
 
-  // Fetch distinct tags and people on mount
+  // Fetch distinct tags and people on mount — solo dal DB, nessun default hardcodato
   useEffect(() => {
     const loadTagsAndPeople = async () => {
       try {
         const dbTags = await TransactionRepository.getDistinctTags();
-        const combinedTags = Array.from(new Set(['lavoro', 'trasferta', ...dbTags]))
-          .filter(t => t !== 'viaggio' && t.trim() !== '');
-        setAvailableTags(combinedTags);
+        setAvailableTags(dbTags.filter(t => t.trim() !== ''));
 
         const dbPeople = await TransactionRepository.getDistinctPeople();
-        const combinedPeople = Array.from(new Set(['mamma', 'papà', ...dbPeople]))
-          .filter(p => p.trim() !== '');
-        setAvailablePeople(combinedPeople);
+        setAvailablePeople(dbPeople.filter(p => p.trim() !== ''));
       } catch (e) {
         console.error('Errore nel caricamento di tag/persone:', e);
       }
@@ -220,7 +232,7 @@ export default function ExpenseDetail() {
               is_weekend: row.is_weekend === 1,
               day_of_week: row.day_of_week || 'monday',
               social_context: (row.social_context || null) as SocialContext,
-              people_mentioned: row.people_mentioned ? row.people_mentioned.split(',') : [],
+              people_mentioned: parseStringArray(row.people_mentioned),
               group_size: row.group_size ?? null,
               is_social: row.social_context !== 'alone' && !!row.social_context,
               location_type: (row.location_type || null) as LocationType,
@@ -233,14 +245,14 @@ export default function ExpenseDetail() {
               split: row.split_people ? {
                 total_people: row.split_people,
                 user_share: row.amount / row.split_people,
-                pending_from: row.people_mentioned ? row.people_mentioned.split(',') : []
+                pending_from: parseStringArray(row.people_mentioned)
               } : null,
               reason: row.description || '',
               description: row.description || '',
               input_method: row.input_method || 'manual',
               raw_input: row.raw_input || '',
               holiday: row.holiday || null,
-              tags: row.tags ? row.tags.split(',') : [],
+              tags: parseStringArray(row.tags),
               is_deleted: row.is_deleted === 1,
               synced_at: row.synced_at || null,
             };
@@ -547,16 +559,21 @@ export default function ExpenseDetail() {
 
   // --- CUSTOM TAG HELPERS ---
   const handleAddCustomTag = () => {
+    Keyboard.dismiss();
     const cleanTag = newTagInput.trim().toLowerCase();
-    if (cleanTag) {
-      const currentTags = editableExpense.tags || [];
-      if (!currentTags.includes(cleanTag)) {
-        updateField('tags', [...currentTags, cleanTag]);
-      }
-      setNewTagInput('');
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setShowNewTagInput(false);
+    if (!cleanTag) return;
+    const currentTags = editableExpense.tags || [];
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    // Aggiunge alla transazione
+    if (!currentTags.includes(cleanTag)) {
+      updateField('tags', [...currentTags, cleanTag]);
     }
+    // Aggiunge subito alla lista disponibile (senza aspettare il reload dal DB)
+    if (!availableTags.includes(cleanTag)) {
+      setAvailableTags(prev => [...prev, cleanTag]);
+    }
+    setNewTagInput('');
+    setShowNewTagInput(false);
   };
 
   const toggleTagChip = (tagStr: string) => {
@@ -580,19 +597,19 @@ export default function ExpenseDetail() {
   };
 
   const handleAddCustomPerson = () => {
+    Keyboard.dismiss();
     if (!newPersonInput.trim()) return;
     const cleanPerson = newPersonInput.trim().toLowerCase();
     const currentPeople = editableExpense.people_mentioned || [];
-    
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    // Aggiunge alla transazione
     if (!currentPeople.includes(cleanPerson)) {
       updateField('people_mentioned', [...currentPeople, cleanPerson]);
     }
-    
+    // Aggiunge subito alla lista disponibile (senza aspettare il reload dal DB)
     if (!availablePeople.includes(cleanPerson)) {
-      setAvailablePeople([...availablePeople, cleanPerson]);
+      setAvailablePeople(prev => [...prev, cleanPerson]);
     }
-    
     setNewPersonInput('');
     setShowNewPersonInput(false);
   };
@@ -1398,7 +1415,7 @@ export default function ExpenseDetail() {
                         onFocus={() => handleInputFocus('newPersonInput')}
                       />
                       <Pressable 
-                        onPress={handleAddCustomPerson}
+                        onPressIn={handleAddCustomPerson}
                         style={styles.addTagButton}
                       >
                         <Ionicons name="checkmark" size={20} color="#FFF" />
@@ -1560,7 +1577,7 @@ export default function ExpenseDetail() {
                 onFocus={() => handleInputFocus('newTagInput')}
               />
               <Pressable 
-                onPress={handleAddCustomTag}
+                onPressIn={handleAddCustomTag}
                 style={styles.addTagButton}
               >
                 <Ionicons name="checkmark" size={20} color="#FFF" />

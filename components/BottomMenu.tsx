@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '../constants/Theme';
 import { parseFromReceipt } from '../modules/registration/receiptParser';
 import { voiceStore } from '../services/voiceStore';
@@ -82,6 +83,8 @@ export default function BottomMenu() {
       chevronTranslateY.setValue(0);
     }
   }, [voiceState.isRecording]);
+
+
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -357,26 +360,46 @@ export default function BottomMenu() {
                         </View>
                       )}
                       {isOffline ? (
-                        <Pressable
-                          onPress={handleOfflinePress}
-                          style={[styles.toolBtn, styles.toolBtnNormal]}
-                        >
-                          <Ionicons name="add" size={28} color="#FFF" />
-                        </Pressable>
+                        <Animated.View>
+                          <Pressable
+                            onPress={handleOfflinePress}
+                            style={[styles.toolBtn, styles.toolBtnNormalWrapper]}
+                          >
+                            <LinearGradient
+                              colors={['#80B3FF', '#FFFFFF', '#80B3FF']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={styles.gradientBorder}
+                            >
+                              <View style={styles.innerToolBtn}>
+                                <Ionicons name="sparkles" size={20} color="#FFF" />
+                              </View>
+                            </LinearGradient>
+                          </Pressable>
+                        </Animated.View>
                       ) : (
                         <Animated.View
                           {...primaryPanResponder.panHandlers}
                           style={[
                             styles.toolBtn,
-                            isVoiceChat ? styles.toolBtnBig : styles.toolBtnNormal,
+                            isVoiceChat ? styles.toolBtnBig : styles.toolBtnNormalWrapper,
                             isSlidingToCancel && styles.micBtnCancel
                           ]}
                         >
-                          <Ionicons 
-                             name={isVoiceChat ? "mic" : "add"} 
-                             size={isVoiceChat ? 28 : 28} 
-                             color={isVoiceChat ? '#0078FF' : '#FFF'} 
-                           />
+                          {isVoiceChat ? (
+                            <Ionicons name="mic" size={28} color="#0078FF" />
+                          ) : (
+                            <LinearGradient
+                              colors={['#80B3FF', '#FFFFFF', '#80B3FF']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={styles.gradientBorder}
+                            >
+                              <View style={styles.innerToolBtn}>
+                                <Ionicons name="sparkles" size={20} color="#FFF" />
+                              </View>
+                            </LinearGradient>
+                          )}
                         </Animated.View>
                       )}
                     </View>
@@ -495,7 +518,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   navItemPlusWrapper: {
-    flex: 1.2,
+    flex: 1.8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -512,6 +535,30 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: COLORS.brandBlue,
+  },
+  toolBtnNormalWrapper: {
+    width: 92,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  gradientBorder: {
+    width: 92,
+    height: 46,
+    borderRadius: 23,
+    padding: 2.2, // spessore del bordo sfumato
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  innerToolBtn: {
+    width: 87.6,
+    height: 41.6,
+    borderRadius: 20.8,
+    backgroundColor: COLORS.brandBlue,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   toolBtnBig: {
     width: 64,

@@ -185,6 +185,8 @@ export interface TransactionRow {
   city: string | null;
   social_context: string | null;
   subscription_name: string | null;
+  tags?: string | null;
+  people_mentioned?: string | null;
 }
 
 export interface ListResult {
@@ -224,7 +226,7 @@ export async function getList(
   const items = await db.getAllAsync<TransactionRow>(
     `SELECT t.id, t.date, t.time, t.amount, t.net_amount, t.direction,
             t.category_key, t.description, t.location_name, t.city,
-            t.social_context, s.name as subscription_name
+            t.social_context, s.name as subscription_name, t.tags, t.people_mentioned
      FROM transactions t
      LEFT JOIN subscriptions s ON t.subscription_id = s.id
      WHERE ${clause}

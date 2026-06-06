@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { TransactionRepository } from '../../services/database/repositories/TransactionRepository';
 import { NetWorthRepository } from '../../services/database/repositories/NetWorthRepository';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
@@ -15,24 +15,74 @@ const { width } = Dimensions.get('window');
 
 const WealthChart = ({ data, labels }: { data: any[], labels: string[] }) => {
   if (data.length === 0) return null;
+
+  // Trova tutti i punti non futuri
+  const nonFuturePoints = data
+    .map((d, i) => ({ ...d, originalIndex: i }))
+    .filter(d => !d.isFuture);
+
   const chartWidth = width - (SPACING.lg * 2);
   const chartHeight = 130;
-  const safeMargin = 10;
-  const maxVal = Math.max(...data.map(d => d.wealth), 1) * 1.1;
-  const minVal = Math.min(...data.map(d => d.wealth), 0) * 0.9;
+  const safeMargin = 16; // Margine aumentato per non tagliare le etichette Max/Min
+
+  if (nonFuturePoints.length === 0) {
+    return (
+      <View style={styles.wealthChartContainer}>
+        <Svg width={chartWidth} height={chartHeight} />
+        <View style={styles.chartLabelsRow}>
+          {labels.filter((_, i) => i % Math.max(1, Math.floor(labels.length / 6)) === 0).map((l, i) => (
+            <Text key={i} style={styles.chartLabelText}>{l}</Text>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  // Calcola min e max basandosi solo sui punti non futuri
+  const activeWealths = nonFuturePoints.map(d => d.wealth);
+  const actualMin = Math.min(...activeWealths);
+  const actualMax = Math.max(...activeWealths);
+  const diff = actualMax - actualMin;
+  
+  // Margine proporzionale del 15% per dare respiro visivo al grafico
+  const rangeMargin = diff > 0 ? diff * 0.15 : Math.abs(actualMax) * 0.1 || 10;
+  
+  let minVal = actualMin - rangeMargin;
+  let maxVal = actualMax + rangeMargin;
+  
+  // Se tutti i valori reali sono positivi, non andiamo sotto lo zero
+  if (actualMin >= 0 && minVal < 0) {
+    minVal = 0;
+  }
+  
   const range = maxVal - minVal;
   const getX = (i: number) => (i * (chartWidth - 40) / (data.length - 1)) + 20;
   const getY = (v: number) => chartHeight - safeMargin - ((v - minVal) / range) * (chartHeight - safeMargin * 2);
-  const pathData = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.wealth)}`).join(' ');
-  const areaData = `${pathData} L ${getX(data.length - 1)} ${chartHeight} L ${getX(0)} ${chartHeight} Z`;
+
+  // pathData ed areaData disegnati solo per i punti non futuri
+  const pathData = nonFuturePoints.map((d, idx) => {
+    const prefix = idx === 0 ? 'M' : 'L';
+    return `${prefix} ${getX(d.originalIndex)} ${getY(d.wealth)}`;
+  }).join(' ');
+
+  const firstIdx = nonFuturePoints[0].originalIndex;
+  const lastIdx = nonFuturePoints[nonFuturePoints.length - 1].originalIndex;
+  const areaData = `${pathData} L ${getX(lastIdx)} ${chartHeight} L ${getX(firstIdx)} ${chartHeight} Z`;
+
+  const hasDiff = diff > 0;
 
   return (
     <View style={styles.wealthChartContainer}>
       <Svg width={chartWidth} height={chartHeight}>
+
+
+        {/* Andamento del Patrimonio */}
         <Path d={areaData} fill="#0A74FF15" />
         <Path d={pathData} fill="none" stroke="#0A74FF" strokeWidth="3" />
-        {data.length < 40 && data.map((d, i) => (
-          <Circle key={i} cx={getX(i)} cy={getY(d.wealth)} r="4" fill="#0A74FF" />
+        
+        {/* Nodi (solo se il numero di punti è limitato) */}
+        {data.length < 40 && nonFuturePoints.map((d) => (
+          <Circle key={d.originalIndex} cx={getX(d.originalIndex)} cy={getY(d.wealth)} r="4" fill="#0A74FF" />
         ))}
       </Svg>
       <View style={styles.chartLabelsRow}>
@@ -120,11 +170,31 @@ export default function NetWorthScreen() {
       setSelectedTotalValue(nwAtEnd);
       
       let runningTotal = nwAtEnd;
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+
       const trendPoints = [...rawTrend].reverse().map(point => {
         const pointNet = (point.income - point.expense);
         const wealthAtEndOfThisPoint = runningTotal;
         runningTotal -= pointNet;
-        return { ...point, wealth: wealthAtEndOfThisPoint };
+
+        let isFuture = false;
+        if (timeRange === 'Settimana' || timeRange === 'Mese') {
+          isFuture = point.date > todayStr;
+        } else if (timeRange === 'Anno') {
+          const selectedYear = d.getFullYear();
+          const currentYear = today.getFullYear();
+          const currentMonth = today.getMonth() + 1; // 1-indexed
+          if (selectedYear > currentYear) {
+            isFuture = true;
+          } else if (selectedYear === currentYear) {
+            isFuture = point.month > currentMonth;
+          }
+        } else if (point.date) {
+          isFuture = point.date > todayStr;
+        }
+
+        return { ...point, wealth: wealthAtEndOfThisPoint, isFuture };
       }).reverse();
       
       setNetWorthTrend(trendPoints);

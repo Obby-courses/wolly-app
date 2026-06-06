@@ -5,6 +5,52 @@ import { DOMAINS_CONFIG, ALL_CATEGORIES, getDomainForCategory } from '../constan
 import { COMUNI_ITALIANI } from '../constants/comuni';
 import { supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TransactionRepository } from './database/repositories/TransactionRepository';
+
+// ── Distanza di Levenshtein (inline, nessuna dipendenza npm) ───────────────────────
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (__, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+/**
+ * Confronta ogni elemento di `inputs` con la lista `known`.
+ * Se la distanza di Levenshtein è ≤ maxDist, restituisce il valore del DB.
+ * Altrimenti mantiene l'originale.
+ */
+function normalizeToKnownValues(
+  inputs: string[],
+  known: string[],
+  maxDist = 2
+): string[] {
+  return inputs.map(input => {
+    const lower = input.toLowerCase();
+    let bestMatch = input;
+    let bestDist = Infinity;
+    for (const k of known) {
+      const d = levenshtein(lower, k.toLowerCase());
+      if (d < bestDist) {
+        bestDist = d;
+        bestMatch = k;
+      }
+    }
+    if (bestDist <= maxDist && bestMatch !== input) {
+      console.log(`🔄 [NORMALIZE] "${input}" → "${bestMatch}" (dist=${bestDist})`);
+      return bestMatch;
+    }
+    return input;
+  });
+}
 
 export interface SubscriptionSuggestion {
   suggest_subscription: boolean;
@@ -274,6 +320,28 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
             }
           }
         }
+
+        // --- NORMALIZZAZIONE TAG & PERSONE (Levenshtein) ---
+        // Solo per input vocali: confronta tag/persone estratti dall'AI con quelli
+        // già nel DB. Se la distanza è ≤ 2 caratteri, usa il valore esistente.
+        // Questo corregge varianti fonetiche (es. "Stefen" → "Stefano", "woly" → "wolly").
+        if (context === 'voice') {
+          try {
+            const [knownTags, knownPeople] = await Promise.all([
+              TransactionRepository.getDistinctTags(),
+              TransactionRepository.getDistinctPeople(),
+            ]);
+            if (knownTags.length > 0 && Array.isArray(result.tags) && result.tags.length > 0) {
+              result.tags = normalizeToKnownValues(result.tags, knownTags);
+            }
+            if (knownPeople.length > 0 && Array.isArray(result.people_mentioned) && result.people_mentioned.length > 0) {
+              result.people_mentioned = normalizeToKnownValues(result.people_mentioned, knownPeople);
+            }
+          } catch (e) {
+            console.warn('[groqParser] Normalizzazione tag/persone fallita (ignorata):', e);
+          }
+        }
+        // ─────────────────────────────────────────────────────────────────────────
 
         // --- LOGICA PASTO (MEAL TYPE) ---
         // Una transazione in un bar o ristorante tra 07:00–10:30 è colazione. 

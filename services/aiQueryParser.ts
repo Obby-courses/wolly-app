@@ -53,9 +53,19 @@ function buildParserPrompt(currentDateISO: string, cities: string[], socialConte
   const holidayList = holidays.length > 0 ? holidays.join(', ') : 'nessuna festività ancora registrata (es: Natale, Pasqua)';
   const tagList = tags.length > 0 ? tags.join(', ') : 'nessun tag ancora registrato (es: viaggio, trasferta)';
 
+  const tagMatchBlock = tags.length > 0
+    ? `
+⚠️ PRIORITÀ ASSOLUTA — VALORI DEFINITI DALL'UTENTE NEL DATABASE:
+L'utente ha registrato nelle sue transazioni i seguenti TAG personalizzati: [${tags.join(', ')}].
+Se la domanda dell'utente contiene una parola che corrisponde esattamente (o in modo molto simile, es: singolare/plurale, minuscolo/maiuscolo) a uno di questi tag, DEVI impostare tag_filter con quel valore e NON usare merchant_filter, category_filter o domain_filter.
+Questi tag sono concetti PERSONALI dell'utente, non nomi di negozi, film, brand o categorie di sistema.
+Esempio critico: se i tag registrati includono "wolly" e l'utente chiede "quanto ho speso per wolly", la risposta corretta è tag_filter="wolly", NON merchant_filter="wolly" (anche se "wolly" potrebbe sembrare un nome di brand o personaggio).
+`
+    : '';
+
   return `Sei un parser di query finanziarie. La tua UNICA funzione è trasformare la domanda dell'utente in un oggetto JSON che descrive COME filtrare i dati. NON calcoli, NON numeri, solo filtri.
 Oggi è ${currentDateISO}.
-
+${tagMatchBlock}
 TASSONOMIA DISPONIBILE:
 - DOMINI (domain_filter): ${domainList}
 - CATEGORIE (category_filter): ${categoryList}
@@ -63,7 +73,7 @@ TASSONOMIA DISPONIBILE:
 - CONTESTI SOCIALI (social_context_filter): ${socialList} (Usa rigorosamente uno di questi valori in inglese se menzionato: friends, family, colleagues, couple, strangers, alone)
 - PERSONE CONOSCIUTE (person_filter): ${peopleList}
 - FESTIVITÀ CONOSCIUTE (holiday_filter): ${holidayList}
-- TAG REGISTRATI (tag_filter): ${tagList}
+- TAG REGISTRATI DALL'UTENTE (tag_filter — PRIORITÀ MASSIMA): ${tagList}
 
 L'AI funge da estrattore rigido. Trasforma la frase in un JSON con i seguenti parametri logici:
 1. SOGGETTO (subject): Usa "net_worth" SOLO ED ESCLUSIVAMENTE se la domanda contiene esplicitamente le parole "patrimonio", "ricchezza", o "bilancio totale". In TUTTI gli altri casi (inclusi "stipendio", "guadagnato", "entrate", "spese"), DEVI usare "transactions".
@@ -141,8 +151,8 @@ REGOLE PER ORDINE, LIMITI E CONFRONTI:
 
 ALTRE REGOLE GENERALI:
 - Se l'utente nomina una festività (es: "Natale", "Pasqua", "Ferragosto") → holiday_filter="nome festività"
-- Se l'utente nomina un tag o una tipologia (es: "viaggio", "trasferta") → tag_filter="tag"
-- Se l'utente nomina un negozio specifico (es: "Coca Cola", "Esselunga", "Amazon") → merchant_filter="nome negozio"
+- REGOLA CRITICA TAG vs MERCHANT: Se una parola della domanda corrisponde a un tag registrato dall'utente (lista sopra), usa SEMPRE tag_filter. Usa merchant_filter SOLO per nomi di negozi/brand che NON appaiono nei tag registrati.
+- Se l'utente nomina un negozio specifico non presente nei tag (es: "Coca Cola", "Esselunga", "Amazon") → merchant_filter="nome negozio"
 - Se l'utente chiede "quante volte" → aggregation_type="count", archetype="total"
 - Se l'utente chiede "media" o "in media" → aggregation_type="average", archetype="total"
 - DISTINZIONE CRITICA: 
@@ -221,7 +231,33 @@ export async function parseQueryIntent(
       };
     }
 
+    // ── Deterministic tag override ────────────────────────────────────────────
+    // Se l'LLM non ha rilevato un tag ma la query dell'utente contiene una
+    // parola che corrisponde esattamente (case-insensitive) a un tag del DB,
+    // forziamo tag_filter e azzeriamo i filtri conflittuali.
+    if (!intent.tag_filter && tags.length > 0) {
+      const lowerMsg = userMessage.toLowerCase();
+      const matchedTag = tags.find((t) => {
+        const lt = t.toLowerCase();
+        // Match parola intera nel messaggio
+        return new RegExp(`(?:^|[\\s,;:!?'"])${lt}(?:[\\s,;:!?'"]|$)`).test(lowerMsg);
+      });
+      if (matchedTag) {
+        console.log(`🏷️ [PARSER] Deterministic tag override: "${matchedTag}" (was merchant: ${intent.merchant_filter ?? 'none'})`);
+        intent.tag_filter = matchedTag;
+        // Rimuove filtri che potrebbero aver "catturato" il tag per errore
+        if (intent.merchant_filter?.toLowerCase() === matchedTag.toLowerCase()) {
+          intent.merchant_filter = undefined;
+        }
+        if (intent.category_filter?.toLowerCase() === matchedTag.toLowerCase()) {
+          intent.category_filter = undefined;
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     console.log(`✅ [PARSER] Intent: ${intent.archetype} | ${intent.direction} | ${intent.period.type} ${intent.period.year || ''}${intent.period.month ? '/' + intent.period.month : ''}`);
+    if (intent.tag_filter) console.log(`   Tag: ${intent.tag_filter}`);
     if (intent.category_filter) console.log(`   Category: ${intent.category_filter}`);
     if (intent.domain_filter) console.log(`   Domain: ${intent.domain_filter}`);
     if (intent.city_filter) console.log(`   City: ${intent.city_filter}`);

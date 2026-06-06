@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ActivityIndicator,
-  Animated, Dimensions,
+  Animated, Dimensions, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -107,8 +107,13 @@ export default function VoiceChatOverlay() {
         </View>
       )}
 
-      {/* Content area — bottom padding for mic button */}
-      <View style={styles.content}>
+      {/* Content area — scrollabile, senza vincolo di viewport */}
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentInner}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {qa ? (
           <>
             {isLoading ? (
@@ -122,7 +127,7 @@ export default function VoiceChatOverlay() {
                 question={qa.question}
                 answer={qa.answer}
                 onRerun={handleRerun}
-                scrollable={true}
+                scrollable={false}
               />
             )}
           </>
@@ -133,7 +138,7 @@ export default function VoiceChatOverlay() {
             </Text>
           </View>
         )}
-      </View>
+      </ScrollView>
     </Animated.View>
   );
 }
@@ -164,8 +169,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    // Spazio inferiore per il pulsante microfono
-    paddingBottom: 110,
+  },
+  contentInner: {
+    flexGrow: 1,
+    paddingBottom: 120, // spazio per il pulsante microfono fisso in basso
+    paddingHorizontal: 4,
   },
   emptyCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyTitle: {

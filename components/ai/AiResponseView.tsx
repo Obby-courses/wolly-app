@@ -174,41 +174,39 @@ export default function AiResponseView({
     ]).start();
   }, [answer.text_response]);
 
-  // Calcolo dinamico del font size basato sulla larghezza dello schermo, altezza dello schermo, JIT widget e parola più lunga
+  // Calcolo dinamico del font size
   const { width, height } = Dimensions.get('window');
-  // Consideriamo un padding di sicurezza orizzontale di circa 48px totali (24px per lato)
+  // Padding orizzontale di sicurezza (24px per lato)
   const availableWidth = width - 48;
 
-  // Altezza occupata da safe-area, pulsante di chiusura superiore, padding del ScrollView e menu microfono inferiore
-  const verticalOffsets = insets.top + insets.bottom + 200;
-  const availableHeight = height - verticalOffsets;
-
-  // Stima dell'altezza dell'eventuale JIT widget attivo
-  let widgetHeight = 0;
-  if (answer.intent === 'distribution') widgetHeight = 280;
-  else if (answer.intent === 'list') widgetHeight = 240;
-  else if (answer.intent === 'timeline') widgetHeight = 200;
-  else if (answer.intent === 'subscriptions') widgetHeight = 220;
-
-  // Altezza target disponibile per il testo della risposta (escludendo la domanda di circa 30px)
-  const targetTextHeight = Math.max(80, availableHeight - 30 - widgetHeight);
-  const totalLength = answer.text_response.length;
-  
-  // Formula matematica: F <= Math.sqrt((targetTextHeight * availableWidth) / (totalLength * 0.65))
-  // per fare in modo che tutto il testo entri verticalmente nello schermo senza scrolling.
-  const maxFontForHeight = Math.sqrt((targetTextHeight * availableWidth) / (totalLength * 0.65));
-  
   const words = answer.text_response.split(/[\s,.\n]+/);
   const maxWordLength = Math.max(...words.map(w => w.length), 1);
-  
-  // Fattore di larghezza per i caratteri (circa 0.58 del font size per Outfit Bold / Sans-Serif)
+  // Fattore larghezza carattere (circa 0.58 del font size per Outfit Bold)
   const charWidthFactor = 0.58;
   const maxFontForWord = availableWidth / (maxWordLength * charWidthFactor);
-  
-  // Impostiamo la dimensione massima desiderata a 45px, ridimensionando se la parola più lunga
-  // non c'entrerebbe in una riga o se l'intero testo non ci starebbe verticalmente.
-  let dynamicFontSize = Math.min(45, maxFontForWord, maxFontForHeight);
-  dynamicFontSize = Math.max(18, Math.floor(dynamicFontSize)); // Minimo di sicurezza 18px
+
+  let dynamicFontSize: number;
+
+  if (!scrollable) {
+    // OVERLAY VOCALE — scroll libero: usa solo il limite della parola più lunga.
+    // Il testo può crescere quanto vuole, l'utente scorre.
+    dynamicFontSize = Math.min(48, maxFontForWord);
+    dynamicFontSize = Math.max(22, Math.floor(dynamicFontSize));
+  } else {
+    // CHAT TESTUALE — prova a far stare tutto senza scroll (comportamento precedente).
+    const verticalOffsets = insets.top + insets.bottom + 200;
+    const availableHeight = height - verticalOffsets;
+    let widgetHeight = 0;
+    if (answer.intent === 'distribution') widgetHeight = 280;
+    else if (answer.intent === 'list') widgetHeight = 240;
+    else if (answer.intent === 'timeline') widgetHeight = 200;
+    else if (answer.intent === 'subscriptions') widgetHeight = 220;
+    const targetTextHeight = Math.max(80, availableHeight - 30 - widgetHeight);
+    const totalLength = answer.text_response.length;
+    const maxFontForHeight = Math.sqrt((targetTextHeight * availableWidth) / (totalLength * 0.65));
+    dynamicFontSize = Math.min(45, maxFontForWord, maxFontForHeight);
+    dynamicFontSize = Math.max(18, Math.floor(dynamicFontSize));
+  }
 
   const body = (
     <>
