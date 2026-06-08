@@ -516,9 +516,6 @@ export default function Home() {
                             €{sub.amount.toFixed(0)}
                           </Text>
                           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
-                            {!sub.isSubscription && (
-                              <Ionicons name="time-outline" size={13} color="#FFFFFF" style={{ marginRight: 4, opacity: 0.85 }} />
-                            )}
                             <Text style={styles.upcomingName} numberOfLines={1}>
                               {sub.name}
                             </Text>
@@ -538,7 +535,7 @@ export default function Home() {
           <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 48 + 12 }]}>
 
             <View style={styles.sectionHeaderCompact}>
-              <Text style={styles.sectionTitle}>Ultime spese</Text>
+              <Text style={styles.sectionTitle}>Ultime transazioni</Text>
               <Pressable onPress={() => router.push({ pathname: '/stats/expenses', params: { range: 'Tutto' } })}>
                 <Text style={styles.seeAllText}>Vedi tutto</Text>
               </Pressable>
