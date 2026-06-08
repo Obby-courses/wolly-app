@@ -86,168 +86,174 @@ export default function SettingsScreen() {
           {userProfile && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Profilo</Text>
-              <Pressable 
-                style={styles.profileCard} 
-                onPress={() => router.push('/profile')}
-              >
-                <View style={[styles.iconContainer, { backgroundColor: '#EFF6FF' }]}>
-                  <Ionicons name="person-circle-outline" size={22} color="#0A74FF" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.itemTitleText}>Il mio account</Text>
-                  <Text style={styles.itemSubtitleText}>Visualizza i dettagli e gestisci il tuo account</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-              </Pressable>
+              <View style={styles.groupedCard}>
+                <Pressable 
+                  style={styles.groupedItem} 
+                  onPress={() => router.push('/profile')}
+                >
+                  <View style={[styles.iconContainer, { backgroundColor: '#EFF6FF' }]}>
+                    <Ionicons name="person-circle-outline" size={22} color="#0A74FF" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.itemTitleText}>Il mio account</Text>
+                    <Text style={styles.itemSubtitleText}>Visualizza i dettagli e gestisci il tuo account</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                </Pressable>
+              </View>
             </View>
           )}
 
           {/* Opzioni Tecniche */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Opzioni Tecniche</Text>
-            
-            <AnomalyReporter
-              renderTrigger={(open) => (
-                <Pressable style={styles.item} onPress={open}>
-                  <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
-                    <Ionicons name="flag" size={20} color="#EF4444" />
-                  </View>
-                  <Text style={styles.itemText}>Segnala un'Anomalia</Text>
-                  <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-                </Pressable>
-              )}
-            />
+            <Text style={styles.sectionTitle}>Opzioni tecniche</Text>
+            <View style={styles.groupedCard}>
+              <AnomalyReporter
+                renderTrigger={(open) => (
+                  <Pressable style={styles.groupedItem} onPress={open}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+                      <Ionicons name="flag" size={20} color="#EF4444" />
+                    </View>
+                    <Text style={styles.itemText}>Segnala un'anomalia</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                  </Pressable>
+                )}
+              />
+            </View>
           </View>
 
           {/* Opzioni Informative */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Informazioni e Note Legali</Text>
+            <Text style={styles.sectionTitle}>Informazioni e note legali</Text>
+            <View style={styles.groupedCard}>
+              <Pressable style={[styles.groupedItem, styles.groupedItemDivider]} onPress={() => router.push('/privacy')}>
+                <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+                  <Ionicons name="shield-checkmark" size={20} color="#0284C7" />
+                </View>
+                <Text style={styles.itemText}>Informativa sulla privacy</Text>
+                <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+              </Pressable>
 
-            <Pressable style={styles.item} onPress={() => router.push('/privacy')}>
-              <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-                <Ionicons name="shield-checkmark" size={20} color="#0284C7" />
-              </View>
-              <Text style={styles.itemText}>Informativa sulla Privacy</Text>
-              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-            </Pressable>
-
-            <Pressable style={[styles.item, { marginTop: 8 }]} onPress={() => router.push('/terms')}>
-              <View style={[styles.iconContainer, { backgroundColor: '#F3EFFF' }]}>
-                <Ionicons name="document-text" size={20} color="#8B5CF6" />
-              </View>
-              <Text style={styles.itemText}>Termini di Utilizzo Beta</Text>
-              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-            </Pressable>
+              <Pressable style={styles.groupedItem} onPress={() => router.push('/terms')}>
+                <View style={[styles.iconContainer, { backgroundColor: '#F3EFFF' }]}>
+                  <Ionicons name="document-text" size={20} color="#8B5CF6" />
+                </View>
+                <Text style={styles.itemText}>Termini di utilizzo beta</Text>
+                <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+              </Pressable>
+            </View>
           </View>
 
           {/* Impostazioni di Sviluppo */}
           {userProfile?.role === 'admin' && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Impostazioni di Sviluppo</Text>
+              <Text style={styles.sectionTitle}>Impostazioni di sviluppo</Text>
               
-              <View style={styles.item}>
-                <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-                  <Ionicons name="code-working" size={20} color="#0284C7" />
+              <View style={styles.groupedCard}>
+                <View style={[styles.groupedItem, devSettingsEnabled && styles.groupedItemDivider]}>
+                  <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+                    <Ionicons name="code-working" size={20} color="#0284C7" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.itemTitleText}>Dev settings</Text>
+                    <Text style={styles.itemSubtitleText}>Abilita strumenti sviluppatore e gestione dati</Text>
+                  </View>
+                  <Switch
+                    value={devSettingsEnabled}
+                    onValueChange={handleToggleDevSettings}
+                    trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
+                    thumbColor={'#FFF'}
+                  />
                 </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.itemTitleText}>Dev Settings</Text>
-                  <Text style={styles.itemSubtitleText}>Abilita strumenti sviluppatore e gestione dati</Text>
-                </View>
-                <Switch
-                  value={devSettingsEnabled}
-                  onValueChange={handleToggleDevSettings}
-                  trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
-                  thumbColor={'#FFF'}
-                />
+
+                {devSettingsEnabled && (
+                  <>
+                    {/* Inizializza Onboarding */}
+                    <Pressable style={[styles.groupedItem, styles.groupedItemDivider]} onPress={async () => {
+                      await AsyncStorage.setItem('wolly_onboarding_completed', 'false');
+                      router.push('/onboarding');
+                    }}>
+                      <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+                        <Ionicons name="rocket" size={20} color="#0284C7" />
+                      </View>
+                      <Text style={styles.itemText}>Inizializza onboarding</Text>
+                      <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                    </Pressable>
+
+                    {/* Gestione Dati & Seed */}
+                    <Pressable style={[styles.groupedItem, styles.groupedItemDivider]} onPress={() => router.push('/seed-data')}>
+                      <View style={[styles.iconContainer, { backgroundColor: '#E6F0FF' }]}>
+                        <Ionicons name="server" size={20} color="#0A74FF" />
+                      </View>
+                      <Text style={styles.itemText}>Gestione dati & seed</Text>
+                      <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                    </Pressable>
+
+                    {/* Test Schermate Limite AI */}
+                    <Pressable style={[styles.groupedItem, styles.groupedItemDivider]} onPress={() => router.push({ pathname: '/ai-limit', params: { type: 'user' } })}>
+                      <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+                        <Ionicons name="speedometer" size={20} color="#D97706" />
+                      </View>
+                      <Text style={styles.itemText}>Test schermata limite AI (user)</Text>
+                      <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                    </Pressable>
+
+                    <Pressable style={[styles.groupedItem, styles.groupedItemDivider]} onPress={() => router.push({ pathname: '/ai-limit', params: { type: 'global' } })}>
+                      <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+                        <Ionicons name="alert-circle" size={20} color="#EF4444" />
+                      </View>
+                      <Text style={styles.itemText}>Test schermata limite AI (global)</Text>
+                      <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                    </Pressable>
+
+                    {/* Modalità Demo Offline */}
+                    <View style={[styles.groupedItem, styles.groupedItemDivider]}>
+                      <View style={[styles.iconContainer, { backgroundColor: '#E6F4EA' }]}>
+                        <Ionicons name="cloud-offline" size={20} color="#34C759" />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.itemTitleText}>Modalità demo offline</Text>
+                        <Text style={styles.itemSubtitleText}>Forza l'app in modalità senza rete (disabilita AI)</Text>
+                      </View>
+                      <Switch
+                        value={networkState.isDemoOffline}
+                        onValueChange={(val) => networkStore.setDemoOffline(val)}
+                        trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
+                        thumbColor={'#FFF'}
+                      />
+                    </View>
+
+                    {/* Unauthorized Mode (Test Permessi) */}
+                    <View style={[styles.groupedItem, styles.groupedItemDivider]}>
+                      <View style={[styles.iconContainer, { backgroundColor: '#FEF08A' }]}>
+                        <Ionicons name="lock-closed" size={20} color="#CA8A04" />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.itemTitleText}>Unauthorized mode</Text>
+                        <Text style={styles.itemSubtitleText}>Forza il rifiuto dei permessi (Microfono e Fotocamera)</Text>
+                      </View>
+                      <Switch
+                        value={networkState.isUnauthorizedMode}
+                        onValueChange={(val) => networkStore.setUnauthorizedMode(val)}
+                        trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
+                        thumbColor={'#FFF'}
+                      />
+                    </View>
+
+                    {/* Elimina tutte le transazioni */}
+                    <Pressable style={styles.groupedItem} onPress={handleDeleteAll}>
+                      <View style={[styles.iconContainer, { backgroundColor: '#FCE8E6' }]}>
+                        <Ionicons name="trash" size={20} color="#EF4444" />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={[styles.itemTitleText, styles.dangerText]}>Elimina tutte le transazioni</Text>
+                        <Text style={styles.itemSubtitleText}>Svuota database transazioni e resetta patrimonio</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="#EF4444" />
+                    </Pressable>
+                  </>
+                )}
               </View>
-
-              {devSettingsEnabled && (
-                <>
-                  {/* Inizializza Onboarding */}
-                  <Pressable style={[styles.item, { marginTop: 8 }]} onPress={async () => {
-                    await AsyncStorage.setItem('wolly_onboarding_completed', 'false');
-                    router.push('/onboarding');
-                  }}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-                      <Ionicons name="rocket" size={20} color="#0284C7" />
-                    </View>
-                    <Text style={styles.itemText}>Inizializza Onboarding</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-                  </Pressable>
-
-                   {/* Gestione Dati & Seed */}
-                  <Pressable style={styles.item} onPress={() => router.push('/seed-data')}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#E6F0FF' }]}>
-                      <Ionicons name="server" size={20} color="#0A74FF" />
-                    </View>
-                    <Text style={styles.itemText}>Gestione Dati & Seed</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-                  </Pressable>
-
-                  {/* Test Schermate Limite AI */}
-                  <Pressable style={styles.item} onPress={() => router.push({ pathname: '/ai-limit', params: { type: 'user' } })}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
-                      <Ionicons name="speedometer" size={20} color="#D97706" />
-                    </View>
-                    <Text style={styles.itemText}>Test Schermata Limite AI (User)</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-                  </Pressable>
-
-                  <Pressable style={styles.item} onPress={() => router.push({ pathname: '/ai-limit', params: { type: 'global' } })}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
-                      <Ionicons name="alert-circle" size={20} color="#EF4444" />
-                    </View>
-                    <Text style={styles.itemText}>Test Schermata Limite AI (Global)</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-                  </Pressable>
-
-                  {/* Modalità Demo Offline */}
-                  <View style={styles.item}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#E6F4EA' }]}>
-                      <Ionicons name="cloud-offline" size={20} color="#34C759" />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.itemTitleText}>Modalità Demo Offline</Text>
-                      <Text style={styles.itemSubtitleText}>Forza l'app in modalità senza rete (disabilita AI)</Text>
-                    </View>
-                    <Switch
-                      value={networkState.isDemoOffline}
-                      onValueChange={(val) => networkStore.setDemoOffline(val)}
-                      trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
-                      thumbColor={'#FFF'}
-                    />
-                  </View>
-
-                  {/* Unauthorized Mode (Test Permessi) */}
-                  <View style={styles.item}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#FEF08A' }]}>
-                      <Ionicons name="lock-closed" size={20} color="#CA8A04" />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.itemTitleText}>Unauthorized Mode</Text>
-                      <Text style={styles.itemSubtitleText}>Forza il rifiuto dei permessi (Microfono e Fotocamera)</Text>
-                    </View>
-                    <Switch
-                      value={networkState.isUnauthorizedMode}
-                      onValueChange={(val) => networkStore.setUnauthorizedMode(val)}
-                      trackColor={{ false: '#D1D5DB', true: '#0A74FF' }}
-                      thumbColor={'#FFF'}
-                    />
-                  </View>
-
-                  {/* Elimina tutte le transazioni */}
-                  <Pressable style={[styles.item, styles.dangerItem]} onPress={handleDeleteAll}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#FCE8E6' }]}>
-                      <Ionicons name="trash" size={20} color="#EF4444" />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={[styles.itemTitleText, styles.dangerText]}>Elimina tutte le transazioni</Text>
-                      <Text style={styles.itemSubtitleText}>Svuota database transazioni e resetta patrimonio</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#EF4444" />
-                  </Pressable>
-                </>
-              )}
             </View>
           )}
         </ScrollView>
@@ -300,8 +306,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
     marginBottom: SPACING.md,
     marginLeft: 4,
   },
@@ -382,5 +386,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: TYPOGRAPHY.fontBold,
     letterSpacing: 0.3,
+  },
+  groupedCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.03)',
+    ...SHADOWS.soft,
+  },
+  groupedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  groupedItemDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
   },
 });
