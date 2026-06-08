@@ -96,13 +96,11 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.base,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.primary,
-    textTransform: 'capitalize',
   },
   transactionMeta: {
     fontSize: 10,
     fontFamily: TYPOGRAPHY.fontFamily,
     color: COLORS.secondary,
-    textTransform: 'uppercase',
   },
   holidayBadge: {
     backgroundColor: '#FEF2F2',
@@ -116,7 +114,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: TYPOGRAPHY.fontBold,
     color: '#B91C1C',
-    textTransform: 'uppercase',
   },
   tagBadge: {
     backgroundColor: '#F3F4F6',

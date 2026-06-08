@@ -213,8 +213,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
     marginBottom: 16,
   },
   // Domain grid
@@ -262,7 +260,7 @@ const styles = StyleSheet.create({
     })
   },
   domainHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
-  domainHeaderLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  domainHeaderLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700' },
   domainHeaderName: { color: '#FFF', fontSize: 18, fontWeight: '800', marginTop: 2 },
   domainSelectBadge: {
     backgroundColor: 'rgba(255,255,255,0.25)',

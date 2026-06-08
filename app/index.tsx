@@ -478,7 +478,7 @@ export default function Home() {
               {/* Card Spese del Mese (Debit Card Style) */}
               <View style={styles.glassCard}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardHeaderText}>ULTIMI 30 GIORNI</Text>
+                  <Text style={styles.cardHeaderText}>Ultimi 30 giorni</Text>
                 </View>
                 <Text style={styles.cardValueText} numberOfLines={1}>
                   €{thisMonthExpenses.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
@@ -503,7 +503,7 @@ export default function Home() {
               {/* Card Spese Programmate (Credit Card Style) */}
               <View style={[styles.glassCard, { justifyContent: 'flex-start', gap: 6 }]}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardHeaderText}>PROSSIME SPESE</Text>
+                  <Text style={styles.cardHeaderText}>Prossime spese</Text>
                 </View>
                 <View style={styles.upcomingList}>
                   {upcomingSubs.length > 0 ? (
@@ -592,8 +592,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 13,
     fontFamily: TYPOGRAPHY.fontBold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   netWorthValueContainer: {
     flexDirection: 'row',
@@ -691,7 +689,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: TYPOGRAPHY.fontBold,
     opacity: 0.85,
-    letterSpacing: 0.5,
   },
   cardDetailText: {
     color: '#FFFFFF',

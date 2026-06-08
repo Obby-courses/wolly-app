@@ -211,13 +211,11 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.base,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.primary,
-    textTransform: 'capitalize',
   },
   meta: {
     fontSize: 10,
     fontFamily: TYPOGRAPHY.fontFamily,
     color: COLORS.secondary,
-    textTransform: 'uppercase',
   },
   metaSep: {
     color: COLORS.secondary,
@@ -235,7 +233,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: TYPOGRAPHY.fontBold,
     color: '#B91C1C',
-    textTransform: 'uppercase',
   },
   tagBadge: {
     backgroundColor: '#F3F4F6',

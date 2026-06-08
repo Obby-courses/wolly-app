@@ -218,7 +218,7 @@ export default function ManualEntry() {
 
           {/* VENDOR & DESCRIPTION */}
           <View style={styles.section}>
-            <Text style={styles.label}>Cosa e Dove</Text>
+            <Text style={styles.label}>Cosa e dove</Text>
             <TextInput 
               style={styles.input}
               placeholder="Venditore / Negozio"
@@ -291,7 +291,7 @@ export default function ManualEntry() {
 
           {/* SOCIAL TAGS */}
           <View style={styles.section}>
-            <Text style={styles.label}>Con Chi (Social)</Text>
+            <Text style={styles.label}>Con chi (social)</Text>
             
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               {[
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   amountInput: { fontSize: 56, fontFamily: TYPOGRAPHY.fontBold, minWidth: 150, textAlign: 'center' },
   section: { marginBottom: 24 },
   row: { flexDirection: 'row', marginBottom: 8 },
-  label: { fontSize: 11, fontFamily: TYPOGRAPHY.fontBold, color: COLORS.secondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  label: { fontSize: 11, fontFamily: TYPOGRAPHY.fontBold, color: COLORS.secondary, marginBottom: 8 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   actionText: { fontSize: 12, color: COLORS.primary, fontFamily: TYPOGRAPHY.fontBold },
   input: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 16, fontSize: 16, color: COLORS.primary, ...SHADOWS.soft },

@@ -203,8 +203,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.xs,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
     marginBottom: SPACING.sm,
     marginTop: SPACING.lg,
   },
