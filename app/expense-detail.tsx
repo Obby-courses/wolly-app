@@ -629,7 +629,7 @@ export default function ExpenseDetail() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable onPress={handleBack} style={styles.backIcon}>
-          <Ionicons name="chevron-back" size={28} color={COLORS.primary} />
+          <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
         </Pressable>
         <Text style={styles.headerTitle}>
           {isEditingExisting ? 'Modifica Transazione' : 'Verifica Dati'}
@@ -638,15 +638,15 @@ export default function ExpenseDetail() {
           {isEditingExisting && (
             <Pressable onPress={handleDelete} disabled={isDeleting || isSaving} style={styles.headerActionBtn}>
               {isDeleting ? (
-                <ActivityIndicator size="small" color="#EF4444" />
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Ionicons name="trash-outline" size={22} color="#EF4444" />
+                <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
               )}
             </Pressable>
           )}
           <Pressable onPress={handleConfirm} disabled={isSaving || isDeleting} style={styles.headerSaveBtn}>
             {isSaving ? (
-              <ActivityIndicator size="small" color={COLORS.primary} />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Text style={styles.headerSaveText}>Salva</Text>
             )}
@@ -1697,7 +1697,14 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     backgroundColor: COLORS.surface,
   },
-  backIcon: { padding: 4 },
+  backIcon: { 
+    width: 32, 
+    height: 32, 
+    borderRadius: 16, 
+    backgroundColor: COLORS.primary, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
@@ -2245,22 +2252,25 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerActionBtn: {
-    padding: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerSaveBtn: {
-    backgroundColor: COLORS.primary + '15',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerSaveText: {
     fontSize: 14,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: '#FFFFFF',
   },
   swipeContainer: {
     position: 'relative',

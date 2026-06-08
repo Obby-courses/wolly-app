@@ -441,7 +441,7 @@ function SubModal({
       <SafeAreaView style={modal.container}>
         <View style={modal.header}>
           <Pressable onPress={handleClose} style={modal.backIcon}>
-            <Ionicons name="close" size={26} color={COLORS.primary} />
+            <Ionicons name="close" size={20} color="#FFFFFF" />
           </Pressable>
           <Text style={modal.headerTitle}>
             {initial ? 'Gestisci Periodica' : 'Nuova Periodica'}
@@ -449,7 +449,7 @@ function SubModal({
           <View style={modal.headerRightContainer}>
             {!!initial && onDelete && (
               <Pressable onPress={handleDeleteClick} style={modal.headerActionBtn}>
-                <Ionicons name="trash-outline" size={22} color="#EF4444" />
+                <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
               </Pressable>
             )}
             <Pressable onPress={handleSave} disabled={saving} style={modal.headerSaveBtn}>
@@ -1408,12 +1408,34 @@ const modal = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  backIcon: { padding: 4 },
+  backIcon: { 
+    width: 32, 
+    height: 32, 
+    borderRadius: 16, 
+    backgroundColor: COLORS.primary, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
-  headerSaveBtn: { paddingHorizontal: 12, paddingVertical: 6 },
-  headerSaveText: { fontSize: 16, fontWeight: '700', color: COLORS.accent },
-  headerActionBtn: { padding: 6, marginRight: 8 },
-  headerRightContainer: { flexDirection: 'row', alignItems: 'center' },
+  headerSaveBtn: { 
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerSaveText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  headerActionBtn: { 
+    width: 32, 
+    height: 32, 
+    borderRadius: 16, 
+    backgroundColor: '#EF4444',
+    justifyContent: 'center', 
+    alignItems: 'center',
+    marginRight: 8 
+  },
+  headerRightContainer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   content: { padding: 20, paddingBottom: 40 },
   sectionTitle: {
     fontSize: 10,
