@@ -32,8 +32,8 @@ export const COLORS = {
 };
 
 export const TYPOGRAPHY = {
-  fontFamily: 'Outfit_400Regular', // We'll need to load this
-  fontBold: 'Outfit_700Bold',
+  fontFamily: 'InterTight_400Regular',
+  fontBold: 'InterTight_700Bold',
   sizes: {
     xs: 10,
     sm: 12,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts, Outfit_400Regular, Outfit_700Bold } from '@expo-google-fonts/outfit';
+import { useFonts, InterTight_400Regular, InterTight_700Bold } from '@expo-google-fonts/inter-tight';
 import BottomMenu from '../components/BottomMenu';
 import TopNavigation from '../components/TopNavigation';
 import SwipeNavigator from '../components/SwipeNavigator';
@@ -33,8 +33,8 @@ export default function RootLayout() {
   const [authChecked, setAuthChecked] = useState(false);
 
   const [loaded, error] = useFonts({
-    Outfit_400Regular,
-    Outfit_700Bold,
+    InterTight_400Regular,
+    InterTight_700Bold,
   });
 
   // ── Controllo sessione e profilo all'avvio ────────────────────────────────
