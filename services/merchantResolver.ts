@@ -1,3 +1,4 @@
+import { supabase } from './supabase';
 import { TransactionRepository } from './database/repositories/TransactionRepository';
 
 /**
@@ -36,9 +37,6 @@ export class MerchantResolver {
   }
 
   private static async resolveWithAI(userInput: string, merchantList: string[]): Promise<string | null> {
-    const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
-    if (!apiKey) return null;
-
     // Limitiamo la lista per non superare i limiti di token, anche se i merchant unici dovrebbero essere gestibili
     const sampleList = merchantList.slice(0, 200).join(', ');
 
@@ -47,22 +45,26 @@ export class MerchantResolver {
     Restituisci SOLO il nome del merchant o "NONE".`;
 
     try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant', // Usiamo un modello veloce per questo compito granulare
+      const { data, error } = await supabase.functions.invoke('wolly-ai-gateway', {
+        body: {
+          model: 'llama-3.1-8b-instant',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: `Input: "${userInput}"\nLista Merchant: [${sampleList}]` }
           ],
           temperature: 0,
           max_tokens: 50,
-        }),
+        },
+        queryParams: { action: 'chat' }
       });
 
-      if (!response.ok) return null;
-      const data = await response.json();
+      if (error || !data) {
+        if (error) {
+          const { handleAiResponseError } = await import('./aiErrorHandler');
+          handleAiResponseError((error as any).status, error.message);
+        }
+        return null;
+      }
       const answer = data.choices[0].message.content.trim().replace(/["']/g, '');
 
       if (answer === 'NONE' || !merchantList.includes(answer)) return null;

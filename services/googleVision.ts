@@ -1,12 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { supabase } from './supabase';
 
 export async function extractTextFromImage(imageUri: string): Promise<string> {
-  const apiKey = process.env.EXPO_PUBLIC_CLOUD_VISION_API;
-  if (!apiKey) {
-    console.warn('Missing Google Vision API Key (EXPO_PUBLIC_CLOUD_VISION_API)');
-    return '';
-  }
-
   try {
     console.log(`[GoogleVision] Extracting text from image URI: ${imageUri.substring(0, 50)}...`);
     
@@ -23,23 +18,20 @@ export async function extractTextFromImage(imageUri: string): Promise<string> {
       ],
     };
 
-    const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+    const { data, error } = await supabase.functions.invoke('wolly-ai-gateway', {
+      body,
+      queryParams: { action: 'vision' },
     });
 
-    console.log(`[GoogleVision] Response status: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error(`Google Vision API Error: ${response.status} ${response.statusText}`, JSON.stringify(errorData, null, 2));
+    if (error || !data) {
+      console.error(`Google Vision API Edge Function Error:`, error);
+      if (error) {
+        const { handleAiResponseError } = await import('./aiErrorHandler');
+        handleAiResponseError((error as any).status, error.message);
+      }
       return '';
     }
 
-    const data = await response.json();
     
     if (data.responses && data.responses[0]) {
       const resp = data.responses[0];

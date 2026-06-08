@@ -82,26 +82,24 @@ export default function SettingsScreen() {
       <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 48 }]}>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Sezione Profilo in alto */}
+          {/* Sezione Profilo */}
           {userProfile && (
-            <Pressable 
-              style={styles.profileCard} 
-              onPress={() => router.push('/profile')}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: '#EFF6FF' }]}>
-                <Ionicons name="person-circle-outline" size={22} color="#0A74FF" />
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.itemTitleText} numberOfLines={1}>{userProfile.email}</Text>
-                <View style={[styles.roleBadge, { backgroundColor: getRoleColor(userProfile.role) + '20' }]}>
-                  <View style={[styles.roleDot, { backgroundColor: getRoleColor(userProfile.role) }]} />
-                  <Text style={[styles.roleText, { color: getRoleColor(userProfile.role) }]}>
-                    {getRoleLabel(userProfile.role)}
-                  </Text>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Profilo</Text>
+              <Pressable 
+                style={styles.profileCard} 
+                onPress={() => router.push('/profile')}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: '#EFF6FF' }]}>
+                  <Ionicons name="person-circle-outline" size={22} color="#0A74FF" />
                 </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-            </Pressable>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.itemTitleText}>Il mio account</Text>
+                  <Text style={styles.itemSubtitleText}>Visualizza i dettagli e gestisci il tuo account</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+              </Pressable>
+            </View>
           )}
 
           {/* Opzioni Tecniche */}
@@ -177,12 +175,29 @@ export default function SettingsScreen() {
                     <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
                   </Pressable>
 
-                  {/* Gestione Dati & Seed */}
+                   {/* Gestione Dati & Seed */}
                   <Pressable style={styles.item} onPress={() => router.push('/seed-data')}>
                     <View style={[styles.iconContainer, { backgroundColor: '#E6F0FF' }]}>
                       <Ionicons name="server" size={20} color="#0A74FF" />
                     </View>
                     <Text style={styles.itemText}>Gestione Dati & Seed</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                  </Pressable>
+
+                  {/* Test Schermate Limite AI */}
+                  <Pressable style={styles.item} onPress={() => router.push({ pathname: '/ai-limit', params: { type: 'user' } })}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+                      <Ionicons name="speedometer" size={20} color="#D97706" />
+                    </View>
+                    <Text style={styles.itemText}>Test Schermata Limite AI (User)</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                  </Pressable>
+
+                  <Pressable style={styles.item} onPress={() => router.push({ pathname: '/ai-limit', params: { type: 'global' } })}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+                      <Ionicons name="alert-circle" size={20} color="#EF4444" />
+                    </View>
+                    <Text style={styles.itemText}>Test Schermata Limite AI (Global)</Text>
                     <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
                   </Pressable>
 

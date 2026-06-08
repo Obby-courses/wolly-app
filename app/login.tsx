@@ -30,7 +30,7 @@ export default function LoginScreen() {
           if (profile) {
             if (profile.role === 'blocked') {
               router.replace('/blocked');
-            } else if (profile.role === 'beta_tester' && isBetaExpired(profile)) {
+            } else if (profile.role === 'tester' && isBetaExpired(profile)) {
               router.replace('/paywall');
             } else {
               router.replace('/');

@@ -443,8 +443,12 @@ export default function OnboardingScreen() {
 
             <Pressable
               onPress={handleNext}
-              disabled={isSaving}
-              style={[styles.btn, styles.btnNext]}
+              disabled={isSaving || (step === 1 && (!privacyAccepted || !termsAccepted))}
+              style={[
+                styles.btn, 
+                styles.btnNext,
+                (step === 1 && (!privacyAccepted || !termsAccepted)) && { opacity: 0.4 }
+              ]}
             >
               <Text style={styles.btnNextText}>
                 {step === totalSteps - 1 ? 'Capito' : 'Continua'}

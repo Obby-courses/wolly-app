@@ -210,13 +210,8 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
+        const { data, error } = await supabase.functions.invoke('wolly-ai-gateway', {
+          body: {
             model: 'llama-3.3-70b-versatile',
             messages: [
               { role: 'system', content: systemPrompt },
@@ -224,15 +219,23 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
             ],
             max_tokens: 1000,
             response_format: { type: 'json_object' }
-          }),
-          signal: controller.signal
+          },
+          queryParams: { action: 'chat' }
         });
 
         clearTimeout(timeoutId);
 
-        if (!response.ok) throw new Error(`Groq API Error: ${response.status}`);
+        if (error || !data) {
+          const status = (error as any)?.status;
+          const msg = error?.message;
+          if (status === 429 || status === 503 || msg?.includes('soglia') || msg?.includes('429') || msg?.includes('503') || msg?.includes('limit exceeded') || msg?.includes('budget exceeded')) {
+            const { handleAiResponseError } = await import('./aiErrorHandler');
+            handleAiResponseError(status, msg);
+            throw new Error('BUDGET_LIMIT');
+          }
+          throw new Error(`Groq API Error: ${JSON.stringify(error)}`);
+        }
 
-        const data = await response.json();
         const result: RawParsingResult = JSON.parse(data.choices[0].message.content);
 
         // --- LOG DI DEBUG IN TERMINALE ---
@@ -454,7 +457,7 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
             end_time: endTime.toISOString(),
             status_code: statusCode,
             tokens: tokenUsage,
-            cost_usd: computedCost,
+            cost_usd: 0,
             app_version: '0.0.1',
             // GDPR: device_id rimosso — log completamente anonimi
           }).select('id').single();
@@ -485,14 +488,19 @@ REGOLA PERIODICA: Imposta "suggest_subscription": true se l'importo ha pattern d
         };
       } catch (error: any) {
         lastError = error;
+        const isBudgetLimit = error.message === 'BUDGET_LIMIT';
         if (error.name === 'AbortError') {
           console.warn(`Groq request timed out, retrying... (${retries} left)`);
         } else {
           console.warn(`Groq request failed: ${error.message}, retrying... (${retries} left)`);
         }
         retries--;
-        // Wait 1s before retry
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (retries >= 0 && !isBudgetLimit) {
+          // Wait 1s before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          break;
+        }
       }
     }
 

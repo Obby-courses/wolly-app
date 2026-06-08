@@ -48,7 +48,7 @@ interface AiResponseViewProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-function renderFormattedText(text: string, queryIntent: QueryIntent | undefined, fontSize: number) {
+function renderFormattedText(text: string, queryIntents: QueryIntent[], fontSize: number) {
   if (!text) return null;
 
   // Rimuoviamo le doppie virgolette dal testo per evitare che vengano visualizzate intorno a categorie/domini
@@ -61,8 +61,24 @@ function renderFormattedText(text: string, queryIntent: QueryIntent | undefined,
   const boldTerms = new Set<string>();
 
   // Categorie & Domini (vengono visualizzati in bianco bold senza virgolette)
-  if (queryIntent?.category_filter) boldTerms.add(queryIntent.category_filter.toLowerCase().replace(/_/g, ' '));
-  if (queryIntent?.domain_filter) boldTerms.add(queryIntent.domain_filter.toLowerCase().replace(/_/g, ' '));
+  queryIntents.forEach(queryIntent => {
+    if (queryIntent.category_filter) boldTerms.add(queryIntent.category_filter.toLowerCase().replace(/_/g, ' '));
+    if (queryIntent.domain_filter) boldTerms.add(queryIntent.domain_filter.toLowerCase().replace(/_/g, ' '));
+    if (queryIntent.merchant_filter) boldTerms.add(queryIntent.merchant_filter.toLowerCase());
+    if (queryIntent.social_context_filter) {
+      const filterLower = queryIntent.social_context_filter.toLowerCase();
+      boldTerms.add(filterLower);
+      if (filterLower === 'alone') {
+        boldTerms.add('da solo');
+        boldTerms.add('da sola');
+        boldTerms.add('solo');
+      }
+    }
+    if (queryIntent.person_filter) boldTerms.add(queryIntent.person_filter.toLowerCase());
+    if (queryIntent.tag_filter) boldTerms.add(queryIntent.tag_filter.toLowerCase());
+    if (queryIntent.holiday_filter) boldTerms.add(queryIntent.holiday_filter.toLowerCase());
+  });
+
   DOMAINS_CONFIG.forEach(d => {
     boldTerms.add(d.label.toLowerCase());
     d.categories.forEach(c => {
@@ -77,31 +93,18 @@ function renderFormattedText(text: string, queryIntent: QueryIntent | undefined,
   // Merchants / Shops (metriche/valori)
   const merchants = ['esselunga', 'coop', 'conad', 'carrefour', 'lidl', 'amazon', 'netflix', 'spotify', 'starbucks', 'mcdonald', 'mcdonalds', 'apple', 'uber', 'shein', 'zara', 'h&m'];
   merchants.forEach(m => boldTerms.add(m));
-  if (queryIntent?.merchant_filter) boldTerms.add(queryIntent.merchant_filter.toLowerCase());
 
   // Social Context / People
   const social = ['friends', 'amici', 'family', 'famiglia', 'colleagues', 'colleghi', 'couple', 'coppia', 'alone', 'strangers', 'sconosciuti'];
   social.forEach(s => boldTerms.add(s));
-  if (queryIntent?.social_context_filter) {
-    const filterLower = queryIntent.social_context_filter.toLowerCase();
-    boldTerms.add(filterLower);
-    if (filterLower === 'alone') {
-      boldTerms.add('da solo');
-      boldTerms.add('da sola');
-      boldTerms.add('solo');
-    }
-  }
-  if (queryIntent?.person_filter) boldTerms.add(queryIntent.person_filter.toLowerCase());
 
   // Tags
   const tags = ['vacanza', 'lavoro', 'weekend', 'regalo', 'trasferta', 'impulsivo', 'personale'];
   tags.forEach(t => boldTerms.add(t));
-  if (queryIntent?.tag_filter) boldTerms.add(queryIntent.tag_filter.toLowerCase());
 
   // Holidays
   const holidays = ['natale', 'pasqua', 'capodanno', 'ferragosto', 'halloween', 'compleanno'];
   holidays.forEach(h => boldTerms.add(h));
-  if (queryIntent?.holiday_filter) boldTerms.add(queryIntent.holiday_filter.toLowerCase());
 
   // Subscriptions / Recurring
   const subscriptions = ['abbonamento', 'abbonamenti', 'ricorrente', 'mensile', 'annuale', 'netflix', 'spotify', 'prime', 'disney+'];
@@ -185,12 +188,16 @@ export default function AiResponseView({
   const charWidthFactor = 0.58;
   const maxFontForWord = availableWidth / (maxWordLength * charWidthFactor);
 
+  const totalLength = answer.text_response.length || 1;
+  // Vincolo per assicurare che il blocco di testo non superi metà del viewport in altezza (height * 0.5)
+  const maxFontForHalfViewport = Math.sqrt((height * 0.5 * availableWidth) / (totalLength * 0.68));
+
   let dynamicFontSize: number;
 
   if (!scrollable) {
     // OVERLAY VOCALE — scroll libero: usa solo il limite della parola più lunga.
     // Il testo può crescere quanto vuole, l'utente scorre.
-    dynamicFontSize = Math.min(48, maxFontForWord);
+    dynamicFontSize = Math.min(48, maxFontForWord, maxFontForHalfViewport);
     dynamicFontSize = Math.max(22, Math.floor(dynamicFontSize));
   } else {
     // CHAT TESTUALE — prova a far stare tutto senza scroll (comportamento precedente).
@@ -202,10 +209,54 @@ export default function AiResponseView({
     else if (answer.intent === 'timeline') widgetHeight = 200;
     else if (answer.intent === 'subscriptions') widgetHeight = 220;
     const targetTextHeight = Math.max(80, availableHeight - 30 - widgetHeight);
-    const totalLength = answer.text_response.length;
     const maxFontForHeight = Math.sqrt((targetTextHeight * availableWidth) / (totalLength * 0.65));
-    dynamicFontSize = Math.min(45, maxFontForWord, maxFontForHeight);
+    dynamicFontSize = Math.min(45, maxFontForWord, maxFontForHeight, maxFontForHalfViewport);
     dynamicFontSize = Math.max(18, Math.floor(dynamicFontSize));
+  }
+
+  const renderJitWidget = (sub: AiChatResponse, index: number) => {
+    return (
+      <View key={index} style={{ width: '100%', marginBottom: 16 }}>
+        {sub.intent === 'distribution' && sub.distribution_data && (
+          <JitDistribution
+            title={sub.distribution_data.title}
+            items={sub.distribution_data.items}
+          />
+        )}
+
+        {sub.intent === 'list' && sub.list_data && (
+          <JitList
+            title={sub.list_data.title}
+            items={sub.list_data.items}
+            totalCount={sub.list_data.total_count}
+          />
+        )}
+
+        {sub.intent === 'timeline' && sub.timeline_data && (
+          <JitTimeline
+            type={sub.timeline_data.type}
+            title={sub.timeline_data.title}
+            data={sub.timeline_data.data}
+            granularity={sub.timeline_data.granularity}
+          />
+        )}
+
+        {sub.intent === 'subscriptions' && sub.subscription_data && (
+          <JitSubscriptions
+            items={sub.subscription_data.items}
+            totalMonthly={sub.subscription_data.total_monthly}
+          />
+        )}
+      </View>
+    );
+  };
+
+  const intentsToHighlight: QueryIntent[] = [];
+  if (answer.queryIntent) intentsToHighlight.push(answer.queryIntent);
+  if (answer.subResponses) {
+    answer.subResponses.forEach(sub => {
+      if (sub.queryIntent) intentsToHighlight.push(sub.queryIntent);
+    });
   }
 
   const body = (
@@ -224,54 +275,17 @@ export default function AiResponseView({
           textStyle, 
           { fontSize: dynamicFontSize, lineHeight: dynamicFontSize * 1.25 }
         ]}>
-          {renderFormattedText(answer.text_response, answer.queryIntent, dynamicFontSize)}
+          {renderFormattedText(answer.text_response, intentsToHighlight, dynamicFontSize)}
         </Text>
       </Animated.View>
 
       {/* ── JIT Widgets ──────────────────────────────────────────────────── */}
       <View style={styles.jitWrapper}>
-
-        {/* disattivato momentaneamente il grafico display big, number per richiesta utente
-        {answer.intent === 'total' && answer.total_data && (
-          <JitTotal
-            value={answer.total_data.value}
-            comparison={answer.total_data.comparison}
-            periodLabel={answer.total_data.period_label}
-          />
+        {answer.subResponses && answer.subResponses.length > 0 ? (
+          answer.subResponses.map((sub, idx) => renderJitWidget(sub, idx))
+        ) : (
+          renderJitWidget(answer, 0)
         )}
-        */}
-
-        {answer.intent === 'distribution' && answer.distribution_data && (
-          <JitDistribution
-            title={answer.distribution_data.title}
-            items={answer.distribution_data.items}
-          />
-        )}
-
-        {answer.intent === 'list' && answer.list_data && (
-          <JitList
-            title={answer.list_data.title}
-            items={answer.list_data.items}
-            totalCount={answer.list_data.total_count}
-          />
-        )}
-
-        {answer.intent === 'timeline' && answer.timeline_data && (
-          <JitTimeline
-            type={answer.timeline_data.type}
-            title={answer.timeline_data.title}
-            data={answer.timeline_data.data}
-            granularity={answer.timeline_data.granularity}
-          />
-        )}
-
-        {answer.intent === 'subscriptions' && answer.subscription_data && (
-          <JitSubscriptions
-            items={answer.subscription_data.items}
-            totalMonthly={answer.subscription_data.total_monthly}
-          />
-        )}
-
       </View>
     </>
   );

@@ -1,4 +1,4 @@
-import { parseQueryIntent, QueryIntent } from './aiQueryParser';
+import { parseQueryIntents, QueryIntent } from './aiQueryParser';
 import { executeQueryIntent, ExecutionResult, DistributionItem, periodToDateRange } from './queryExecutor';
 import { SubscriptionRepository, Subscription } from './database/repositories/SubscriptionRepository';
 import { translateSocialContext, translateLocationType, translateTimeOfDay } from '../constants/i18n';
@@ -73,6 +73,7 @@ export interface AiChatResponse {
     active_count: number;
     items: Subscription[];
   };
+  subResponses?: AiChatResponse[];
 }
 
 // ─── Global Chat Store ────────────────────────────────────────────────────────
@@ -518,12 +519,10 @@ async function rephraseWithAI(
   userMessage: string,
   onTokensCaptured?: (tokens: { prompt_tokens: number, completion_tokens: number, total_tokens: number }) => void
 ): Promise<string> {
-  const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
-  if (!apiKey) return draft;
-
   const prompt = `Sei Wolly, un assistente finanziario.
-Il tuo compito è prendere una risposta generata automaticamente (il "Draft tecnico") e riformularla in modo più naturale e fluido, rispondendo direttamente e in modo conciso all'utente.
-Se il draft riporta 0 transazioni o nessun dato, dillo chiaramente.
+Il tuo compito è prendere una risposta generata automaticamente (il "Draft tecnico") e riformularla in modo più naturale e fluido, rispondendo direttamente e in modo conciso all'utente in lingua italiana.
+Se ci sono più informazioni o risposte separate nel draft (es: spese per diversi giorni o filtri multipli), evita assolutamente ripetizioni dello stesso schema frasale (es. non iniziare ogni riga con lo stesso preambolo come "Dunque, per quanto riguarda..."). Combina le frasi in modo fluido e naturale (es. "Ieri hai speso X, mentre l'altro ieri...") oppure organizzale in righe distinte con un inizio variato e pulito.
+Se il draft riporta 0 transazioni o nessun dato per un periodo, dillo chiaramente.
 NON aggiungere considerazioni personali, consigli non richiesti o chiacchiere inutili. Rispondi in modo diretto alla domanda.
 NON inventare dati o cifre che non sono nel draft tecnico. Mantieni i numeri e i concetti esatti.
 NON elencare o ripetere in forma testuale le singole transazioni o voci di una lista (con data, descrizione o importo) se presenti, poiché queste informazioni verranno già visualizzate graficamente in un widget o in una lista sotto la tua risposta. Limitati ad introdurre la lista o a indicare il totale e il numero di elementi.
@@ -537,24 +536,24 @@ Scrivi solo la risposta finale, senza preamboli o commenti.`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('wolly-ai-gateway', {
+      body: {
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'system', content: prompt }],
         max_tokens: 150,
-        temperature: 0.1, // Molto bassa per garantire precisione ed evitare considerazioni superflue
-      }),
-      signal: controller.signal,
+        temperature: 0.3,
+      },
+      queryParams: { action: 'chat' }
     });
+
     clearTimeout(timeoutId);
 
-    if (response.ok) {
-      const data = await response.json();
+    if (error) {
+      const { handleAiResponseError } = await import('./aiErrorHandler');
+      handleAiResponseError((error as any).status, error.message);
+    }
+
+    if (!error && data) {
       if (data.usage && onTokensCaptured) {
         onTokensCaptured({
           prompt_tokens: data.usage.prompt_tokens,
@@ -592,55 +591,78 @@ export async function askAiChat(
   let parsedIntent: QueryIntent | undefined;
 
   try {
-    let intent: QueryIntent;
+    let intents: QueryIntent[];
     
     if (preParsedIntent) {
       console.log('⚡ [EXECUTOR] Usando intento pre-parificato (Feedback Bar)');
-      intent = preParsedIntent;
+      intents = [preParsedIntent];
     } else {
       // ── FASE 1: AI Parser ───────────────────────────────────────────────────
-      intent = await parseQueryIntent(userMessage, history);
+      intents = await parseQueryIntents(userMessage, history);
     }
-    parsedIntent = intent;
+    parsedIntent = intents[0];
 
-    console.log('🔍 [PARSER] DETTAGLI INTENT:');
-    console.log(`   • Archetipo: ${intent.archetype}`);
-    console.log(`   • Periodo: ${intent.period.type} (${intent.period.year || ''}${intent.period.month ? '/' + intent.period.month : ''})`);
-    console.log(`   • Filtri: ${intent.category_filter || intent.domain_filter || 'Nessuno'}`);
-    if (intent.city_filter) console.log(`   • Città: ${intent.city_filter}`);
-    if (intent.social_context_filter) console.log(`   • Contesto: ${intent.social_context_filter}`);
-    if (intent.merchant_filter) console.log(`   • Merchant: ${intent.merchant_filter}`);
+    const subResponses: AiChatResponse[] = [];
+    let concatenatedDraft = '';
+    const allAnalysisSteps: string[] = [];
 
-    // ── FASE 2: Esecuzione DB ───────────────────────────────────────────────
-    const result = await executeQueryIntent(intent);
-    console.log('⚙️ [EXECUTOR] RISULTATO DB:');
-    if (result.total !== undefined) console.log(`   • Totale: €${result.total.toFixed(2)}`);
-    if (result.distribution_items) console.log(`   • Distribuzione: ${result.distribution_items.length} categorie`);
-    if (result.transactions) console.log(`   • Transazioni: ${result.transactions.length} righe`);
-    if (result.subscriptions) console.log(`   • Abbonamenti: ${result.subscriptions.length} trovati`);
+    for (let i = 0; i < intents.length; i++) {
+      const intent = intents[i];
+      console.log(`🔍 [PARSER] DETTAGLI INTENT [${i + 1}/${intents.length}]:`);
+      console.log(`   • Archetipo: ${intent.archetype}`);
+      console.log(`   • Periodo: ${intent.period.type} (${intent.period.year || ''}${intent.period.month ? '/' + intent.period.month : ''})`);
+      console.log(`   • Filtri: ${intent.category_filter || intent.domain_filter || 'Nessuno'}`);
+      if (intent.city_filter) console.log(`   • Città: ${intent.city_filter}`);
+      if (intent.social_context_filter) console.log(`   • Contesto: ${intent.social_context_filter}`);
+      if (intent.merchant_filter) console.log(`   • Merchant: ${intent.merchant_filter}`);
 
-    // ── FASE 3: Composizione ────────────────────────────────────────────────
-    let finalResponse: AiChatResponse;
+      // ── FASE 2: Esecuzione DB ───────────────────────────────────────────────
+      const result = await executeQueryIntent(intent);
+      console.log(`⚙️ [EXECUTOR] RISULTATO DB [${i + 1}/${intents.length}]:`);
+      if (result.total !== undefined) console.log(`   • Totale: €${result.total.toFixed(2)}`);
+      if (result.distribution_items) console.log(`   • Distribuzione: ${result.distribution_items.length} categorie`);
+      if (result.transactions) console.log(`   • Transazioni: ${result.transactions.length} righe`);
+      if (result.subscriptions) console.log(`   • Abbonamenti: ${result.subscriptions.length} trovati`);
 
-    if (result.archetype === 'text') {
-      console.log('💬 [ORCHESTRATOR] Domanda testuale → Blocco risposta');
-      finalResponse = { 
-        intent: 'text', 
-        text_response: 'Non posso aiutarti con questo. Sono qui solo per analizzare i tuoi dati finanziari.', 
-        queryIntent: intent 
-      };
-    } else {
-      console.log(`✅ [ORCHESTRATOR] Dati pronti → composizione TS (archetype: ${result.archetype})`);
-      finalResponse = buildResponseFromResult(intent, result);
-      finalResponse.queryIntent = intent; // Assicuriamoci che sia presente
+      // ── FASE 3: Composizione ────────────────────────────────────────────────
+      let subResponse: AiChatResponse;
+
+      if (result.archetype === 'text') {
+        console.log('💬 [ORCHESTRATOR] Domanda testuale → Blocco risposta');
+        subResponse = { 
+          intent: 'text', 
+          text_response: 'Non posso aiutarti con questo. Sono qui solo per analizzare i tuoi dati finanziari.', 
+          queryIntent: intent 
+        };
+      } else {
+        console.log(`✅ [ORCHESTRATOR] Dati pronti → composizione TS (archetype: ${result.archetype})`);
+        subResponse = buildResponseFromResult(intent, result);
+        subResponse.queryIntent = intent; // Assicuriamoci che sia presente
+      }
+
+      if (subResponse.analysis_steps && subResponse.analysis_steps.length > 0) {
+        console.log(`🧠 [RAGIONAMENTO SUB ${i + 1}]:`);
+        subResponse.analysis_steps.forEach(step => console.log(`   • ${step}`));
+        allAnalysisSteps.push(...subResponse.analysis_steps.map(step => `[Intent ${i+1}] ${step}`));
+      }
+
+      subResponses.push(subResponse);
+      if (concatenatedDraft) concatenatedDraft += '\n\n';
+      concatenatedDraft += subResponse.text_response;
     }
 
-    if (finalResponse.analysis_steps && finalResponse.analysis_steps.length > 0) {
-      console.log('🧠 [RAGIONAMENTO]:');
-      finalResponse.analysis_steps.forEach(step => console.log(`   • ${step}`));
-    }
+    const firstSub = subResponses[0] || { intent: 'text', text_response: '' };
+    const finalResponse: AiChatResponse = intents.length === 1
+      ? { ...firstSub, subResponses }
+      : {
+          intent: 'multi',
+          queryIntent: intents[0],
+          text_response: concatenatedDraft,
+          analysis_steps: allAnalysisSteps,
+          subResponses: subResponses,
+        };
 
-    console.log(`📝 [ORCHESTRATOR] Draft testuale: "${finalResponse.text_response}"`);
+    console.log(`📝 [ORCHESTRATOR] Draft testuale combinato: "${finalResponse.text_response}"`);
     
     // Capture tokens of rephrase
     let rephrasePromptTokens = 0;
@@ -662,9 +684,9 @@ export async function askAiChat(
     console.log(`📤 RISPOSTA FINALE: "${finalResponse.text_response}"`);
     console.log('='.repeat(60) + '\n');
 
-    const parserPromptTokens = intent._tokens?.prompt_tokens || 0;
-    const parserCompletionTokens = intent._tokens?.completion_tokens || 0;
-    const parserTotalTokens = intent._tokens?.total_tokens || 0;
+    const parserPromptTokens = intents[0]?._tokens?.prompt_tokens || 0;
+    const parserCompletionTokens = intents[0]?._tokens?.completion_tokens || 0;
+    const parserTotalTokens = intents[0]?._tokens?.total_tokens || 0;
 
     const totalPrompt = parserPromptTokens + rephrasePromptTokens;
     const totalCompletion = parserCompletionTokens + rephraseCompletionTokens;
@@ -675,10 +697,10 @@ export async function askAiChat(
 
     // Classificazione is_advice: se archetype è 'text' o se fa domande conversazionali
     const isAdvice = finalResponse.intent === 'text' || 
-                     intent.archetype === 'text' || 
+                     intents[0]?.archetype === 'text' || 
                      /consigli|consiglia|suggerisci|risparmiare|aiuto|opinione/i.test(userMessage);
 
-    // Salva nei log
+    // Salva nei log (client-side cost set to 0.0 to prevent duplication with gateway logs)
     try {
       const { error } = await supabase
         .from('parsing_logs')
@@ -692,13 +714,13 @@ export async function askAiChat(
             completion: totalCompletion,
             total: totalTotal,
             // GDPR: query_text rimosso — non salviamo il contenuto delle domande utente
-            archetype: intent.archetype,
-            category_filter: intent.category_filter || null,
-            domain_filter: intent.domain_filter || null,
-            period_label: intent.period_label || null,
+            archetype: intents[0]?.archetype || 'text',
+            category_filter: intents[0]?.category_filter || null,
+            domain_filter: intents[0]?.domain_filter || null,
+            period_label: intents[0]?.period_label || null,
             is_advice: isAdvice
           },
-          cost_usd: computedCost,
+          cost_usd: 0.0,
           app_version: '0.0.1',
           // GDPR: device_id rimosso — log completamente anonimi
         });
@@ -706,24 +728,32 @@ export async function askAiChat(
       console.log(`📊 [ANALYTICS] AI Query logged successfully. Cost: $${computedCost.toFixed(6)}, Tokens: ${totalTotal}`);
 
       const durationMs = Date.now() - startTime;
-      const resolvedPeriod = periodToDateRange(intent.period);
+      const resolvedPeriod = intents[0] ? periodToDateRange(intents[0].period) : null;
 
       const filtersList: string[] = [];
-      if (intent.category_filter) filtersList.push('category');
-      if (intent.domain_filter) filtersList.push('domain');
-      if (intent.merchant_filter) filtersList.push('merchant');
-      if (intent.city_filter) filtersList.push('city');
-      if (intent.social_context_filter) filtersList.push('social_context');
-      if (intent.person_filter) filtersList.push('person');
-      if (intent.holiday_filter) filtersList.push('holiday');
-      if (intent.tag_filter) filtersList.push('tag');
-      if (intent.is_recurring_filter) filtersList.push('recurring');
-      if (intent.is_scheduled_filter) filtersList.push('scheduled');
+      if (intents[0]) {
+        const intent = intents[0];
+        if (intent.category_filter) filtersList.push('category');
+        if (intent.domain_filter) filtersList.push('domain');
+        if (intent.merchant_filter) filtersList.push('merchant');
+        if (intent.city_filter) filtersList.push('city');
+        if (intent.social_context_filter) filtersList.push('social_context');
+        if (intent.person_filter) filtersList.push('person');
+        if (intent.holiday_filter) filtersList.push('holiday');
+        if (intent.tag_filter) filtersList.push('tag');
+        if (intent.is_recurring_filter) filtersList.push('recurring');
+        if (intent.is_scheduled_filter) filtersList.push('scheduled');
+      }
       const activeFiltersStr = filtersList.length > 0 ? filtersList.join(',') : null;
       
-      let chartTypeValue: any = finalResponse.chart ? finalResponse.chart.type : null;
-      if (!chartTypeValue && (finalResponse.total_data || intent.archetype === 'total')) {
+      let chartTypeValue: any = null;
+      for (const sub of subResponses) {
+        if (sub.chart) {
+          chartTypeValue = sub.chart.type;
+          break;
+        } else if (sub.total_data || sub.queryIntent?.archetype === 'total') {
           chartTypeValue = 'big_number';
+        }
       }
 
       const { error: analysisError } = await supabase.from('analysis_logs').insert({
@@ -734,18 +764,18 @@ export async function askAiChat(
         prompt_tokens: totalPrompt,
         completion_tokens: totalCompletion,
         total_tokens: totalTotal,
-        archetype: intent.archetype,
-        category_filter: intent.category_filter || null,
-        domain_filter: intent.domain_filter || null,
-        period_label: intent.period_label || null,
-        period_start: resolvedPeriod.from,
-        period_end: resolvedPeriod.to,
+        archetype: intents[0]?.archetype || 'text',
+        category_filter: intents[0]?.category_filter || null,
+        domain_filter: intents[0]?.domain_filter || null,
+        period_label: intents[0]?.period_label || null,
+        period_start: resolvedPeriod ? resolvedPeriod.from : null,
+        period_end: resolvedPeriod ? resolvedPeriod.to : null,
         is_advice: isAdvice,
         chart_type: chartTypeValue,
         status_code: '200',
         active_filters: activeFiltersStr,
         app_version: '0.0.1',
-        cost_usd: computedCost,
+        cost_usd: 0.0,
         // GDPR: device_id rimosso — log completamente anonimi
       });
       if (analysisError) console.warn('❌ [ANALYTICS] Failed to save analysis_logs:', analysisError.message);

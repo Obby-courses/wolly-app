@@ -35,9 +35,20 @@ export default function VoiceInputBar({
   const recordingProgress = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<any>(null);
 
+  const lastSentTimeRef = useRef(0);
+
   const handleSend = () => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
+
+    // Generous client-side debounce (cooldown of 2 seconds)
+    const now = Date.now();
+    if (now - lastSentTimeRef.current < 2000) {
+      console.log('[VoiceInputBar] Ignored rapid double-click send');
+      return;
+    }
+    lastSentTimeRef.current = now;
+
     onSubmit(trimmed);
     setText('');
   };

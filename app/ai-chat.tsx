@@ -68,8 +68,18 @@ export default function AiChatPage() {
     }
   }, [params.message]);
 
+  const lastSentTimeRef = React.useRef(0);
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
+
+    // Generous client-side debounce (cooldown of 2 seconds)
+    const now = Date.now();
+    if (now - lastSentTimeRef.current < 2000) {
+      console.log('[ai-chat] Ignored rapid double-click send');
+      return;
+    }
+    lastSentTimeRef.current = now;
 
     analytics.trackClick('btn_ai_chat_send_message', ANALYTICS_SCREENS.AI_CHAT, {
       message_length: text.length

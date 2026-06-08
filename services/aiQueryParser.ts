@@ -1,3 +1,4 @@
+import { supabase } from './supabase';
 import { ChatMessage } from './aiChat';
 import { DOMAINS_CONFIG } from '../constants/categories';
 import { TransactionRepository } from './database/repositories/TransactionRepository';
@@ -63,7 +64,10 @@ Esempio critico: se i tag registrati includono "wolly" e l'utente chiede "quanto
 `
     : '';
 
-  return `Sei un parser di query finanziarie. La tua UNICA funzione è trasformare la domanda dell'utente in un oggetto JSON che descrive COME filtrare i dati. NON calcoli, NON numeri, solo filtri.
+  return `Sei un parser di query finanziarie. Il tuo compito è analizzare l'input dell'utente e restituire un oggetto JSON con un campo "intents" contenente un array di oggetti, dove ciascun oggetto descrive una query o un filtro specifico.
+IMPORTANTE: Se l'utente fa domande su più periodi di tempo diversi (es: "ieri e oggi", "gennaio e febbraio", "maggio e giugno"), fa più domande distinte (es: "quanto ho speso ieri e quali sono le spese") o chiede più archetipi diversi, devi generare più oggetti all'interno dell'array "intents", uno per ciascun periodo o sotto-domanda.
+Se invece c'è una sola domanda e un solo periodo di tempo, restituisci comunque la lista "intents" contenente quel singolo oggetto.
+NON fare calcoli numerici o stime, estrai solo i filtri descrittivi.
 Oggi è ${currentDateISO}.
 ${tagMatchBlock}
 TASSONOMIA DISPONIBILE:
@@ -98,41 +102,45 @@ AGGREGATION_TYPE:
 
 FORMATO JSON OBBLIGATORIO:
 {
-  "subject": "transactions"|"net_worth",
-  "archetype": "total"|"distribution"|"list"|"timeline"|"text"|"subscriptions",
-  "direction": "out"|"in"|"both",
-  "aggregation_type": "total"|"average"|"count",
-  "period": {
-    "type": "week"|"month"|"year"|"custom"|"all",
-    "year": number|null,
-    "month": number|null,
-    "from": "YYYY-MM-DD"|null,
-    "to": "YYYY-MM-DD"|null
-  },
-  "category_filter": string|null,
-  "domain_filter": string|null,
-  "merchant_filter": string|null,
-  "period_label": "English readable string (e.g. 'April 2026', 'Yesterday', 'Last 12 months')",
-  "city_filter": string|null,
-  "group_by": "category"|"city"|null,
-  "social_context_filter": string|null,
-  "person_filter": string|null,
-  "holiday_filter": string|null,
-  "tag_filter": string|null,
-  "sort_by": "date"|"amount_desc"|"amount_asc"|null,
-  "limit": number|null,
-  "comparison_period": "prev_month"|"prev_year"|null,
-  "is_recurring_filter": boolean|null,
-  "is_scheduled_filter": boolean|null
+  "intents": [
+    {
+      "subject": "transactions"|"net_worth",
+      "archetype": "total"|"distribution"|"list"|"timeline"|"text"|"subscriptions",
+      "direction": "out"|"in"|"both",
+      "aggregation_type": "total"|"average"|"count",
+      "period": {
+        "type": "week"|"month"|"year"|"custom"|"all",
+        "year": number|null,
+        "month": number|null,
+        "from": "YYYY-MM-DD"|null,
+        "to": "YYYY-MM-DD"|null
+      },
+      "category_filter": string|null,
+      "domain_filter": string|null,
+      "merchant_filter": string|null,
+      "period_label": "Stringa leggibile in italiano (es. 'aprile 2026', 'ieri', 'l'altro ieri', 'oggi', 'questo mese', 'gli ultimi 12 mesi')",
+      "city_filter": string|null,
+      "group_by": "category"|"city"|null,
+      "social_context_filter": string|null,
+      "person_filter": string|null,
+      "holiday_filter": string|null,
+      "tag_filter": string|null,
+      "sort_by": "date"|"amount_desc"|"amount_asc"|null,
+      "limit": number|null,
+      "comparison_period": "prev_month"|"prev_year"|null,
+      "is_recurring_filter": boolean|null,
+      "is_scheduled_filter": boolean|null
+    }
+  ]
 }
 
 REGOLE CRITICHE PER DATE E PERIODI:
 - Se l'utente si riferisce a un intervallo personalizzato o relativo (es: "ieri", "l'altro ieri", "ultimi 5 giorni", "ultimi 12 mesi", "ultimo anno"):
   * Imposta "type": "custom".
   * Calcola rigorosamente le date "from" e "to" basandoti su oggi (${currentDateISO}).
-  * Esempio "ieri" (se oggi è 2026-05-17) → "from": "2026-05-16", "to": "2026-05-16", "period_label": "Yesterday".
-  * Esempio "l'altro ieri" (se oggi è 2026-05-17) → "from": "2026-05-15", "to": "2026-05-15", "period_label": "Day before yesterday".
-  * Esempio "nell'ultimo anno" o "negli ultimi 12 mesi" (se oggi è 2026-05-17) → "from": "2025-05-17", "to": "2026-05-17", "period_label": "Last 12 months".
+  * Esempio "ieri" (se oggi è 2026-05-17) → "from": "2026-05-16", "to": "2026-05-16", "period_label": "ieri".
+  * Esempio "l'altro ieri" (se oggi è 2026-05-17) → "from": "2026-05-15", "to": "2026-05-15", "period_label": "l'altro ieri".
+  * Esempio "nell'ultimo anno" o "negli ultimi 12 mesi" (se oggi è 2026-05-17) → "from": "2025-05-17", "to": "2026-05-17", "period_label": "gli ultimi 12 mesi".
   * NOTA: "nell'ultimo anno" NON significa anno solare concluso 2025! Significa ultimi 365 giorni (type: "custom", from: 1 anno fa, to: oggi).
 - Se l'utente specifica un anno o mese preciso (es: "nel 2025", "a marzo 2025"):
   * Imposta "type": "year" o "month" con "year" e "month" numerici appropriati, e "from"/"to" a null.
@@ -167,13 +175,10 @@ ALTRE REGOLE GENERALI:
 
 // ─── Main Parser ──────────────────────────────────────────────────────────────
 
-export async function parseQueryIntent(
+export async function parseQueryIntents(
   userMessage: string,
   history: ChatMessage[]
-): Promise<QueryIntent> {
-  const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
-  if (!apiKey) throw new Error('Missing Groq API Key');
-
+): Promise<QueryIntent[]> {
   const now = new Date();
   const currentDateISO = now.toISOString().split('T')[0];
   
@@ -199,82 +204,92 @@ export async function parseQueryIntent(
   const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+    const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/wolly-ai-gateway?action=chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${token}`,
+        'apikey': anonKey,
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages,
-        max_tokens: 300,
+        max_tokens: 450,
         response_format: { type: 'json_object' },
-        temperature: 0,  // deterministico
+        temperature: 0,
       }),
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
-    if (!response.ok) throw new Error(`Groq API Error: ${response.status}`);
 
-    const data = await response.json();
-    const raw = data.choices[0].message.content;
-    console.log(`📄 [PARSER] Raw AI Response: ${raw}`);
-    const intent: QueryIntent = JSON.parse(raw);
-
-    if (data.usage) {
-      intent._tokens = {
-        prompt_tokens: data.usage.prompt_tokens,
-        completion_tokens: data.usage.completion_tokens,
-        total_tokens: data.usage.total_tokens
-      };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[aiQueryParser] Edge Function Error text:`, errorText);
+      if (response.status === 429 || response.status === 503) {
+        const { handleAiResponseError } = await import('./aiErrorHandler');
+        handleAiResponseError(response.status, errorText);
+      }
+      throw new Error(`Groq API Error: Status ${response.status} - ${errorText}`);
     }
 
-    // ── Deterministic tag override ────────────────────────────────────────────
-    // Se l'LLM non ha rilevato un tag ma la query dell'utente contiene una
-    // parola che corrisponde esattamente (case-insensitive) a un tag del DB,
-    // forziamo tag_filter e azzeriamo i filtri conflittuali.
-    if (!intent.tag_filter && tags.length > 0) {
-      const lowerMsg = userMessage.toLowerCase();
-      const matchedTag = tags.find((t) => {
-        const lt = t.toLowerCase();
-        // Match parola intera nel messaggio
-        return new RegExp(`(?:^|[\\s,;:!?'"])${lt}(?:[\\s,;:!?'"]|$)`).test(lowerMsg);
-      });
-      if (matchedTag) {
-        console.log(`🏷️ [PARSER] Deterministic tag override: "${matchedTag}" (was merchant: ${intent.merchant_filter ?? 'none'})`);
-        intent.tag_filter = matchedTag;
-        // Rimuove filtri che potrebbero aver "catturato" il tag per errore
-        if (intent.merchant_filter?.toLowerCase() === matchedTag.toLowerCase()) {
-          intent.merchant_filter = undefined;
-        }
-        if (intent.category_filter?.toLowerCase() === matchedTag.toLowerCase()) {
-          intent.category_filter = undefined;
+    const data = await response.json();
+
+    const raw = data.choices[0].message.content;
+    console.log(`📄 [PARSER] Raw AI Response: ${raw}`);
+    
+    const parsed = JSON.parse(raw);
+    const intents: QueryIntent[] = Array.isArray(parsed.intents)
+      ? parsed.intents
+      : parsed.intents?.intents
+        ? parsed.intents.intents
+        : [parsed];
+
+    for (const intent of intents) {
+      if (data.usage) {
+        intent._tokens = {
+          prompt_tokens: data.usage.prompt_tokens,
+          completion_tokens: data.usage.completion_tokens,
+          total_tokens: data.usage.total_tokens
+        };
+      }
+
+      // ── Deterministic tag override ────────────────────────────────────────────
+      if (!intent.tag_filter && tags.length > 0) {
+        const lowerMsg = userMessage.toLowerCase();
+        const matchedTag = tags.find((t) => {
+          const lt = t.toLowerCase();
+          return new RegExp(`(?:^|[\\s,;:!?'"])${lt}(?:[\\s,;:!?'"]|$)`).test(lowerMsg);
+        });
+        if (matchedTag) {
+          console.log(`🏷️ [PARSER] Deterministic tag override: "${matchedTag}"`);
+          intent.tag_filter = matchedTag;
+          if (intent.merchant_filter?.toLowerCase() === matchedTag.toLowerCase()) {
+            intent.merchant_filter = undefined;
+          }
+          if (intent.category_filter?.toLowerCase() === matchedTag.toLowerCase()) {
+            intent.category_filter = undefined;
+          }
         }
       }
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
-    console.log(`✅ [PARSER] Intent: ${intent.archetype} | ${intent.direction} | ${intent.period.type} ${intent.period.year || ''}${intent.period.month ? '/' + intent.period.month : ''}`);
-    if (intent.tag_filter) console.log(`   Tag: ${intent.tag_filter}`);
-    if (intent.category_filter) console.log(`   Category: ${intent.category_filter}`);
-    if (intent.domain_filter) console.log(`   Domain: ${intent.domain_filter}`);
-    if (intent.city_filter) console.log(`   City: ${intent.city_filter}`);
-    if (intent.social_context_filter) console.log(`   Social: ${intent.social_context_filter}`);
-    if (intent.person_filter) console.log(`   Person: ${intent.person_filter}`);
-
-    return intent;
+    console.log(`✅ [PARSER] Intents parsed: ${intents.length}`);
+    return intents;
   } catch (error: any) {
     clearTimeout(timeoutId);
     console.error('[PARSER] Error:', error.message);
-    // Fallback: risposta testuale generica
-    return {
+    return [{
       archetype: 'text',
       direction: 'out',
       aggregation_type: 'total',
       period: { type: 'month', year: now.getFullYear(), month: now.getMonth() + 1 },
-      period_label: 'This month',
-    };
+      period_label: 'questo mese',
+    }];
   }
 }

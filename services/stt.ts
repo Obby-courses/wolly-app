@@ -1,14 +1,8 @@
-/**
- * stt.ts
- * Speech-to-Text service using Groq Whisper.
- */
+import { supabase } from './supabase';
 
 let activeAbortController: AbortController | null = null;
 
 export async function transcribeAudio(uri: string): Promise<string> {
-  const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
-  if (!apiKey) throw new Error('Missing Groq API Key (EXPO_PUBLIC_GROQ_FINANCE_API)');
-
   // Abort any pending transcription request
   if (activeAbortController) {
     console.log('[stt] Aborting previous pending transcription request...');
@@ -46,38 +40,50 @@ export async function transcribeAudio(uri: string): Promise<string> {
 
       console.log(`⏳ Sending request to Groq API (Attempt ${attempt}/${MAX_RETRIES})...`);
       
-      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+      const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/wolly-ai-gateway?action=transcribe`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${token}`,
+          'apikey': anonKey,
         },
         body: formData,
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
-      console.log(`📥 Received response from Groq. Status: ${response.status}`);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Groq STT Error: ${response.status} - ${JSON.stringify(errorData)}`);
+        const errorText = await response.text();
+        if (response.status === 429 || response.status === 503) {
+          const { handleAiResponseError } = await import('./aiErrorHandler');
+          handleAiResponseError(response.status, errorText);
+          throw new Error('BUDGET_LIMIT');
+        }
+        throw new Error(`Groq STT Error: Status ${response.status} - ${errorText}`);
       }
+
+      const responseJson = await response.json();
 
       // Clear reference since we are done
       if (activeAbortController === controller) {
         activeAbortController = null;
       }
 
-      const data = await response.json();
-      console.log("📝 Transcription result:", data.text);
-      return data.text;
+      console.log("📝 Transcription result:", responseJson.text);
+      return responseJson.text;
 
     } catch (err: any) {
       clearTimeout(timeoutId);
       console.error(`❌ Attempt ${attempt}/${MAX_RETRIES} failed:`, err.message || err);
 
+      const isBudgetLimit = err.message === 'BUDGET_LIMIT';
       const wasCancelled = err.name === 'AbortError' && !isTimeout;
-      if (wasCancelled || attempt >= MAX_RETRIES) {
+      if (wasCancelled || attempt >= MAX_RETRIES || isBudgetLimit) {
         // Clear reference if this call failed/finished
         if (activeAbortController === controller) {
           activeAbortController = null;

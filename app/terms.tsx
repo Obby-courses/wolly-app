@@ -83,6 +83,11 @@ export default function TermsScreen() {
               presentati dall'applicazione per la gestione del proprio budget.
             </Text>
           </BulletItem>
+          <BulletItem>
+            <Text style={styles.bulletText}>
+              <Text style={styles.bold}>Perdita dei dati su rimozione app</Text>: Le transazioni, gli abbonamenti e tutti i dati patrimoniali sono memorizzati in modalità offline locale (SQLite) sul dispositivo. L'utente accetta che la disinstallazione o l'eliminazione dell'applicazione dal telefono comporterà la perdita definitiva e irreversibile di tutti i dati registrati.
+            </Text>
+          </BulletItem>
         </Section>
 
         {/* ─── 3. ESCLUSIONE CONSULENZA FINANZIARIA ─── */}

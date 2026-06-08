@@ -1,12 +1,8 @@
+import { supabase } from './supabase';
+
 let activeAbortController: AbortController | null = null;
 
 export async function transcribeAudio(audioUri: string): Promise<string> {
-  const apiKey = process.env.EXPO_PUBLIC_GROQ_FINANCE_API;
-  if (!apiKey) {
-    console.warn('Missing Groq API Key (EXPO_PUBLIC_GROQ_FINANCE_API)');
-    return '';
-  }
-
   // Abort any pending transcription request
   if (activeAbortController) {
     console.log('[GroqWhisper] Aborting previous pending transcription request...');
@@ -43,10 +39,17 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
       formData.append('language', 'it');
       formData.append('response_format', 'text');
 
-      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      // Use direct fetch to Supabase Edge Function to securely call Groq Whisper
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+      const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/wolly-ai-gateway?action=transcribe`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${token}`,
+          'apikey': anonKey,
         },
         body: formData,
         signal: controller.signal,
@@ -54,11 +57,15 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
       
       clearTimeout(timeoutId);
 
-      console.log(`[GroqWhisper] Response status: ${response.status} ${response.statusText}`);
-
       if (!response.ok) {
-        console.error(`Groq API Error: ${response.status} ${response.statusText}`);
-        throw new Error(`Groq API Error status ${response.status}`);
+        const errorText = await response.text();
+        console.error(`Groq STT Edge Function Error:`, errorText);
+        if (response.status === 429 || response.status === 503) {
+          const { handleAiResponseError } = await import('./aiErrorHandler');
+          handleAiResponseError(response.status, errorText);
+          throw new Error('BUDGET_LIMIT');
+        }
+        throw new Error(`Groq STT Edge Function Error`);
       }
 
       if (activeAbortController === controller) {
@@ -73,8 +80,9 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
       clearTimeout(timeoutId);
       console.error(`[GroqWhisper] Attempt ${attempt}/${MAX_RETRIES} failed:`, error.message || error);
 
+      const isBudgetLimit = error.message === 'BUDGET_LIMIT';
       const wasCancelled = error.name === 'AbortError' && !isTimeout;
-      if (wasCancelled || attempt >= MAX_RETRIES) {
+      if (wasCancelled || attempt >= MAX_RETRIES || isBudgetLimit) {
         if (activeAbortController === controller) {
           activeAbortController = null;
         }

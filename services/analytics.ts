@@ -131,28 +131,9 @@ class WollyAnalytics {
     delete cleanedPayload.screen_name;
     delete cleanedPayload.button_name;
 
-    // Invia i dati a Supabase solo se configurato correttamente
-    if (!isSupabaseConfigured()) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from('analytics_events').insert({
-        event_type: eventType,
-        screen_name: screenName,
-        button_name: buttonName,
-        payload: cleanedPayload,
-        device_os: Platform.OS,
-        app_version: this.appVersion,
-      });
-
-      if (error && this.isDevelopment) {
-        // Silenced
-      }
-    } catch (err) {
-      if (this.isDevelopment) {
-        // Silenced
-      }
+    // Disabilitato salvataggio remoto su Supabase
+    if (this.isDevelopment) {
+      console.log(`[Analytics Log] Event: ${eventType} | Screen: ${screenName} | Button: ${buttonName}`, cleanedPayload);
     }
   }
 }

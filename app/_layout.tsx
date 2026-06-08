@@ -63,7 +63,7 @@ export default function RootLayout() {
           return;
         }
 
-        if (profile.role === 'beta_tester' && isBetaExpired(profile)) {
+        if (profile.role === 'tester' && isBetaExpired(profile)) {
           router.replace('/paywall');
           return;
         }
@@ -101,7 +101,7 @@ export default function RootLayout() {
             router.replace('/blocked');
             return;
           }
-          if (profile.role === 'beta_tester' && isBetaExpired(profile)) {
+          if (profile.role === 'tester' && isBetaExpired(profile)) {
             router.replace('/paywall');
             return;
           }
@@ -162,6 +162,7 @@ export default function RootLayout() {
           <Stack.Screen name="seed-data" />
           <Stack.Screen name="subscriptions" />
           <Stack.Screen name="ai-chat" options={{ animation: 'none' }} />
+          <Stack.Screen name="ai-limit" options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="privacy" />
           <Stack.Screen name="terms" />
         </Stack>

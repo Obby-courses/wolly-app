@@ -12,7 +12,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'beta_tester' | 'user' | 'blocked';
+export type UserRole = 'admin' | 'tester' | 'user' | 'blocked';
 export type UserPlan = 'free' | 'premium' | 'lifetime';
 
 export interface UserProfile {
@@ -128,7 +128,7 @@ export async function getProfile(shouldRetry: boolean = false): Promise<UserProf
 // ─── Helper per controllo accessi ─────────────────────────────────────────────
 
 /**
- * Verifica se la beta è scaduta per un utente beta_tester.
+ * Verifica se la beta è scaduta per un utente tester.
  */
 export function isBetaExpired(profile: UserProfile): boolean {
   if (!profile.beta_expires_at) return false;
@@ -142,7 +142,7 @@ export function isBetaExpired(profile: UserProfile): boolean {
 export function hasFullAccess(profile: UserProfile): boolean {
   if (profile.role === 'blocked') return false;
   if (profile.role === 'admin') return true;
-  if (profile.role === 'beta_tester' && isBetaExpired(profile)) return false;
+  if (profile.role === 'tester' && isBetaExpired(profile)) return false;
   return true;
 }
 
@@ -152,7 +152,7 @@ export function hasFullAccess(profile: UserProfile): boolean {
 export function canUseAI(profile: UserProfile): boolean {
   if (profile.role === 'blocked') return false;
   if (profile.role === 'admin') return true;
-  if (profile.role === 'beta_tester') return !isBetaExpired(profile);
+  if (profile.role === 'tester') return !isBetaExpired(profile);
   // role === 'user': richiede piano premium
   return profile.plan === 'premium' || profile.plan === 'lifetime';
 }
@@ -163,7 +163,7 @@ export function canUseAI(profile: UserProfile): boolean {
 export function getRoleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     admin: 'Amministratore',
-    beta_tester: 'Beta Tester',
+    tester: 'Tester',
     user: 'Utente',
     blocked: 'Sospeso',
   };
@@ -176,7 +176,7 @@ export function getRoleLabel(role: UserRole): string {
 export function getRoleColor(role: UserRole): string {
   const colors: Record<UserRole, string> = {
     admin: '#7C3AED',
-    beta_tester: '#0A74FF',
+    tester: '#0A74FF',
     user: '#059669',
     blocked: '#EF4444',
   };

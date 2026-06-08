@@ -3,7 +3,7 @@
     "name": "Wolly",
     "scheme": "wolly",
     "slug": "wolly",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "orientation": "portrait",
     "icon": "./wolly_favicon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.wolly.app"
     },
     "android": {
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./wolly_favicon.png",
         "backgroundColor": "#ffffff"
