@@ -441,7 +441,7 @@ function SubModal({
       <SafeAreaView style={modal.container}>
         <View style={modal.header}>
           <Pressable onPress={handleClose} style={modal.backIcon}>
-            <Ionicons name="close" size={20} color="#FFFFFF" />
+            <Ionicons name="close" size={20} color={COLORS.primary} />
           </Pressable>
           <Text style={modal.headerTitle}>
             {initial ? 'Gestisci Periodica' : 'Nuova Periodica'}
@@ -449,7 +449,7 @@ function SubModal({
           <View style={modal.headerRightContainer}>
             {!!initial && onDelete && (
               <Pressable onPress={handleDeleteClick} style={modal.headerActionBtn}>
-                <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
               </Pressable>
             )}
             <Pressable onPress={handleSave} disabled={saving} style={modal.headerSaveBtn}>
@@ -481,22 +481,38 @@ function SubModal({
             {/* AMOUNT */}
             <View style={modal.amountContainer}>
                <Text style={[modal.currency, { color: isIncome ? COLORS.success : COLORS.primary }]}>€</Text>
-               <TextInput 
+                <TextInput 
                   style={[modal.amountInput, { color: isIncome ? COLORS.success : COLORS.primary }]}
                   value={form.amount}
                   onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9,.]/g, '');
-                    const firstComma = cleaned.indexOf(',');
-                    const firstDot = cleaned.indexOf('.');
-                    if (firstComma !== -1 && firstDot !== -1) {
-                      if (firstComma < firstDot) {
-                        cleaned = cleaned.replace(/\./g, '');
-                      } else {
-                        cleaned = cleaned.replace(/,/g, '');
-                      }
+                    let newVal = val;
+                    if (newVal.endsWith('.')) {
+                      newVal = newVal.slice(0, -1) + ',';
                     }
-                    cleaned = cleaned.replace(/(,.*),/g, '$1').replace(/(\..*)\./, '$1');
-                    set('amount', cleaned);
+                    let raw = newVal.replace(/\./g, '');
+                    raw = raw.replace(/[^0-9,]/g, '');
+                    raw = raw.replace(/(,.*),/g, '$1');
+
+                    let parts = raw.split(',');
+                    if (parts.length > 1) {
+                      parts[1] = parts[1].substring(0, 2);
+                      raw = parts.join(',');
+                    }
+
+                    let intPart = parts[0];
+                    if (intPart.length > 9) {
+                      intPart = intPart.substring(0, 9);
+                    }
+                    
+                    if (intPart.length > 1 && intPart.startsWith('0')) {
+                      intPart = intPart.replace(/^0+/, '');
+                      if (intPart === '') intPart = '0';
+                    }
+
+                    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                    const formatted = parts.length > 1 ? `${formattedInt},${parts[1]}` : formattedInt;
+
+                    set('amount', formatted);
                   }}
                   keyboardType="decimal-pad"
                   placeholder="0,00"
@@ -953,7 +969,7 @@ export default function SubscriptionsScreen() {
     if (!editTarget?.id) return;
     await SubscriptionRepository.update(editTarget.id, {
       name: form.name.trim(),
-      amount: parseFloat(form.amount.replace(',', '.')),
+      amount: parseFloat(form.amount.replace(/\./g, '').replace(',', '.')),
       direction: form.direction,
       category_key: form.category_key,
       frequency: form.frequency,
@@ -1412,28 +1428,27 @@ const modal = StyleSheet.create({
     width: 32, 
     height: 32, 
     borderRadius: 16, 
-    backgroundColor: COLORS.primary, 
+    backgroundColor: 'rgba(28, 28, 30, 0.25)', 
     justifyContent: 'center', 
     alignItems: 'center' 
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
   headerSaveBtn: { 
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'rgba(28, 28, 30, 0.25)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerSaveText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  headerSaveText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
   headerActionBtn: { 
     width: 32, 
     height: 32, 
     borderRadius: 16, 
-    backgroundColor: '#EF4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
     justifyContent: 'center', 
-    alignItems: 'center',
-    marginRight: 8 
+    alignItems: 'center' 
   },
   headerRightContainer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   content: { padding: 20, paddingBottom: 40 },
@@ -1590,7 +1605,6 @@ const modal = StyleSheet.create({
     width: 24,
   },
   expandedSection: {
-    backgroundColor: '#F9FAFB',
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomLeftRadius: 16,

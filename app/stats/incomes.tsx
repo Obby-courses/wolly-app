@@ -4,10 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { G, Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { G, Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Rect, Text as SvgText, Line } from 'react-native-svg';
 import { TransactionRepository } from '../../services/database/repositories/TransactionRepository';
+import { NetWorthRepository } from '../../services/database/repositories/NetWorthRepository';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../../constants/Theme';
-import { CATEGORIES_CONFIG } from '../../constants/categories';
+import { CATEGORIES_CONFIG, DOMAINS_CONFIG, ALL_CATEGORIES } from '../../constants/categories';
 import TimeFilter, { TimeRange } from '../../components/TimeFilter';
 import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../../services/analytics';
 import TransactionPreview from '../../components/TransactionPreview';
@@ -120,98 +121,424 @@ const CompactDistributionCard = ({ title, data, selectedKeys, onToggleKey, onRes
   );
 };
 
-const SimpleTrendChart = ({ data, color }: { data: any[], color: string }) => {
-  if (data.length === 0) return (
-    <View style={[styles.emptyChart, { height: 100 }]}>
-      <Text style={[styles.emptyText, { marginTop: 0, fontSize: 13 }]}>Dati insufficienti</Text>
-    </View>
-  );
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-  const chartWidth = width - (SPACING.lg * 4) - 20;
-  const chartHeight = 100;
-  const maxVal = Math.max(...data.map(d => d.value), 1) * 1.05;
+const formatCompactValue = (val: number): string => {
+  const absVal = Math.abs(val);
+  const sign = val < 0 ? '-' : '';
+  if (absVal < 1000) {
+    return `${sign}${Math.round(absVal)}`;
+  }
+  if (absVal < 1000000) {
+    const kVal = absVal / 1000;
+    if (kVal < 10) {
+      const formatted = kVal.toFixed(1);
+      return `${sign}${formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted}K`;
+    } else {
+      return `${sign}${Math.round(kVal)}K`;
+    }
+  }
+  const mVal = absVal / 1000000;
+  if (mVal < 10) {
+    const formatted = mVal.toFixed(1);
+    return `${sign}${formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted}M`;
+  } else {
+    return `${sign}${Math.round(mVal)}M`;
+  }
+};
 
-  const totalBars = data.length;
-  const barGap = totalBars > 15 ? 3 : 6;
-  const totalGaps = totalBars - 1;
-  let barWidth = (chartWidth - (totalGaps * barGap)) / totalBars;
-  if (barWidth > 24) barWidth = 24;
+const formatDateLabel = (dateStr: string | undefined, timeRange: string, fallbackLabel: string): string => {
+  if (!dateStr) return fallbackLabel;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return fallbackLabel;
+  
+  const months = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const m = months[d.getMonth()];
+  
+  if (timeRange === 'Anno') {
+    const yy = d.getFullYear().toString().slice(-2);
+    return `${m}${yy}`;
+  } else if (timeRange === 'Tutto') {
+    const year = d.getFullYear();
+    const yy = year.toString().slice(-2);
+    const day = d.getDate();
+    if (fallbackLabel.includes('/')) {
+      return `${m}${yy}`;
+    } else if (fallbackLabel.length === 4 && !isNaN(Number(fallbackLabel))) {
+      return fallbackLabel;
+    } else {
+      return `${day}${m}`;
+    }
+  } else {
+    return `${d.getDate()}${m}`;
+  }
+};
 
-  const totalChartContentWidth = (totalBars * barWidth) + (totalGaps * barGap);
-  const startX = (chartWidth - totalChartContentWidth) / 2;
+const TrendChart = ({ 
+  data, 
+  labels, 
+  absoluteMax, 
+  color, 
+  timeRange 
+}: { 
+  data: any[], 
+  labels: string[], 
+  absoluteMax?: number, 
+  color: string, 
+  timeRange: string 
+}) => {
+  if (data.length === 0) return null;
 
-  const getBarHeight = (v: number) => {
-    if (maxVal === 0) return 0;
-    const usableHeight = chartHeight - 8;
-    return Math.max(v > 0 ? 3 : 0, (v / maxVal) * usableHeight);
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const touchStart = React.useRef<number>(0);
+  const activeIdxRef = React.useRef<number | null>(null);
+
+  const visiblePoints = data
+    .map((d, i) => ({ ...d, originalIndex: i }))
+    .filter(d => !d.isFuture && d.value !== null && d.value !== undefined);
+
+  const chartWidth = width - (SPACING.lg * 2);
+  const chartHeight = Math.round(SCREEN_HEIGHT * 0.5);
+  const safeMargin = 20;
+
+  const getFilteredLabels = () => {
+    const total = labels.length;
+    if (total === 0) return [];
+    if (total <= 7) return labels.map((l, index) => ({ label: l, index }));
+    const indices: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      indices.push(Math.round((i * (total - 1)) / 6));
+    }
+    return labels
+      .map((l, index) => ({ label: l, index }))
+      .filter((_, idx) => indices.includes(idx));
   };
 
+  if (visiblePoints.length === 0) {
+    return (
+      <View style={styles.trendChartContainer}>
+        <Svg width={chartWidth} height={chartHeight} />
+        <View style={styles.chartLabelsRow}>
+          {getFilteredLabels().map((item, i) => (
+            <View key={i} style={styles.labelBadge}>
+              <Text style={styles.chartLabelText}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  const activeValues = visiblePoints.map(d => d.value as number);
+  const actualMin = Math.min(...activeValues, 0);
+  const actualMax = Math.max(...activeValues);
+
+  const finalAbsoluteMax = absoluteMax !== undefined ? Math.max(absoluteMax, actualMax) : actualMax;
+  const finalAbsoluteMin = actualMin;
+  const diff = finalAbsoluteMax - finalAbsoluteMin;
+
+  const rangeMargin = diff > 0 ? diff * 0.05 : Math.abs(finalAbsoluteMax) * 0.05 || 10;
+
+  let minVal = finalAbsoluteMin;
+  let maxVal = finalAbsoluteMax + rangeMargin;
+
+  const range = maxVal - minVal;
+  const horizontalMargin = 28;
+
+  const totalPoints = data.length;
+  const getX = (i: number) => {
+    if (totalPoints <= 1) return chartWidth / 2;
+    return (i * (chartWidth - horizontalMargin * 2) / (totalPoints - 1)) + horizontalMargin;
+  };
+  const getY = (v: number) => chartHeight - safeMargin - ((v - minVal) / range) * (chartHeight - safeMargin * 2);
+
+  const getPointIndexFromX = (touchX: number) => {
+    if (visiblePoints.length === 0) return null;
+    let closestIndex = visiblePoints[0].originalIndex;
+    let minDistance = Infinity;
+    for (const p of visiblePoints) {
+      const px = getX(p.originalIndex);
+      const distance = Math.abs(touchX - px);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIndex = p.originalIndex;
+      }
+    }
+    return closestIndex;
+  };
+
+  const handleTouchStart = (evt: any) => {
+    touchStart.current = Date.now();
+    const touchX = evt.nativeEvent.locationX;
+    const index = getPointIndexFromX(touchX);
+    if (index !== null) {
+      setActiveIdx(index);
+      activeIdxRef.current = index;
+    }
+  };
+
+  const handleTouchMove = (evt: any) => {
+    const touchX = evt.nativeEvent.locationX;
+    const index = getPointIndexFromX(touchX);
+    if (index !== null) {
+      setActiveIdx(index);
+      activeIdxRef.current = index;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    const duration = Date.now() - touchStart.current;
+    if (duration < 250 && activeIdxRef.current !== null) {
+      const d = data[activeIdxRef.current];
+      if (d?.value != null) {
+        const periodLabel = labels[activeIdxRef.current];
+        Alert.alert(
+          'Dettaglio Periodo',
+          `Periodo: ${periodLabel}\nImporto: € ${d.value.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        );
+      }
+    }
+    setActiveIdx(null);
+    activeIdxRef.current = null;
+  };
+
+  let activeTooltip: any = null;
+  if (activeIdx !== null && activeIdx < data.length && data[activeIdx]?.value != null) {
+    const fallbackLabel = labels[activeIdx];
+    const dateStr = data[activeIdx].date;
+    const valueText = `€${formatCompactValue(data[activeIdx].value)} (${formatDateLabel(dateStr, timeRange, fallbackLabel)})`;
+    const rectWidth = Math.max(46, valueText.length * 7.5 + 12);
+    const rawX = getX(activeIdx) - rectWidth / 2;
+    const rectX = Math.max(4, Math.min(chartWidth - rectWidth - 4, rawX));
+    const textX = rectX + rectWidth / 2;
+    activeTooltip = { valueText, rectWidth, rectX, textX };
+  }
+
+  if (visiblePoints.length === 1) {
+    const singlePoint = visiblePoints[0];
+    const cx = chartWidth / 2;
+    const cy = chartHeight / 2;
+
+    let singleTooltip: any = null;
+    if (activeIdx !== null && data[activeIdx]?.value != null) {
+      const fallbackLabel = labels[activeIdx] ?? labels[singlePoint.originalIndex];
+      const dateStr = data[activeIdx]?.date ?? singlePoint.date;
+      const pointVal = data[activeIdx]?.value ?? singlePoint.value;
+      const valueText = `€${formatCompactValue(pointVal)} (${formatDateLabel(dateStr, timeRange, fallbackLabel)})`;
+      const rectWidth = Math.max(46, valueText.length * 7.5 + 12);
+      const rawX = cx - rectWidth / 2;
+      const rectX = Math.max(4, Math.min(chartWidth - rectWidth - 4, rawX));
+      const textX = rectX + rectWidth / 2;
+      singleTooltip = { valueText, rectWidth, rectX, textX };
+    }
+
+    const handleSingleTouchStart = (evt: any) => {
+      touchStart.current = Date.now();
+      setActiveIdx(singlePoint.originalIndex);
+      activeIdxRef.current = singlePoint.originalIndex;
+    };
+
+    const handleSingleTouchEnd = () => {
+      setActiveIdx(null);
+      activeIdxRef.current = null;
+    };
+
+    return (
+      <View style={styles.trendChartContainer}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+          <Svg width={chartWidth} height={chartHeight}>
+            <Line
+              x1={cx} y1={safeMargin}
+              x2={cx} y2={chartHeight - safeMargin}
+              stroke={color}
+              strokeWidth="1"
+              strokeDasharray="4, 6"
+              opacity="0.25"
+            />
+            <Circle cx={cx} cy={cy} r="7" fill={color} stroke="#FFFFFF" strokeWidth="3" />
+
+            {activeIdx !== null && (
+              <G>
+                <Line
+                  x1={cx} y1={safeMargin}
+                  x2={cx} y2={chartHeight - safeMargin}
+                  stroke={COLORS.secondary}
+                  strokeWidth="1.5"
+                  strokeDasharray="4, 4"
+                />
+                <Circle cx={cx} cy={cy} r="8" fill={color} stroke="#FFFFFF" strokeWidth="2.5" />
+                {singleTooltip && (
+                  <>
+                    <Rect
+                      x={singleTooltip.rectX}
+                      y={4}
+                      width={singleTooltip.rectWidth}
+                      height={20}
+                      rx={5}
+                      fill={COLORS.primary}
+                    />
+                    <SvgText
+                      x={singleTooltip.textX}
+                      y={18}
+                      fontSize="10"
+                      fontFamily={TYPOGRAPHY.fontBold}
+                      fill="#FFFFFF"
+                      textAnchor="middle"
+                    >
+                      {singleTooltip.valueText}
+                    </SvgText>
+                  </>
+                )}
+              </G>
+            )}
+          </Svg>
+          <View
+            style={StyleSheet.absoluteFill}
+            onTouchStart={handleSingleTouchStart}
+            onTouchMove={handleSingleTouchStart}
+            onTouchEnd={handleSingleTouchEnd}
+            onTouchCancel={handleSingleTouchEnd}
+          />
+        </View>
+        <View style={styles.chartLabelsRow}>
+          {getFilteredLabels().map((item, i) => (
+            <View key={i} style={styles.labelBadge}>
+              <Text style={styles.chartLabelText}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  let pathData = '';
+  pathData = `M ${getX(visiblePoints[0].originalIndex)} ${getY(visiblePoints[0].value)}`;
+  for (let i = 0; i < visiblePoints.length - 1; i++) {
+    const pStart = visiblePoints[i];
+    const pEnd = visiblePoints[i + 1];
+    const xStart = getX(pStart.originalIndex);
+    const yStart = getY(pStart.value);
+    const xEnd = getX(pEnd.originalIndex);
+    const yEnd = getY(pEnd.value);
+
+    const cp1x = xStart + (xEnd - xStart) / 3;
+    const cp1y = yStart;
+    const cp2x = xStart + 2 * (xEnd - xStart) / 3;
+    const cp2y = yEnd;
+
+    pathData += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${xEnd} ${yEnd}`;
+  }
+
+  const firstIdx = visiblePoints[0].originalIndex;
+  const lastIdx = visiblePoints[visiblePoints.length - 1].originalIndex;
+  const areaData = `${pathData} L ${getX(lastIdx)} ${chartHeight} L ${getX(firstIdx)} ${chartHeight} Z`;
+
   return (
-    <View style={{ height: 125, marginTop: 10 }}>
-      <Svg width={chartWidth} height={chartHeight + 20}>
-        {data.map((d, i) => {
-          const x = startX + i * (barWidth + barGap);
-          const h = getBarHeight(d.value);
-          const y = chartHeight - h;
-          const roundedRadius = Math.min(barWidth / 2, 4);
+    <View style={styles.trendChartContainer}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+        <Svg width={chartWidth} height={chartHeight}>
+          <Defs>
+            <SvgLinearGradient id="areaGradTrend" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor={color} stopOpacity="0.08" />
+              <Stop offset="100%" stopColor={color} stopOpacity="0" />
+            </SvgLinearGradient>
+          </Defs>
 
-          return (
-            <G key={i}>
-              {/* Barra Visibile */}
-              <Rect
-                x={x}
-                y={y}
-                width={barWidth}
-                height={h}
-                rx={roundedRadius}
-                ry={roundedRadius}
+          <Path d={areaData} fill="url(#areaGradTrend)" />
+          <Path d={pathData} fill="none" stroke={color} strokeWidth="3" />
+
+          {visiblePoints.length > 0 && lastIdx < data.length - 1 && (() => {
+            const lastPoint = visiblePoints[visiblePoints.length - 1];
+            const startXCoord = getX(lastPoint.originalIndex);
+            const endXCoord = getX(data.length - 1);
+            const yCoord = getY(lastPoint.value);
+            return (
+              <Line
+                x1={startXCoord}
+                y1={yCoord}
+                x2={endXCoord}
+                y2={yCoord}
+                stroke={color}
+                strokeWidth="1.5"
+                strokeDasharray="4, 4"
+                opacity="0.4"
+              />
+            );
+          })()}
+
+          <Circle
+            cx={getX(visiblePoints[0].originalIndex)}
+            cy={getY(visiblePoints[0].value)}
+            r="5"
+            fill={color}
+            stroke="#FFFFFF"
+            strokeWidth="2"
+          />
+
+          <Circle
+            cx={getX(visiblePoints[visiblePoints.length - 1].originalIndex)}
+            cy={getY(visiblePoints[visiblePoints.length - 1].value)}
+            r="5"
+            fill={color}
+            stroke="#FFFFFF"
+            strokeWidth="2"
+          />
+
+          {activeIdx !== null && activeIdx < data.length && data[activeIdx]?.value != null && activeTooltip && (
+            <G>
+              <Line
+                x1={getX(activeIdx)}
+                y1={safeMargin}
+                x2={getX(activeIdx)}
+                y2={chartHeight - safeMargin}
+                stroke={COLORS.secondary}
+                strokeWidth="1.5"
+                strokeDasharray="4, 4"
+              />
+              <Circle
+                cx={getX(activeIdx)}
+                cy={getY(data[activeIdx].value)}
+                r="6"
                 fill={color}
+                stroke="#FFFFFF"
+                strokeWidth="2"
               />
-              {/* Target di tocco invisibile allargato per una UX perfetta */}
               <Rect
-                x={x - 2}
-                y={0}
-                width={barWidth + 4}
-                height={chartHeight}
-                fill="transparent"
-                onPress={() => {
-                  analytics.trackClick(ANALYTICS_BUTTONS.CHART_BAR_CLICK, ANALYTICS_SCREENS.STATS_INCOMES, { period: d.label, amount: d.value });
-                  Alert.alert(
-                    'Dettaglio Entrata',
-                    `Periodo: ${d.label}\nEntrata Totale: € ${d.value.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                  );
-                }}
+                x={activeTooltip.rectX}
+                y={4}
+                width={activeTooltip.rectWidth}
+                height={20}
+                rx={5}
+                fill={COLORS.primary}
               />
+              <SvgText
+                x={activeTooltip.textX}
+                y={18}
+                fontSize="10"
+                fontFamily={TYPOGRAPHY.fontBold}
+                fill="#FFFFFF"
+                textAnchor="middle"
+              >
+                {activeTooltip.valueText}
+              </SvgText>
             </G>
-          );
-        })}
-
-        {/* Etichetta Estrema Sinistra */}
-        <SvgText
-          x={startX + barWidth / 2}
-          y={chartHeight + 16}
-          fontSize={10}
-          fontFamily={TYPOGRAPHY.fontBold}
-          fill={COLORS.secondary}
-          textAnchor={totalBars === 1 ? 'middle' : (startX < 30 ? 'start' : 'middle')}
-        >
-          {data[0]?.label}
-        </SvgText>
-
-        {/* Etichetta Estrema Destra */}
-        {totalBars > 1 && (
-          <SvgText
-            x={startX + (totalBars - 1) * (barWidth + barGap) + barWidth / 2}
-            y={chartHeight + 16}
-            fontSize={10}
-            fontFamily={TYPOGRAPHY.fontBold}
-            fill={COLORS.secondary}
-            textAnchor={(chartWidth - (startX + totalChartContentWidth)) < 30 ? 'end' : 'middle'}
-          >
-            {data[data.length - 1]?.label}
-          </SvgText>
-        )}
-      </Svg>
+          )}
+        </Svg>
+        <View
+          style={StyleSheet.absoluteFill}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+        />
+      </View>
+      <View style={styles.chartLabelsRow}>
+        {getFilteredLabels().map((item, i) => (
+          <View key={i} style={styles.labelBadge}>
+            <Text style={styles.chartLabelText}>{item.label}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 };
@@ -227,9 +554,51 @@ export default function IncomesScreen() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [trendPoints, setTrendPoints] = useState<any[]>([]);
   const [sortBy, setSortBy] = useState<'date' | 'amount_asc' | 'amount_desc'>('date');
+  const [absoluteLimits, setAbsoluteLimits] = useState<{ max: number; min: number } | null>(null);
   
-  const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'domain' | 'category' | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const domainsList = DOMAINS_CONFIG.filter(d => d.direction === 'in');
+  const categoriesList = selectedDomain 
+    ? DOMAINS_CONFIG.find(d => d.key === selectedDomain)?.categories || []
+    : DOMAINS_CONFIG.filter(d => d.direction === 'in').flatMap(d => d.categories);
+
+  const getCategoryLabel = (catKey: string) => {
+    const cat = ALL_CATEGORIES.find(c => c.key === catKey);
+    return cat ? cat.label : catKey;
+  };
+
+  const handleSelectDomain = (domainKey: string) => {
+    setSelectedDomain(domainKey);
+    setActiveDropdown(null);
+    if (selectedCategory) {
+      const cat = ALL_CATEGORIES.find(c => c.key === selectedCategory);
+      if (!cat || cat.domain_key !== domainKey) {
+        setSelectedCategory(null);
+      }
+    }
+  };
+
+  const handleSelectCategory = (catKey: string) => {
+    setSelectedCategory(catKey);
+    setActiveDropdown(null);
+    const cat = ALL_CATEGORIES.find(c => c.key === catKey);
+    if (cat) {
+      setSelectedDomain(cat.domain_key);
+    }
+  };
+
+  const handleClearDomain = () => {
+    setSelectedDomain(null);
+    setSelectedCategory(null);
+  };
+
+  const handleClearCategory = () => {
+    setSelectedCategory(null);
+  };
 
   // Automatic reset when entering the screen
   useFocusEffect(
@@ -237,16 +606,18 @@ export default function IncomesScreen() {
       analytics.trackScreen(ANALYTICS_SCREENS.STATS_INCOMES);
       setTimeRange('Mese');
       setBaseDate(new Date().toISOString().split('T')[0]);
-      setSelectedDomains([]);
-      setSelectedCategories([]);
+      setSelectedDomain(null);
+      setSelectedCategory(null);
+      setActiveDropdown(null);
       setSortBy('date');
+      setRefreshKey(prev => prev + 1);
     }, [])
   );
 
   // Load stats when filters change
   useEffect(() => {
     loadStats();
-  }, [timeRange, baseDate, selectedDomains, selectedCategories, sortBy]);
+  }, [timeRange, baseDate, selectedDomain, selectedCategory, sortBy, refreshKey]);
 
   // Track time range changes
   useEffect(() => {
@@ -272,11 +643,10 @@ export default function IncomesScreen() {
       const cData = await TransactionRepository.getCategoryDistribution(timeRange, 'in', baseDate);
       
       let filteredCats = cData;
-      if (selectedDomains.length > 0) {
+      if (selectedDomain) {
         filteredCats = cData.filter(item => {
-          const cat = CATEGORIES_CONFIG.flatMap(d => d.subcategories.map(s => ({...s, domainKey: d.key})))
-            .find(s => s.key === item.category_key);
-          return cat && selectedDomains.includes(cat.domainKey);
+          const cat = ALL_CATEGORIES.find(s => s.key === item.category_key);
+          return cat && cat.domain_key === selectedDomain;
         });
       }
 
@@ -296,89 +666,196 @@ export default function IncomesScreen() {
       // 3. Transactions
       const txs = await TransactionRepository.getFilteredTransactions(timeRange, {
         direction: 'in',
-        domain_keys: selectedDomains,
-        category_keys: selectedCategories,
+        domain_keys: selectedDomain ? [selectedDomain] : [],
+        category_keys: selectedCategory ? [selectedCategory] : [],
       }, sortBy, baseDate);
       setTransactions(txs);
 
       // 4. Trend
       const trend = await TransactionRepository.getFilteredTrend(timeRange, 'in', {
-        domain_keys: selectedDomains,
-        category_keys: selectedCategories,
+        domain_keys: selectedDomain ? [selectedDomain] : [],
+        category_keys: selectedCategory ? [selectedCategory] : [],
       }, baseDate);
-      setTrendPoints(trend);
+
+      const firstDate = await NetWorthRepository.getFirstHistoryDate();
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+
+      const processedTrend = trend.map((point) => {
+        let isFuture = false;
+        if (timeRange === 'Settimana' || timeRange === 'Mese') {
+          isFuture = point.date > todayStr;
+        } else if (timeRange === 'Anno') {
+          const d = new Date(baseDate);
+          const selectedYear = d.getFullYear();
+          const currentYear = today.getFullYear();
+          const currentMonth = today.getMonth() + 1;
+          if (selectedYear > currentYear) {
+            isFuture = true;
+          } else if (selectedYear === currentYear) {
+            const pointMonth = parseInt(point.date.split('-')[1], 10);
+            isFuture = pointMonth > currentMonth;
+          }
+        } else if (point.date) {
+          isFuture = point.date > todayStr;
+        }
+
+        let isBeforeDayZero = false;
+        if (firstDate) {
+          if (timeRange === 'Anno') {
+            const firstDateMonthStr = firstDate.slice(0, 7);
+            const pointMonthStr = point.date.slice(0, 7);
+            isBeforeDayZero = pointMonthStr < firstDateMonthStr;
+          } else {
+            isBeforeDayZero = point.date < firstDate;
+          }
+        }
+
+        return {
+          ...point,
+          value: isBeforeDayZero ? null : point.value,
+          isFuture
+        };
+      });
+
+      setTrendPoints(processedTrend);
+
+      const limits = await TransactionRepository.getAbsoluteTrendLimits(timeRange, 'in', {
+        domain_keys: selectedDomain ? [selectedDomain] : [],
+        category_keys: selectedCategory ? [selectedCategory] : [],
+      });
+      setAbsoluteLimits(limits);
 
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
-  const handleToggleDomain = (key: string) => {
-    let nextDomains: string[];
-    if (selectedDomains.includes(key)) {
-      nextDomains = selectedDomains.filter(d => d !== key);
-    } else {
-      nextDomains = [...selectedDomains, key];
-    }
-    setSelectedDomains(nextDomains);
-
-    // Clean up category filters that don't belong to selected domains
-    if (nextDomains.length > 0) {
-      setSelectedCategories(prev => prev.filter(catKey => {
-        const cat = CATEGORIES_CONFIG.flatMap(d => d.subcategories.map(s => ({...s, domainKey: d.key})))
-          .find(s => s.key === catKey);
-        return cat && nextDomains.includes(cat.domainKey);
-      }));
-    } else {
-      setSelectedCategories([]);
-    }
-  };
-
-  const handleToggleCategory = (key: string) => {
-    if (selectedCategories.includes(key)) {
-      setSelectedCategories(selectedCategories.filter(c => c !== key));
-    } else {
-      setSelectedCategories([...selectedCategories, key]);
-    }
-  };
-
-  const handleResetDomains = () => {
-    setSelectedDomains([]);
-    setSelectedCategories([]);
-  };
-
-  const handleResetCategories = () => {
-    setSelectedCategories([]);
-  };
 
   return (
     <View style={styles.container}>
-      {/* Header Sfumato Blu Premium */}
-      <LinearGradient
-        colors={['#5CB5FF', '#0078FF']}
-        style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
-      >
-        <Pressable onPress={() => router.back()} style={{ marginLeft: -4, marginBottom: 12, alignSelf: 'flex-start' }}>
-          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+      {activeDropdown !== null && (
+        <Pressable 
+          style={StyleSheet.absoluteFill} 
+          onPress={() => setActiveDropdown(null)} 
+        />
+      )}
+
+      {/* Header pulito senza banner blu */}
+      <View style={[styles.headerContainer, { paddingTop: insets.top + 12 }]}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
         </Pressable>
-        <View style={[styles.header, { marginTop: 0 }]}>
-          <Text style={styles.title}>Entrate</Text>
+        <Text style={styles.centeredTitle}>Entrate</Text>
+        <Pressable onPress={() => {
+          Alert.alert(
+            'Informazioni Entrate',
+            'Questa schermata offre un\'analisi dettagliata delle tue fonti di entrata, mostrando l\'andamento temporale e la suddivisione per categorie.'
+          );
+        }} style={styles.infoButton}>
+          <Ionicons name="information-circle-outline" size={24} color={COLORS.primary} />
+        </Pressable>
+      </View>
+
+      <TimeFilter 
+        timeRange={timeRange} 
+        setTimeRange={setTimeRange} 
+        baseDate={baseDate}
+        onDateChange={setBaseDate}
+      />
+
+      {/* Filters Row Container */}
+      <View style={styles.filterRowContainer}>
+        <View style={styles.filtersRow}>
+          {/* Dominio Dropdown */}
+          <Pressable 
+            style={[styles.filterDropdownButton, activeDropdown === 'domain' && styles.filterDropdownButtonActive]} 
+            onPress={() => setActiveDropdown(activeDropdown === 'domain' ? null : 'domain')}
+          >
+            <Text style={styles.filterDropdownButtonText} numberOfLines={1}>
+              {selectedDomain ? (domainsList.find(d => d.key === selectedDomain)?.label || selectedDomain) : 'Dominio'}
+            </Text>
+            {selectedDomain ? (
+              <Pressable 
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                onPress={() => handleClearDomain()} 
+                style={styles.clearFilterIcon}
+              >
+                <Ionicons name="close-circle" size={16} color={COLORS.primary} />
+              </Pressable>
+            ) : (
+              <Ionicons name="chevron-down" size={16} color={COLORS.secondary} style={styles.dropdownChevron} />
+            )}
+          </Pressable>
+
+          {/* Categoria Dropdown */}
+          <Pressable 
+            style={[styles.filterDropdownButton, activeDropdown === 'category' && styles.filterDropdownButtonActive]} 
+            onPress={() => setActiveDropdown(activeDropdown === 'category' ? null : 'category')}
+          >
+            <Text style={styles.filterDropdownButtonText} numberOfLines={1}>
+              {selectedCategory ? getCategoryLabel(selectedCategory) : 'Categoria'}
+            </Text>
+            {selectedCategory ? (
+              <Pressable 
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                onPress={() => handleClearCategory()} 
+                style={styles.clearFilterIcon}
+              >
+                <Ionicons name="close-circle" size={16} color={COLORS.primary} />
+              </Pressable>
+            ) : (
+              <Ionicons name="chevron-down" size={16} color={COLORS.secondary} style={styles.dropdownChevron} />
+            )}
+          </Pressable>
         </View>
-        <Text style={styles.subtitle}>Analizza l'andamento delle tue entrate</Text>
-      </LinearGradient>
+
+        {/* Dropdown menus (tende) */}
+        {activeDropdown === 'domain' && (
+          <View style={styles.tendaContainer}>
+            <ScrollView style={styles.tendaScroll} nestedScrollEnabled={true}>
+              {domainsList.map((domain) => (
+                <Pressable
+                  key={domain.key}
+                  style={[styles.tendaItem, selectedDomain === domain.key && styles.tendaItemActive]}
+                  onPress={() => handleSelectDomain(domain.key)}
+                >
+                  <Text style={[styles.tendaItemText, selectedDomain === domain.key && styles.tendaItemTextActive]}>
+                    {domain.label}
+                  </Text>
+                  {selectedDomain === domain.key && (
+                    <Ionicons name="checkmark" size={16} color={COLORS.primary} />
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {activeDropdown === 'category' && (
+          <View style={styles.tendaContainer}>
+            <ScrollView style={styles.tendaScroll} nestedScrollEnabled={true}>
+              {categoriesList.map((cat) => (
+                <Pressable
+                  key={cat.key}
+                  style={[styles.tendaItem, selectedCategory === cat.key && styles.tendaItemActive]}
+                  onPress={() => handleSelectCategory(cat.key)}
+                >
+                  <Text style={[styles.tendaItemText, selectedCategory === cat.key && styles.tendaItemTextActive]}>
+                    {cat.label}
+                  </Text>
+                  {selectedCategory === cat.key && (
+                    <Ionicons name="checkmark" size={16} color={COLORS.primary} />
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
 
       {/* Overlapping Bottom Sheet - NO border radius */}
       <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 64 }]}>
         
-        {/* TimeFilter in premium white card container */}
-        <View style={styles.filterCard}>
-          <TimeFilter 
-            timeRange={timeRange} 
-            setTimeRange={setTimeRange} 
-            baseDate={baseDate}
-            onDateChange={setBaseDate}
-          />
-        </View>
-
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} scrollEnabled={true}>
           {loading && transactions.length === 0 ? (
             <ActivityIndicator size="large" color="#0A74FF" style={{ marginTop: 50 }} />
@@ -398,7 +875,17 @@ export default function IncomesScreen() {
                   <Text style={[styles.cardTitle, { fontSize: 16 }]}>Andamento Temporale</Text>
                   <Ionicons name="trending-up-outline" size={18} color={COLORS.success} />
                 </View>
-                <SimpleTrendChart data={trendPoints} color={COLORS.success} />
+                <TrendChart 
+                  data={trendPoints} 
+                  labels={
+                    timeRange === 'Anno' 
+                      ? ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'] 
+                      : trendPoints.map(s => s.label || '')
+                  }
+                  absoluteMax={absoluteLimits?.max}
+                  color={COLORS.success}
+                  timeRange={timeRange}
+                />
               </View>
 
               {/* Stacked distributions */}
@@ -406,19 +893,31 @@ export default function IncomesScreen() {
                 <CompactDistributionCard 
                   title="Domini"
                   data={domainDist}
-                  selectedKeys={selectedDomains}
-                  onToggleKey={handleToggleDomain}
-                  onReset={handleResetDomains}
+                  selectedKeys={selectedDomain ? [selectedDomain] : []}
+                  onToggleKey={(key) => {
+                    if (selectedDomain === key) {
+                      handleClearDomain();
+                    } else {
+                      handleSelectDomain(key);
+                    }
+                  }}
+                  onReset={handleClearDomain}
                   emptyMessage="Nessun dato"
                 />
 
                 <CompactDistributionCard 
                   title="Categorie"
                   data={catDist}
-                  selectedKeys={selectedCategories}
-                  onToggleKey={handleToggleCategory}
-                  onReset={handleResetCategories}
-                  emptyMessage={selectedDomains.length > 0 ? "Vuoto" : "Seleziona macro"}
+                  selectedKeys={selectedCategory ? [selectedCategory] : []}
+                  onToggleKey={(key) => {
+                    if (selectedCategory === key) {
+                      handleClearCategory();
+                    } else {
+                      handleSelectCategory(key);
+                    }
+                  }}
+                  onReset={handleClearCategory}
+                  emptyMessage={selectedDomain ? "Vuoto" : "Seleziona macro"}
                 />
               </View>
 
@@ -454,34 +953,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  headerGradient: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: COLORS.background,
   },
-  title: {
-    fontSize: 24,
+  backButton: {
+    padding: 4,
+  },
+  infoButton: {
+    padding: 4,
+  },
+  centeredTitle: {
+    fontSize: 16,
     fontFamily: TYPOGRAPHY.fontBold,
-    color: '#FFFFFF',
-  },
-  subtitle: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 14,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    marginTop: 6,
+    color: COLORS.primary,
+    textAlign: 'center',
   },
   bottomSection: {
     flex: 1,
     backgroundColor: COLORS.background,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
-    marginTop: -20,
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
   },
   scrollContent: {
     paddingBottom: 60,
@@ -636,5 +1134,105 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.success,
+  },
+  trendChartContainer: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+  },
+  chartLabelsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 10,
+    marginTop: 6,
+  },
+  labelBadge: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  filterRowContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: COLORS.background,
+    zIndex: 100,
+    position: 'relative',
+  },
+  filtersRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  filterDropdownButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  filterDropdownButtonActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#FFFFFF',
+  },
+  filterDropdownButtonText: {
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+    flex: 1,
+    marginRight: 4,
+  },
+  dropdownChevron: {
+    marginLeft: 2,
+  },
+  clearFilterIcon: {
+    padding: 2,
+  },
+  tendaContainer: {
+    position: 'absolute',
+    top: 48,
+    left: 16,
+    right: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    maxHeight: 250,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    zIndex: 101,
+    ...SHADOWS.medium,
+  },
+  tendaScroll: {
+    paddingVertical: 4,
+  },
+  tendaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  tendaItemActive: {
+    backgroundColor: '#F3F4F6',
+  },
+  tendaItemText: {
+    fontSize: 14,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.primary,
+  },
+  tendaItemTextActive: {
+    fontFamily: TYPOGRAPHY.fontBold,
   },
 });

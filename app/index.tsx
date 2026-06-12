@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, FlatList, Dimensions, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
@@ -103,6 +104,7 @@ function getNextOccurrenceDate(sub: any): Date {
   return today;
 }
 
+const { width, height } = Dimensions.get('window');
 let homeScrollY = 0;
 
 export default function Home() {
@@ -118,6 +120,9 @@ export default function Home() {
   const [thisMonthExpenses, setThisMonthExpenses] = useState<number>(0);
   const [prevMonthExpensesComp, setPrevMonthExpensesComp] = useState<number>(0);
   const [percentageChange, setPercentageChange] = useState<number>(0);
+  const [cardTitle, setCardTitle] = useState<string>('ULTIMI 30 GIORNI');
+  const [comparisonLabel, setComparisonLabel] = useState<string>('vs 30gg prec.');
+  const [isFirstDay, setIsFirstDay] = useState<boolean>(false);
   const [subMonthlyEstimate, setSubMonthlyEstimate] = useState<number>(0);
   const [isNetWorthHidden, setIsNetWorthHidden] = useState(false);
   const [isEditingNetWorth, setIsEditingNetWorth] = useState(false);
@@ -219,6 +224,7 @@ export default function Home() {
             setIsEditingNetWorth(false);
             await NetWorthRepository.recordManualAdjustment(finalAmount);
             setNetWorth(finalAmount);
+            loadData();
           },
         },
       ]
@@ -343,34 +349,96 @@ export default function Home() {
 
       setUpcomingSubs(mergedUpcoming.slice(0, 3));
 
-      // 1. Spese degli ultimi 30 giorni
+      // 1. Dynamic Period Card: Ieri -> Settimana -> Mese
+      const firstDate = await NetWorthRepository.getFirstHistoryDate();
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
       
-      const date30DaysAgo = new Date(today);
-      date30DaysAgo.setDate(today.getDate() - 29);
-      const date30DaysAgoStr = date30DaysAgo.toISOString().split('T')[0];
+      let firstDayCheck = true;
+      let daysSince = 0;
       
-      const thisMonthSum = await TransactionRepository.getExpensesSumForPeriod(date30DaysAgoStr, todayStr);
-      setThisMonthExpenses(thisMonthSum);
+      if (firstDate) {
+        const fDate = new Date(firstDate);
+        fDate.setHours(0,0,0,0);
+        const tDate = new Date(today);
+        tDate.setHours(0,0,0,0);
+        const diffTime = tDate.getTime() - fDate.getTime();
+        daysSince = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        if (daysSince > 0) {
+          firstDayCheck = false;
+        }
+      }
 
-      // Spese del periodo subito precedente (i 30 giorni antecedenti)
-      const date60DaysAgo = new Date(today);
-      date60DaysAgo.setDate(today.getDate() - 59);
-      const date60DaysAgoStr = date60DaysAgo.toISOString().split('T')[0];
-      
-      const date31DaysAgo = new Date(today);
-      date31DaysAgo.setDate(today.getDate() - 30);
-      const date31DaysAgoStr = date31DaysAgo.toISOString().split('T')[0];
-      
-      const prevMonthSum = await TransactionRepository.getExpensesSumForPeriod(date60DaysAgoStr, date31DaysAgoStr);
-      setPrevMonthExpensesComp(prevMonthSum);
-      
+      setIsFirstDay(firstDayCheck);
+
+      let title = 'OGGI';
+      let currentPeriodExpenses = 0;
+      let previousPeriodExpenses = 0;
+      let label = '';
+
+      if (firstDayCheck) {
+        title = 'OGGI';
+        currentPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(todayStr, todayStr);
+        previousPeriodExpenses = 0;
+        label = 'continua a registrare e scopri il confronto con il periodo precedente';
+      } else if (daysSince >= 1 && daysSince < 7) {
+        title = 'OGGI';
+        currentPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(todayStr, todayStr);
+        
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        previousPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(yesterdayStr, yesterdayStr);
+        
+        label = 'vs ieri';
+      } else if (daysSince >= 7 && daysSince < 30) {
+        title = 'ULTIMI 7 GIORNI';
+        
+        const date7DaysAgo = new Date(today);
+        date7DaysAgo.setDate(today.getDate() - 6);
+        const date7DaysAgoStr = date7DaysAgo.toISOString().split('T')[0];
+        currentPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(date7DaysAgoStr, todayStr);
+        
+        const date14DaysAgo = new Date(today);
+        date14DaysAgo.setDate(today.getDate() - 13);
+        const date14DaysAgoStr = date14DaysAgo.toISOString().split('T')[0];
+        
+        const date8DaysAgo = new Date(today);
+        date8DaysAgo.setDate(today.getDate() - 7);
+        const date8DaysAgoStr = date8DaysAgo.toISOString().split('T')[0];
+        previousPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(date14DaysAgoStr, date8DaysAgoStr);
+        
+        label = 'vs sett. prec.';
+      } else {
+        title = 'ULTIMI 30 GIORNI';
+        
+        const date30DaysAgo = new Date(today);
+        date30DaysAgo.setDate(today.getDate() - 29);
+        const date30DaysAgoStr = date30DaysAgo.toISOString().split('T')[0];
+        currentPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(date30DaysAgoStr, todayStr);
+        
+        const date60DaysAgo = new Date(today);
+        date60DaysAgo.setDate(today.getDate() - 59);
+        const date60DaysAgoStr = date60DaysAgo.toISOString().split('T')[0];
+        
+        const date31DaysAgo = new Date(today);
+        date31DaysAgo.setDate(today.getDate() - 30);
+        const date31DaysAgoStr = date31DaysAgo.toISOString().split('T')[0];
+        previousPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(date60DaysAgoStr, date31DaysAgoStr);
+        
+        label = 'vs 30gg prec.';
+      }
+
+      setCardTitle(title);
+      setThisMonthExpenses(currentPeriodExpenses);
+      setPrevMonthExpensesComp(previousPeriodExpenses);
+      setComparisonLabel(label);
+
       // Calcolo percentuale
       let pct = 0;
-      if (prevMonthSum > 0) {
-        pct = ((thisMonthSum - prevMonthSum) / prevMonthSum) * 100;
-      } else if (thisMonthSum > 0) {
+      if (previousPeriodExpenses > 0) {
+        pct = ((currentPeriodExpenses - previousPeriodExpenses) / previousPeriodExpenses) * 100;
+      } else if (currentPeriodExpenses > 0) {
         pct = 100;
       }
       setPercentageChange(pct);
@@ -409,10 +477,9 @@ export default function Home() {
         </View>
       ) : (
         <View style={{ flex: 1 }}>
-          {/* PARTE SUPERIORE: Sfumatura blu elettrico premium */}
-          <LinearGradient
-            colors={['#5CB5FF', '#0078FF']}
-            style={[styles.topSection, { paddingTop: insets.top + 16 }]}
+          {/* PARTE SUPERIORE: Sfondo blu elettrico premium */}
+          <View
+            style={[styles.topSection, { backgroundColor: '#0078FF', paddingTop: insets.top + 16 }]}
           >
             {/* Patrimonio totale (Sinistra allineato, stile premium) */}
             <View style={styles.netWorthHeaderContainer}>
@@ -478,32 +545,38 @@ export default function Home() {
               {/* Card Spese del Mese (Debit Card Style) */}
               <View style={styles.glassCard}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardHeaderText}>Ultimi 30 giorni</Text>
+                  <Text style={styles.cardHeaderText}>{cardTitle}</Text>
                 </View>
                 <Text style={styles.cardValueText} numberOfLines={1}>
                   €{thisMonthExpenses.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </Text>
-                <View style={[
-                  styles.trendPill,
-                  percentageChange <= 0 ? styles.trendPillGreen : styles.trendPillRed
-                ]}>
-                  <Text style={[
-                    styles.trendPillText,
-                    percentageChange <= 0 ? styles.trendTextGreen : styles.trendTextRed
-                  ]} numberOfLines={1}>
-                    {percentageChange !== 0 ? (
-                      `${percentageChange > 0 ? '+' : '-'}${Math.abs(percentageChange).toFixed(0)}% vs 30gg prec.`
-                    ) : (
-                      'Trend stabile'
-                    )}
+                {isFirstDay ? (
+                  <Text style={styles.placeholderComparisonText}>
+                    {comparisonLabel}
                   </Text>
-                </View>
+                ) : (
+                  <View style={[
+                    styles.trendPill,
+                    percentageChange <= 0 ? styles.trendPillGreen : styles.trendPillRed
+                  ]}>
+                    <Text style={[
+                      styles.trendPillText,
+                      percentageChange <= 0 ? styles.trendTextGreen : styles.trendTextRed
+                    ]} numberOfLines={1}>
+                      {percentageChange !== 0 ? (
+                        `${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(0)}% ${comparisonLabel}`
+                      ) : (
+                        `Trend stabile ${comparisonLabel}`
+                      )}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               {/* Card Spese Programmate (Credit Card Style) */}
               <View style={[styles.glassCard, { justifyContent: 'flex-start', gap: 6 }]}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardHeaderText}>Prossime spese</Text>
+                  <Text style={styles.cardHeaderText}>PROSSIME SPESE</Text>
                 </View>
                 <View style={styles.upcomingList}>
                   {upcomingSubs.length > 0 ? (
@@ -529,7 +602,7 @@ export default function Home() {
                 </View>
               </View>
             </View>
-          </LinearGradient>
+          </View>
 
           {/* PARTE INFERIORE: Overlapping Bottom Sheet in Off-white */}
           <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 48 + 12 }]}>
@@ -592,6 +665,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 13,
     fontFamily: TYPOGRAPHY.fontBold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   netWorthValueContainer: {
     flexDirection: 'row',
@@ -689,6 +764,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: TYPOGRAPHY.fontBold,
     opacity: 0.85,
+    letterSpacing: 0.5,
   },
   cardDetailText: {
     color: '#FFFFFF',
@@ -826,5 +902,12 @@ const styles = StyleSheet.create({
   },
   trendTextRed: {
     color: '#FEE2E2',
+  },
+  placeholderComparisonText: {
+    fontSize: 9,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: 'rgba(255, 255, 255, 0.75)',
+    marginTop: 4,
+    lineHeight: 12,
   },
 });

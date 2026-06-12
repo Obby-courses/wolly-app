@@ -104,7 +104,7 @@ export default function ManualEntry() {
   };
 
   const handleSave = () => {
-    const parsedVal = parseFloat(amount.replace(',', '.'));
+    const parsedVal = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
     if (!amount || isNaN(parsedVal) || parsedVal <= 0) {
       Alert.alert('Errore', 'Inserisci un importo valido.');
       return;
@@ -208,8 +208,34 @@ export default function ManualEntry() {
                 keyboardType="decimal-pad"
                 value={amount}
                 onChangeText={(val) => {
-                  const cleaned = val.replace(/[^0-9,.]/g, '');
-                  setAmount(cleaned);
+                  let newVal = val;
+                  if (newVal.endsWith('.')) {
+                    newVal = newVal.slice(0, -1) + ',';
+                  }
+                  let raw = newVal.replace(/\./g, '');
+                  raw = raw.replace(/[^0-9,]/g, '');
+                  raw = raw.replace(/(,.*),/g, '$1');
+
+                  let parts = raw.split(',');
+                  if (parts.length > 1) {
+                    parts[1] = parts[1].substring(0, 2);
+                    raw = parts.join(',');
+                  }
+
+                  let intPart = parts[0];
+                  if (intPart.length > 9) {
+                    intPart = intPart.substring(0, 9);
+                  }
+                  
+                  if (intPart.length > 1 && intPart.startsWith('0')) {
+                    intPart = intPart.replace(/^0+/, '');
+                    if (intPart === '') intPart = '0';
+                  }
+
+                  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                  const formatted = parts.length > 1 ? `${formattedInt},${parts[1]}` : formattedInt;
+
+                  setAmount(formatted);
                 }}
                 autoFocus
               />

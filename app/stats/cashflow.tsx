@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +19,8 @@ export default function CashflowScreen() {
   const [trendData, setTrendData] = useState<any[]>([]);
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpense, setTotalExpense] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [absoluteLimits, setAbsoluteLimits] = useState<{ max: number; min: number } | null>(null);
 
   // Automatic reset when entering the screen
   useFocusEffect(
@@ -26,13 +28,14 @@ export default function CashflowScreen() {
       analytics.trackScreen(ANALYTICS_SCREENS.STATS_CASHFLOW);
       setTimeRange('Mese');
       setBaseDate(new Date().toISOString().split('T')[0]);
+      setRefreshKey(prev => prev + 1);
     }, [])
   );
 
   // Load stats when filters change
   useEffect(() => {
     loadStats();
-  }, [timeRange, baseDate]);
+  }, [timeRange, baseDate, refreshKey]);
 
   // Track time range changes
   useEffect(() => {
@@ -57,39 +60,41 @@ export default function CashflowScreen() {
       setTotalIncome(incomes);
       setTotalExpense(expenses);
 
+      const limits = await TransactionRepository.getAbsoluteTrendLimits(timeRange, 'both');
+      setAbsoluteLimits(limits);
+
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
   return (
     <View style={styles.container}>
-      {/* Header Sfumato Blu Premium */}
-      <LinearGradient
-        colors={['#5CB5FF', '#0078FF']}
-        style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
-      >
-        <Pressable onPress={() => router.back()} style={{ marginLeft: -4, marginBottom: 12, alignSelf: 'flex-start' }}>
-          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+      {/* Header pulito senza banner blu */}
+      <View style={[styles.headerContainer, { paddingTop: insets.top + 12 }]}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
         </Pressable>
-        <View style={[styles.header, { marginTop: 0 }]}>
-          <Text style={styles.title}>Flusso di Cassa</Text>
-        </View>
-        <Text style={styles.subtitle}>Confronto diretto tra entrate e uscite</Text>
-      </LinearGradient>
+        <Text style={styles.centeredTitle}>Flusso di Cassa</Text>
+        <Pressable onPress={() => {
+          Alert.alert(
+            'Informazioni Flusso di Cassa',
+            'Questa schermata ti permette di confrontare direttamente le entrate e le uscite totali nel periodo selezionato per monitorare il tuo flusso di risparmio.'
+          );
+        }} style={styles.infoButton}>
+          <Ionicons name="information-circle-outline" size={24} color={COLORS.primary} />
+        </Pressable>
+      </View>
+
+      <TimeFilter 
+        timeRange={timeRange} 
+        setTimeRange={setTimeRange} 
+        baseDate={baseDate}
+        onDateChange={setBaseDate}
+      />
 
       {/* Overlapping Bottom Sheet - NO border radius */}
       <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 64 }]}>
         
-        {/* TimeFilter in premium white card container */}
-        <View style={styles.filterCard}>
-          <TimeFilter 
-            timeRange={timeRange} 
-            setTimeRange={setTimeRange} 
-            baseDate={baseDate}
-            onDateChange={setBaseDate}
-          />
-        </View>
-
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} scrollEnabled={false}>
           {loading ? <ActivityIndicator size="large" color="#0A74FF" style={{ marginTop: 50 }} /> : (
             <View style={styles.card}>
@@ -103,6 +108,7 @@ export default function CashflowScreen() {
                 data={trendData} 
                 title=""
                 height={130}
+                absoluteMax={absoluteLimits?.max}
                 labels={
                   timeRange === 'Settimana' 
                     ? trendData.map(s => s.label || '') 
@@ -148,34 +154,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  headerGradient: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: COLORS.background,
   },
-  title: {
-    fontSize: 24,
+  backButton: {
+    padding: 4,
+  },
+  infoButton: {
+    padding: 4,
+  },
+  centeredTitle: {
+    fontSize: 16,
     fontFamily: TYPOGRAPHY.fontBold,
-    color: '#FFFFFF',
-  },
-  subtitle: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 14,
-    fontFamily: TYPOGRAPHY.fontFamily,
-    marginTop: 6,
+    color: COLORS.primary,
+    textAlign: 'center',
   },
   bottomSection: {
     flex: 1,
     backgroundColor: COLORS.background,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
-    marginTop: -20,
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
   },
   scrollContent: {
     paddingBottom: 20,

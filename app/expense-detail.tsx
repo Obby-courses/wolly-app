@@ -5,7 +5,7 @@ import {
   PanResponder, Animated, Dimensions
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ParsedExpense, SocialContext, LocationType } from '../modules/registration/types';
 import { getDomainForCategory, getCategory } from '../constants/categories';
@@ -100,6 +100,7 @@ const DEFAULT_EXPENSE = {
 export default function ExpenseDetail() {
   const router = useRouter();
   const { data, id, returnTo } = useLocalSearchParams<{ data?: string; id?: string; returnTo?: string }>();
+  const insets = useSafeAreaInsets();
   
   const isEditingExisting = !!id;
 
@@ -626,7 +627,7 @@ export default function ExpenseDetail() {
   const minutesArray = Array.from({ length: 60 }, (_, i) => i);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Pressable onPress={handleBack} style={styles.backIcon}>
           <Ionicons name="chevron-back" size={20} color="#FFFFFF" />

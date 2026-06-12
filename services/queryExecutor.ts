@@ -52,7 +52,7 @@ export interface ExecutionResult {
   transactions?: any[];
   transaction_count?: number;
   // Archetipo: QUANDO
-  timeline_data?: { label: string; value: number }[];
+  timeline_data?: { label: string; value: number | null }[];
   // Archetipo: ABBONAMENTI
   subscriptions?: Subscription[];
 }
@@ -174,13 +174,13 @@ export async function executeQueryIntent(intent: QueryIntent): Promise<Execution
       if (to >= todayISO) {
         finalValue = await NetWorthRepository.getCurrentTotal();
       } else {
-        finalValue = await NetWorthRepository.getNetWorthAtDate(to);
+        finalValue = (await NetWorthRepository.getNetWorthAtDate(to)) ?? 0;
       }
       
       let comparison: ExecutionResult['comparison'] = undefined;
       if (intent.comparison_period) {
         // Il Net Worth a inizio periodo (from) equivale essenzialmente a quello di fine periodo precedente
-        const prevValue = await NetWorthRepository.getNetWorthAtDate(from);
+        const prevValue = (await NetWorthRepository.getNetWorthAtDate(from)) ?? 0;
         const diff = finalValue - prevValue;
         comparison = {
           prev_total: prevValue,

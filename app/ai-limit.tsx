@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     padding: 24,
     alignItems: 'center',
-    ...SHADOWS.large,
+    ...SHADOWS.medium,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.8)',
   },
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.small,
+    ...SHADOWS.soft,
   },
   buttonText: {
     fontSize: 16,
