@@ -5,7 +5,7 @@ import {
   PanResponder, Animated, Dimensions
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ParsedExpense, SocialContext, LocationType } from '../modules/registration/types';
 import { getDomainForCategory, getCategory } from '../constants/categories';
@@ -21,6 +21,8 @@ import CategoryPill, { getCategoryColor } from '../components/CategoryPill';
 import { LinearGradient } from 'expo-linear-gradient';
 import PeriodicDateSelector from '../components/PeriodicDateSelector';
 import { COMUNI_ITALIANI, ComuneItem } from '../constants/comuni';
+import { useToast } from '../components/Toast';
+import { INPUT_MAX_LENGTH } from '../constants/accessibility';
 const sanitizeLocationField = (val: string | null | undefined): string => {
   if (!val) return '';
   const blacklist = [
@@ -100,6 +102,8 @@ const DEFAULT_EXPENSE = {
 export default function ExpenseDetail() {
   const router = useRouter();
   const { data, id, returnTo } = useLocalSearchParams<{ data?: string; id?: string; returnTo?: string }>();
+  const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   
   const isEditingExisting = !!id;
 
@@ -452,8 +456,10 @@ export default function ExpenseDetail() {
       }
 
       if (!isEditingExisting && returnTo) {
+        showToast({ message: isEditingExisting ? 'Transazione aggiornata' : 'Transazione salvata', type: 'success' });
         router.replace(returnTo as any);
       } else {
+        showToast({ message: isEditingExisting ? 'Transazione aggiornata' : 'Transazione salvata', type: 'success' });
         router.back();
       }
     } catch (error) {
@@ -626,9 +632,15 @@ export default function ExpenseDetail() {
   const minutesArray = Array.from({ length: 60 }, (_, i) => i);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={handleBack} style={styles.backIcon}>
+        <Pressable
+          onPress={handleBack}
+          style={styles.backIcon}
+          accessibilityRole="button"
+          accessibilityLabel="Torna indietro"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Ionicons name="chevron-back" size={28} color={COLORS.primary} />
         </Pressable>
         <Text style={styles.headerTitle}>
@@ -636,7 +648,14 @@ export default function ExpenseDetail() {
         </Text>
         <View style={styles.headerRightContainer}>
           {isEditingExisting && (
-            <Pressable onPress={handleDelete} disabled={isDeleting || isSaving} style={styles.headerActionBtn}>
+            <Pressable
+              onPress={handleDelete}
+              disabled={isDeleting || isSaving}
+              style={styles.headerActionBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Elimina transazione"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               {isDeleting ? (
                 <ActivityIndicator size="small" color="#EF4444" />
               ) : (
@@ -644,7 +663,13 @@ export default function ExpenseDetail() {
               )}
             </Pressable>
           )}
-          <Pressable onPress={handleConfirm} disabled={isSaving || isDeleting} style={styles.headerSaveBtn}>
+          <Pressable
+            onPress={handleConfirm}
+            disabled={isSaving || isDeleting}
+            style={styles.headerSaveBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Salva transazione"
+          >
             {isSaving ? (
               <ActivityIndicator size="small" color={COLORS.primary} />
             ) : (
@@ -714,6 +739,8 @@ export default function ExpenseDetail() {
                 }}
                 keyboardType="decimal-pad"
                 onFocus={() => handleInputFocus('amount')}
+                accessibilityLabel="Importo in euro"
+                accessibilityHint="Usa la virgola come separatore decimale"
              />
           </View>
 
@@ -880,6 +907,9 @@ export default function ExpenseDetail() {
                     value={periodicName}
                     onChangeText={setPeriodicName}
                     onFocus={() => handleInputFocus('periodicName')}
+                    maxLength={INPUT_MAX_LENGTH.subscriptionName}
+                    autoCapitalize="words"
+                    accessibilityLabel="Nome abbonamento o entrata periodica"
                   />
                   <PeriodicDateSelector
                     frequency={periodicFrequency}
@@ -1075,6 +1105,10 @@ export default function ExpenseDetail() {
                   onChangeText={setCitySearch}
                   autoFocus
                   onFocus={() => handleInputFocus('citySearch')}
+                  maxLength={INPUT_MAX_LENGTH.citySearch}
+                  returnKeyType="search"
+                  autoCapitalize="words"
+                  accessibilityLabel="Cerca comune italiano"
                 />
               </View>
 
@@ -1085,6 +1119,8 @@ export default function ExpenseDetail() {
                       key={i}
                       onPress={() => handleCitySelect(c)}
                       style={styles.cityResultItem}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${c.n}, ${c.s}`}
                     >
                       <Ionicons name="location-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
                       <Text style={styles.cityResultText}>
@@ -1093,6 +1129,9 @@ export default function ExpenseDetail() {
                     </Pressable>
                   ))}
                 </View>
+              )}
+              {citySearch.length >= 2 && filteredCities.length === 0 && (
+                <Text style={styles.noResultsText}>Nessun comune trovato</Text>
               )}
 
               <Text style={[styles.editorLabel, { marginTop: 15 }]}>Via / Indirizzo specifico</Text>
@@ -1104,6 +1143,9 @@ export default function ExpenseDetail() {
                 value={editableExpense.address || ''}
                 onChangeText={(v) => updateField('address', sanitizeLocationField(v))}
                 onFocus={() => handleInputFocus('address')}
+                maxLength={INPUT_MAX_LENGTH.address}
+                autoCapitalize="words"
+                accessibilityLabel="Via o indirizzo specifico"
               />
             </View>
           )}
@@ -1132,11 +1174,13 @@ export default function ExpenseDetail() {
                     ref={ref => { inputRefs.current['description'] = ref; }}
                     style={styles.rowTextInput}
                     placeholder="----"
-                    placeholderTextColor={COLORS.primary}
+                    placeholderTextColor={COLORS.secondary}
                     value={editableExpense.description || editableExpense.reason || ''}
                     onChangeText={(v) => updateField('description', v)}
                     editable={focusedInlineField === 'description'}
                     scrollEnabled={false}
+                    maxLength={INPUT_MAX_LENGTH.note}
+                    accessibilityLabel="Nota o descrizione della transazione"
                     onPressIn={() => {
                       if (focusedInlineField !== 'description') {
                         setFocusedInlineField('description');
@@ -1177,11 +1221,14 @@ export default function ExpenseDetail() {
                     ref={ref => { inputRefs.current['location_name'] = ref; }}
                     style={styles.rowTextInput}
                     placeholder="----"
-                    placeholderTextColor={COLORS.primary}
+                    placeholderTextColor={COLORS.secondary}
                     value={capitalizeProperNoun(editableExpense.location_name)}
                     onChangeText={(v) => updateField('location_name', capitalizeProperNoun(v))}
                     editable={focusedInlineField === 'location_name'}
                     scrollEnabled={false}
+                    maxLength={INPUT_MAX_LENGTH.vendor}
+                    autoCapitalize="words"
+                    accessibilityLabel="Nome negozio o luogo"
                     onPressIn={() => {
                       if (focusedInlineField !== 'location_name') {
                         setFocusedInlineField('location_name');
@@ -1413,6 +1460,10 @@ export default function ExpenseDetail() {
                         autoFocus
                         onSubmitEditing={handleAddCustomPerson}
                         onFocus={() => handleInputFocus('newPersonInput')}
+                        maxLength={INPUT_MAX_LENGTH.personName}
+                        autoCapitalize="words"
+                        returnKeyType="done"
+                        accessibilityLabel="Nome della persona"
                       />
                       <Pressable 
                         onPressIn={handleAddCustomPerson}
@@ -1575,6 +1626,10 @@ export default function ExpenseDetail() {
                 autoFocus
                 onSubmitEditing={handleAddCustomTag}
                 onFocus={() => handleInputFocus('newTagInput')}
+                maxLength={INPUT_MAX_LENGTH.tag}
+                autoCapitalize="none"
+                returnKeyType="done"
+                accessibilityLabel="Nome del nuovo tag"
               />
               <Pressable 
                 onPressIn={handleAddCustomTag}
@@ -2276,5 +2331,12 @@ const styles = StyleSheet.create({
   },
   resetIcon: {
     fontWeight: 'bold',
+  },
+  noResultsText: {
+    fontSize: 13,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    textAlign: 'center',
+    paddingVertical: 12,
   },
 });

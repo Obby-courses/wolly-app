@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, FlatList, Dimensions, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { analytics, ANALYTICS_SCREENS } from '../services/analytics';
@@ -17,6 +18,8 @@ import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { getCategory } from '../constants/categories';
 import { getCategoryColor } from '../components/CategoryPill';
 import TransactionPreview from '../components/TransactionPreview';
+import { useToast } from '../components/Toast';
+import Popup from '../components/Popup';
 
 function getNextOccurrenceDate(sub: any): Date {
   const today = new Date();
@@ -103,6 +106,7 @@ function getNextOccurrenceDate(sub: any): Date {
   return today;
 }
 
+const { width, height } = Dimensions.get('window');
 let homeScrollY = 0;
 
 export default function Home() {
@@ -118,6 +122,9 @@ export default function Home() {
   const [thisMonthExpenses, setThisMonthExpenses] = useState<number>(0);
   const [prevMonthExpensesComp, setPrevMonthExpensesComp] = useState<number>(0);
   const [percentageChange, setPercentageChange] = useState<number>(0);
+  const [cardTitle, setCardTitle] = useState<string>('ULTIMI 30 GIORNI');
+  const [comparisonLabel, setComparisonLabel] = useState<string>('vs 30gg prec.');
+  const [isFirstDay, setIsFirstDay] = useState<boolean>(false);
   const [subMonthlyEstimate, setSubMonthlyEstimate] = useState<number>(0);
   const [isNetWorthHidden, setIsNetWorthHidden] = useState(false);
   const [isEditingNetWorth, setIsEditingNetWorth] = useState(false);
@@ -125,6 +132,12 @@ export default function Home() {
   const [editIsNegative, setEditIsNegative] = useState(false);
   const editInputRef = useRef<TextInput>(null);
   const flatListRef = useRef<FlatList>(null);
+  const { showToast } = useToast();
+  
+  // Custom Confirmation Popup states
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const [pendingNetWorthAmount, setPendingNetWorthAmount] = useState<number | null>(null);
+  const [pendingNetWorthDiffText, setPendingNetWorthDiffText] = useState('');
 
   // Ripristina la posizione dello scroll quando la lista viene caricata
   useEffect(() => {
@@ -204,25 +217,40 @@ export default function Home() {
     const numVal = parseFloat(cleanBalance) || 0;
     const finalAmount = editIsNegative ? -numVal : numVal;
     const diff = finalAmount - netWorth;
-    if (diff === 0) { setIsEditingNetWorth(false); return; }
+    
+    if (diff === 0) { 
+      setIsEditingNetWorth(false); 
+      return; 
+    }
+
     const diffSign = diff > 0 ? '+' : '-';
     const diffFormatted = `${diffSign}€${Math.abs(diff).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const newFormatted = `€${Math.abs(finalAmount).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    Alert.alert(
-      'Aggiorna patrimonio',
-      `Stai impostando il patrimonio a ${newFormatted} (variazione: ${diffFormatted}). Confermi?`,
-      [
-        { text: 'Annulla', style: 'cancel', onPress: () => setIsEditingNetWorth(false) },
-        {
-          text: 'Conferma',
-          onPress: async () => {
-            setIsEditingNetWorth(false);
-            await NetWorthRepository.recordManualAdjustment(finalAmount);
-            setNetWorth(finalAmount);
-          },
-        },
-      ]
-    );
+    
+    setPendingNetWorthAmount(finalAmount);
+    setPendingNetWorthDiffText(diffFormatted);
+    setShowConfirmPopup(true);
+  };
+
+  const handleSaveNetWorthConfirmed = async () => {
+    if (pendingNetWorthAmount === null) return;
+    
+    setShowConfirmPopup(false);
+    setIsEditingNetWorth(false);
+    
+    const finalAmount = pendingNetWorthAmount;
+    setPendingNetWorthAmount(null);
+    
+    await NetWorthRepository.recordManualAdjustment(finalAmount);
+    setNetWorth(finalAmount);
+    await loadData();
+    
+    showToast({ message: `Patrimonio aggiornato (${pendingNetWorthDiffText})`, type: 'success' });
+  };
+
+  const handleSaveNetWorthCancelled = () => {
+    setShowConfirmPopup(false);
+    setIsEditingNetWorth(false);
+    setPendingNetWorthAmount(null);
   };
   
   useEffect(() => {
@@ -343,34 +371,96 @@ export default function Home() {
 
       setUpcomingSubs(mergedUpcoming.slice(0, 3));
 
-      // 1. Spese degli ultimi 30 giorni
+      // 1. Dynamic Period Card: Ieri -> Settimana -> Mese
+      const firstDate = await NetWorthRepository.getFirstHistoryDate();
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
       
-      const date30DaysAgo = new Date(today);
-      date30DaysAgo.setDate(today.getDate() - 29);
-      const date30DaysAgoStr = date30DaysAgo.toISOString().split('T')[0];
+      let firstDayCheck = true;
+      let daysSince = 0;
       
-      const thisMonthSum = await TransactionRepository.getExpensesSumForPeriod(date30DaysAgoStr, todayStr);
-      setThisMonthExpenses(thisMonthSum);
+      if (firstDate) {
+        const fDate = new Date(firstDate);
+        fDate.setHours(0,0,0,0);
+        const tDate = new Date(today);
+        tDate.setHours(0,0,0,0);
+        const diffTime = tDate.getTime() - fDate.getTime();
+        daysSince = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        if (daysSince > 0) {
+          firstDayCheck = false;
+        }
+      }
 
-      // Spese del periodo subito precedente (i 30 giorni antecedenti)
-      const date60DaysAgo = new Date(today);
-      date60DaysAgo.setDate(today.getDate() - 59);
-      const date60DaysAgoStr = date60DaysAgo.toISOString().split('T')[0];
-      
-      const date31DaysAgo = new Date(today);
-      date31DaysAgo.setDate(today.getDate() - 30);
-      const date31DaysAgoStr = date31DaysAgo.toISOString().split('T')[0];
-      
-      const prevMonthSum = await TransactionRepository.getExpensesSumForPeriod(date60DaysAgoStr, date31DaysAgoStr);
-      setPrevMonthExpensesComp(prevMonthSum);
-      
+      setIsFirstDay(firstDayCheck);
+
+      let title = 'OGGI';
+      let currentPeriodExpenses = 0;
+      let previousPeriodExpenses = 0;
+      let label = '';
+
+      if (firstDayCheck) {
+        title = 'OGGI';
+        currentPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(todayStr, todayStr);
+        previousPeriodExpenses = 0;
+        label = 'continua a registrare e scopri il confronto con il periodo precedente';
+      } else if (daysSince >= 1 && daysSince < 7) {
+        title = 'OGGI';
+        currentPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(todayStr, todayStr);
+        
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        previousPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(yesterdayStr, yesterdayStr);
+        
+        label = 'vs ieri';
+      } else if (daysSince >= 7 && daysSince < 30) {
+        title = 'ULTIMI 7 GIORNI';
+        
+        const date7DaysAgo = new Date(today);
+        date7DaysAgo.setDate(today.getDate() - 6);
+        const date7DaysAgoStr = date7DaysAgo.toISOString().split('T')[0];
+        currentPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(date7DaysAgoStr, todayStr);
+        
+        const date14DaysAgo = new Date(today);
+        date14DaysAgo.setDate(today.getDate() - 13);
+        const date14DaysAgoStr = date14DaysAgo.toISOString().split('T')[0];
+        
+        const date8DaysAgo = new Date(today);
+        date8DaysAgo.setDate(today.getDate() - 7);
+        const date8DaysAgoStr = date8DaysAgo.toISOString().split('T')[0];
+        previousPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(date14DaysAgoStr, date8DaysAgoStr);
+        
+        label = 'vs sett. prec.';
+      } else {
+        title = 'ULTIMI 30 GIORNI';
+        
+        const date30DaysAgo = new Date(today);
+        date30DaysAgo.setDate(today.getDate() - 29);
+        const date30DaysAgoStr = date30DaysAgo.toISOString().split('T')[0];
+        currentPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(date30DaysAgoStr, todayStr);
+        
+        const date60DaysAgo = new Date(today);
+        date60DaysAgo.setDate(today.getDate() - 59);
+        const date60DaysAgoStr = date60DaysAgo.toISOString().split('T')[0];
+        
+        const date31DaysAgo = new Date(today);
+        date31DaysAgo.setDate(today.getDate() - 30);
+        const date31DaysAgoStr = date31DaysAgo.toISOString().split('T')[0];
+        previousPeriodExpenses = await TransactionRepository.getExpensesSumForPeriod(date60DaysAgoStr, date31DaysAgoStr);
+        
+        label = 'vs 30gg prec.';
+      }
+
+      setCardTitle(title);
+      setThisMonthExpenses(currentPeriodExpenses);
+      setPrevMonthExpensesComp(previousPeriodExpenses);
+      setComparisonLabel(label);
+
       // Calcolo percentuale
       let pct = 0;
-      if (prevMonthSum > 0) {
-        pct = ((thisMonthSum - prevMonthSum) / prevMonthSum) * 100;
-      } else if (thisMonthSum > 0) {
+      if (previousPeriodExpenses > 0) {
+        pct = ((currentPeriodExpenses - previousPeriodExpenses) / previousPeriodExpenses) * 100;
+      } else if (currentPeriodExpenses > 0) {
         pct = 100;
       }
       setPercentageChange(pct);
@@ -409,10 +499,9 @@ export default function Home() {
         </View>
       ) : (
         <View style={{ flex: 1 }}>
-          {/* PARTE SUPERIORE: Sfumatura blu elettrico premium */}
-          <LinearGradient
-            colors={['#5CB5FF', '#0078FF']}
-            style={[styles.topSection, { paddingTop: insets.top + 16 }]}
+          {/* PARTE SUPERIORE: Sfondo blu elettrico premium */}
+          <View
+            style={[styles.topSection, { backgroundColor: '#0078FF', paddingTop: insets.top + 16 }]}
           >
             {/* Patrimonio totale (Sinistra allineato, stile premium) */}
             <View style={styles.netWorthHeaderContainer}>
@@ -424,6 +513,9 @@ export default function Home() {
                     <Pressable
                       onPress={() => setEditIsNegative(!editIsNegative)}
                       style={[styles.signToggle, editIsNegative ? styles.signToggleNeg : styles.signTogglePos]}
+                      accessibilityRole="button"
+                      accessibilityLabel={editIsNegative ? 'Segno negativo, tocca per positivo' : 'Segno positivo, tocca per negativo'}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       <Text style={[styles.signToggleText, editIsNegative ? { color: '#FCA5A5' } : { color: '#BFDBFE' }]}>
                         {editIsNegative ? '-' : '+'}
@@ -434,21 +526,34 @@ export default function Home() {
                       style={styles.netWorthEditInput}
                       value={editNetWorthValue}
                       onChangeText={handleEditNetWorthChange}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                       returnKeyType="done"
                       onSubmitEditing={handleConfirmNetWorthEdit}
-                      onBlur={() => setIsEditingNetWorth(false)}
+                      onBlur={handleConfirmNetWorthEdit}
                       selectionColor="rgba(255,255,255,0.5)"
+                      accessibilityLabel="Nuovo valore patrimonio in euro"
                     />
                     <Text style={styles.netWorthCurrency}> €</Text>
-                    <Pressable onPress={handleConfirmNetWorthEdit} style={styles.confirmEditButton}>
+                    <Pressable
+                      onPress={handleConfirmNetWorthEdit}
+                      style={styles.confirmEditButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Conferma modifica patrimonio"
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                       <Ionicons name="checkmark" size={20} color="#FFFFFF" />
                     </Pressable>
                   </>
                 ) : (
                   // ── DISPLAY MODE ─────────────────────────────────────────
                   <>
-                    <Pressable onPress={handleNetWorthTap} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Pressable
+                      onPress={handleNetWorthTap}
+                      style={{ flexDirection: 'row', alignItems: 'center' }}
+                      accessibilityRole="button"
+                      accessibilityLabel={isNetWorthHidden ? 'Patrimonio nascosto' : `Patrimonio ${netWorth < 0 ? 'negativo' : 'positivo'} ${formattedNetWorth} euro, tocca per modificare`}
+                      accessibilityHint={isNetWorthHidden ? '' : 'Tocca per modificare il valore del patrimonio'}
+                    >
                       <Text style={styles.netWorthValue}>
                         {isNetWorthHidden ? (
                           <Text style={{ fontSize: 36, letterSpacing: 4 }}>••••••</Text>
@@ -461,7 +566,13 @@ export default function Home() {
                         )}
                       </Text>
                     </Pressable>
-                    <Pressable onPress={toggleNetWorthVisibility} style={styles.eyeButton}>
+                    <Pressable
+                      onPress={toggleNetWorthVisibility}
+                      style={styles.eyeButton}
+                      accessibilityRole="button"
+                      accessibilityLabel={isNetWorthHidden ? 'Mostra patrimonio' : 'Nascondi patrimonio'}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
                       <Ionicons
                         name={isNetWorthHidden ? 'eye-off-sharp' : 'eye-sharp'}
                         size={18}
@@ -478,26 +589,32 @@ export default function Home() {
               {/* Card Spese del Mese (Debit Card Style) */}
               <View style={styles.glassCard}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardHeaderText}>ULTIMI 30 GIORNI</Text>
+                  <Text style={styles.cardHeaderText}>{cardTitle}</Text>
                 </View>
                 <Text style={styles.cardValueText} numberOfLines={1}>
                   €{thisMonthExpenses.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </Text>
-                <View style={[
-                  styles.trendPill,
-                  percentageChange <= 0 ? styles.trendPillGreen : styles.trendPillRed
-                ]}>
-                  <Text style={[
-                    styles.trendPillText,
-                    percentageChange <= 0 ? styles.trendTextGreen : styles.trendTextRed
-                  ]} numberOfLines={1}>
-                    {percentageChange !== 0 ? (
-                      `${percentageChange > 0 ? '+' : '-'}${Math.abs(percentageChange).toFixed(0)}% vs 30gg prec.`
-                    ) : (
-                      'Trend stabile'
-                    )}
+                {isFirstDay ? (
+                  <Text style={styles.placeholderComparisonText}>
+                    {comparisonLabel}
                   </Text>
-                </View>
+                ) : (
+                  <View style={[
+                    styles.trendPill,
+                    percentageChange <= 0 ? styles.trendPillGreen : styles.trendPillRed
+                  ]}>
+                    <Text style={[
+                      styles.trendPillText,
+                      percentageChange <= 0 ? styles.trendTextGreen : styles.trendTextRed
+                    ]} numberOfLines={1}>
+                      {percentageChange !== 0 ? (
+                        `${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(0)}% ${comparisonLabel}`
+                      ) : (
+                        `Trend stabile ${comparisonLabel}`
+                      )}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               {/* Card Spese Programmate (Credit Card Style) */}
@@ -515,11 +632,9 @@ export default function Home() {
                           <Text style={styles.upcomingAmount}>
                             €{sub.amount.toFixed(0)}
                           </Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
-                            <Text style={styles.upcomingName} numberOfLines={1}>
-                              {sub.name}
-                            </Text>
-                          </View>
+                          <Text style={styles.upcomingName} numberOfLines={1} ellipsizeMode="tail">
+                            {sub.name}
+                          </Text>
                         </View>
                       );
                     })
@@ -529,7 +644,7 @@ export default function Home() {
                 </View>
               </View>
             </View>
-          </LinearGradient>
+          </View>
 
           {/* PARTE INFERIORE: Overlapping Bottom Sheet in Off-white */}
           <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 48 + 12 }]}>
@@ -565,6 +680,16 @@ export default function Home() {
           </View>
         </View>
       )}
+      
+      <Popup
+        visible={showConfirmPopup}
+        title="Aggiorna patrimonio"
+        description={`Stai impostando il patrimonio a €${Math.abs(pendingNetWorthAmount || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (variazione: ${pendingNetWorthDiffText}). Confermi?`}
+        confirmLabel="Conferma"
+        cancelLabel="Annulla"
+        onConfirm={handleSaveNetWorthConfirmed}
+        onCancel={handleSaveNetWorthCancelled}
+      />
     </View>
   );
 }
@@ -618,9 +743,9 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontBold,
   },
   eyeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -639,9 +764,9 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   signToggle: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 6,
@@ -657,9 +782,9 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontBold,
   },
   confirmEditButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -741,7 +866,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: TYPOGRAPHY.fontFamily,
     flex: 1,
-    marginLeft: 6,
+    marginLeft: 12,
+    textAlign: 'right',
   },
   upcomingAmount: {
     color: 'rgba(255, 255, 255, 0.9)',
@@ -829,5 +955,12 @@ const styles = StyleSheet.create({
   },
   trendTextRed: {
     color: '#FEE2E2',
+  },
+  placeholderComparisonText: {
+    fontSize: 9,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: 'rgba(255, 255, 255, 0.75)',
+    marginTop: 4,
+    lineHeight: 12,
   },
 });

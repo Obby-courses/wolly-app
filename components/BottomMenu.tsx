@@ -364,6 +364,8 @@ export default function BottomMenu() {
                           <Pressable
                             onPress={handleOfflinePress}
                             style={[styles.toolBtn, styles.toolBtnNormalWrapper]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Aggiungi transazione manuale offline"
                           >
                             <LinearGradient
                               colors={['#80B3FF', '#FFFFFF', '#80B3FF']}
@@ -385,6 +387,10 @@ export default function BottomMenu() {
                             isVoiceChat ? styles.toolBtnBig : styles.toolBtnNormalWrapper,
                             isSlidingToCancel && styles.micBtnCancel
                           ]}
+                          accessible={true}
+                          accessibilityRole="button"
+                          accessibilityLabel="Registrazione intelligente"
+                          accessibilityHint="Un tocco apre la chat AI. Doppio tocco apre la fotocamera per lo scontrino. Tieni premuto per parlare."
                         >
                           {isVoiceChat ? (
                             <Ionicons name="mic" size={28} color="#0078FF" />
@@ -412,6 +418,12 @@ export default function BottomMenu() {
               }
 
               const active = isActive(item.path);
+              const labelMap: Record<string, string> = {
+                home: 'Home',
+                stats: 'Statistiche',
+                subs: 'Abbonamenti',
+                settings: 'Impostazioni',
+              };
               return (
                 <Pressable
                   key={item.id}
@@ -420,6 +432,9 @@ export default function BottomMenu() {
                     router.replace(item.path as any);
                   }}
                   style={styles.navItem}
+                  accessibilityRole="tab"
+                  accessibilityLabel={labelMap[item.id] ?? item.id}
+                  accessibilityState={{ selected: active }}
                 >
                   <Ionicons
                     name={active ? (item.iconSharp as any) : (item.iconOutline as any)}

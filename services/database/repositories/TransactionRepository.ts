@@ -136,11 +136,31 @@ export class TransactionRepository {
       ORDER BY month ASC
     `, [year.toString()]);
 
-    const stats = Array.from({ length: 12 }, (_, i) => ({
-      month: i + 1,
-      income: 0,
-      expense: 0
-    }));
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
+
+    const stats = Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      const mStr = m < 10 ? `0${m}` : `${m}`;
+      
+      let dateStr = '';
+      if (year === currentYear && m === currentMonth) {
+        dateStr = todayStr;
+      } else {
+        const lastDay = new Date(year, m, 0).getDate();
+        const lastDayStr = lastDay < 10 ? `0${lastDay}` : `${lastDay}`;
+        dateStr = `${year}-${mStr}-${lastDayStr}`;
+      }
+
+      return {
+        month: m,
+        date: dateStr,
+        income: 0,
+        expense: 0
+      };
+    });
 
     results.forEach((row: any) => {
       if (row.month >= 1 && row.month <= 12) {
@@ -149,7 +169,7 @@ export class TransactionRepository {
       }
     });
 
-    return stats;
+    return stats as any[];
   }
 
   /**
@@ -278,6 +298,7 @@ export class TransactionRepository {
 
     const start = parseLocalDate(firstDateStr);
     const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
     const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     
     const timeDiff = end.getTime() - start.getTime();
@@ -310,6 +331,7 @@ export class TransactionRepository {
         const match = results.find(r => r.period === dateStr);
         stats.push({
           label: d.getDate().toString().padStart(2, '0') + ' ' + d.toLocaleDateString('it-IT', { month: 'short' }),
+          date: dateStr,
           income: match ? match.income : 0,
           expense: match ? match.expense : 0
         });
@@ -329,15 +351,25 @@ export class TransactionRepository {
       
       const current = new Date(start.getFullYear(), start.getMonth(), 1);
       const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
+      const todayPeriodStr = `${end.getFullYear()}-${(end.getMonth() + 1).toString().padStart(2, '0')}`;
       
       for (let c = new Date(current); c <= targetEnd; c.setMonth(c.getMonth() + 1)) {
         const yStr = c.getFullYear();
         const mStr = (c.getMonth() + 1).toString().padStart(2, '0');
         const periodStr = `${yStr}-${mStr}`;
         
+        let dateStr = '';
+        if (periodStr === todayPeriodStr) {
+          dateStr = todayStr;
+        } else {
+          const lastDay = new Date(c.getFullYear(), c.getMonth() + 1, 0).getDate();
+          dateStr = `${yStr}-${mStr}-${lastDay.toString().padStart(2, '0')}`;
+        }
+        
         const match = results.find(r => r.period === periodStr);
         stats.push({
           label: `${mStr}/${yStr.toString().slice(2)}`,
+          date: dateStr,
           income: match ? match.income : 0,
           expense: match ? match.expense : 0
         });
@@ -359,9 +391,16 @@ export class TransactionRepository {
       const endYear = end.getFullYear();
       
       for (let y = startYear; y <= endYear; y++) {
+        let dateStr = '';
+        if (y === endYear) {
+          dateStr = todayStr;
+        } else {
+          dateStr = `${y}-12-31`;
+        }
         const match = results.find(r => r.period === y.toString());
         stats.push({
           label: y.toString(),
+          date: dateStr,
           income: match ? match.income : 0,
           expense: match ? match.expense : 0
         });
@@ -644,7 +683,7 @@ export class TransactionRepository {
     direction: 'in' | 'out',
     filters: { category_key?: string, subcategory_key?: string, domain_keys?: string[], category_keys?: string[] },
     baseDate: string = new Date().toISOString().split('T')[0]
-  ): Promise<{ label: string, value: number }[]> {
+  ): Promise<{ label: string, value: number, date: string }[]> {
     const db = await getDBConnection();
     
     let timeExpr = "date";
@@ -696,6 +735,7 @@ export class TransactionRepository {
         const match = results.find(r => r.period === dateStr);
         stats.push({
           label: d.toLocaleDateString('it-IT', { weekday: 'short' }),
+          date: dateStr,
           value: match ? match.total : 0
         });
       }
@@ -714,6 +754,7 @@ export class TransactionRepository {
         const match = results.find(r => r.period === dateStr);
         stats.push({
           label: dayStr,
+          date: dateStr,
           value: match ? match.total : 0
         });
       }
@@ -730,6 +771,7 @@ export class TransactionRepository {
         
         stats.push({
           label: months[m - 1],
+          date: `${year}-${m.toString().padStart(2, '0')}-01`,
           value: match ? match.total : 0
         });
       }
@@ -784,6 +826,7 @@ export class TransactionRepository {
         const match = dailyResults.find(r => r.period === dateStr);
         stats.push({
           label: d.getDate().toString().padStart(2, '0') + ' ' + d.toLocaleDateString('it-IT', { month: 'short' }),
+          date: dateStr,
           value: match ? match.total : 0
         });
       }
@@ -809,6 +852,7 @@ export class TransactionRepository {
         const match = monthlyResults.find(r => r.period === periodStr);
         stats.push({
           label: `${mStr}/${yStr.toString().slice(2)}`,
+          date: `${yStr}-${mStr}-01`,
           value: match ? match.total : 0
         });
         
@@ -832,6 +876,7 @@ export class TransactionRepository {
         const match = yearlyResults.find(r => r.period === y.toString());
         stats.push({
           label: y.toString(),
+          date: `${y}-01-01`,
           value: match ? match.total : 0
         });
       }
@@ -1042,13 +1087,119 @@ export class TransactionRepository {
   }
 
   /**
+   * Helper to determine granularity for all time stats
+   */
+  static async getGranularityForTutto(): Promise<'daily' | 'monthly' | 'yearly'> {
+    const db = await getDBConnection();
+    const firstTxResult = await db.getFirstAsync<{ first_date: string }>(`
+      SELECT MIN(date) as first_date FROM transactions WHERE is_deleted = 0
+    `);
+    
+    const firstDateStr = firstTxResult?.first_date || new Date().toISOString().split('T')[0];
+    
+    const parseLocalDate = (dateStr: string): Date => {
+      const parts = dateStr.split('T')[0].split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      return new Date(y, m, d);
+    };
+
+    const start = parseLocalDate(firstDateStr);
+    const today = new Date();
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    const timeDiff = end.getTime() - start.getTime();
+    const daysSpan = Math.round(timeDiff / (1000 * 3600 * 24));
+    
+    if (daysSpan <= 60) {
+      return 'daily';
+    } else if (daysSpan <= 730) {
+      return 'monthly';
+    } else {
+      return 'yearly';
+    }
+  }
+
+  /**
+   * Calculates the absolute max and min values for trend aggregates (in, out, or both)
+   * across the entire database history, based on the current granularity and category filters.
+   */
+  static async getAbsoluteTrendLimits(
+    timeRange: 'Settimana' | 'Mese' | 'Anno' | 'Tutto',
+    direction: 'in' | 'out' | 'both',
+    filters: { category_key?: string, subcategory_key?: string, domain_keys?: string[], category_keys?: string[] } = {}
+  ): Promise<{ max: number; min: number }> {
+    const db = await getDBConnection();
+    
+    let granularity: 'daily' | 'monthly' | 'yearly' = 'daily';
+    if (timeRange === 'Anno') {
+      granularity = 'monthly';
+    } else if (timeRange === 'Tutto') {
+      granularity = await this.getGranularityForTutto();
+    }
+    
+    let timeExpr = "date";
+    if (granularity === 'monthly') {
+      timeExpr = "strftime('%Y-%m', date)";
+    } else if (granularity === 'yearly') {
+      timeExpr = "strftime('%Y', date)";
+    }
+    
+    let filterExpr = "";
+    if (filters.category_key) filterExpr += ` AND category_key = '${filters.category_key}'`;
+    if (filters.subcategory_key) filterExpr += ` AND subcategory_key = '${filters.subcategory_key}'`;
+    if (filters.domain_keys && filters.domain_keys.length > 0) {
+      const placeholders = filters.domain_keys.map(k => `'${k}'`).join(',');
+      filterExpr += ` AND domain_key IN (${placeholders})`;
+    }
+    if (filters.category_keys && filters.category_keys.length > 0) {
+      const placeholders = filters.category_keys.map(k => `'${k}'`).join(',');
+      filterExpr += ` AND category_key IN (${placeholders})`;
+    }
+
+    let query = "";
+    if (direction === 'both') {
+      query = `
+        SELECT MAX(CASE WHEN income > expense THEN income ELSE expense END) as max_val FROM (
+          SELECT 
+            SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END) as income,
+            SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END) as expense
+          FROM transactions
+          WHERE is_deleted = 0 AND direction != 'adj' ${filterExpr}
+          GROUP BY ${timeExpr}
+        )
+      `;
+    } else {
+      query = `
+        SELECT MAX(total) as max_val FROM (
+          SELECT SUM(amount) as total
+          FROM transactions
+          WHERE is_deleted = 0 AND direction = '${direction}' ${filterExpr}
+          GROUP BY ${timeExpr}
+        )
+      `;
+    }
+    
+    const result = await db.getFirstAsync<{ max_val: number }>(query);
+    return { max: result?.max_val || 0, min: 0 };
+  }
+
+  /**
    * Deletes all transactions, subscriptions, and resets the net worth to baseline 1000.0.
    */
   static async deleteAll(): Promise<void> {
     const db = await getDBConnection();
     await db.runAsync('DELETE FROM transactions');
     await db.runAsync('DELETE FROM subscriptions');
-    await db.runAsync('UPDATE net_worth SET amount = 1000.0');
+    await db.runAsync('DELETE FROM net_worth_history');
+
+    // Use today as the new "day zero" so all charts and stats start from now
+    const now = new Date();
+    const initDate = now.toISOString();
+    const initDateStr = now.toISOString().split('T')[0];
+    await db.runAsync(`UPDATE net_worth SET amount = 1000.0, updated_at = ?`, [initDate]);
+    await db.runAsync(`INSERT OR REPLACE INTO net_worth_history (date, amount, updated_at) VALUES (?, 1000.0, ?)`, [initDateStr, initDate]);
   }
 }
 

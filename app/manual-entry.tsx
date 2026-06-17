@@ -11,6 +11,7 @@ import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../constants/Theme';
 import { ParsedExpense, TimeOfDay, SocialContext, LocationType } from '../modules/registration/types';
 import { getCurrentLocationContext } from '../services/location';
 import { analytics, ANALYTICS_SCREENS, ANALYTICS_BUTTONS } from '../services/analytics';
+import { INPUT_MAX_LENGTH } from '../constants/accessibility';
 
 export default function ManualEntry() {
   const router = useRouter();
@@ -37,6 +38,14 @@ export default function ManualEntry() {
   const [city, setCity] = useState<string | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  
+  // Validation
+  const [amountError, setAmountError] = useState<string | null>(null);
+
+  // Custom Calendar state
+  const [calendarDate, setCalendarDate] = useState(() => {
+    return { year: dateTime.getFullYear(), month: dateTime.getMonth() };
+  });
 
   // Update subcategories when category changes
   useEffect(() => {
@@ -103,12 +112,41 @@ export default function ManualEntry() {
     }
   };
 
+  const MONTHS_IT = [
+    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+  ];
+
+  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+  const getFirstDayOfMonth = (y: number, m: number) => {
+    const day = new Date(y, m, 1).getDay();
+    return day === 0 ? 6 : day - 1; // Lun=0, Dom=6
+  };
+
+  const changeMonth = (dir: 'next' | 'prev') => {
+    setCalendarDate(curr => {
+      let m = curr.month + (dir === 'next' ? 1 : -1);
+      let y = curr.year;
+      if (m > 11) { m = 0; y += 1; }
+      if (m < 0) { m = 11; y -= 1; }
+      return { year: y, month: m };
+    });
+  };
+
+  const handleDaySelect = (dayNum: number) => {
+    const newDate = new Date(dateTime);
+    newDate.setFullYear(calendarDate.year, calendarDate.month, dayNum);
+    setDateTime(newDate);
+    setShowDatePicker(false);
+  };
+
   const handleSave = () => {
-    const parsedVal = parseFloat(amount.replace(',', '.'));
+    const parsedVal = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
     if (!amount || isNaN(parsedVal) || parsedVal <= 0) {
-      Alert.alert('Errore', 'Inserisci un importo valido.');
+      setAmountError('Inserisci un importo valido');
       return;
     }
+    setAmountError(null);
 
     analytics.trackClick(ANALYTICS_BUTTONS.SAVE_TRANSACTION, ANALYTICS_SCREENS.MANUAL_ENTRY, {
       amount: parsedVal,
@@ -175,7 +213,13 @@ export default function ManualEntry() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Torna indietro"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Ionicons name="close" size={28} color={COLORS.primary} />
           </Pressable>
           <Text style={styles.headerTitle}>Nuova Voce</Text>
@@ -203,17 +247,61 @@ export default function ManualEntry() {
             <View style={styles.amountInputRow}>
               <Text style={[styles.currency, { color: direction === 'in' ? COLORS.success : COLORS.primary }]}>€</Text>
               <TextInput 
-                style={[styles.amountInput, { color: direction === 'in' ? COLORS.success : COLORS.primary }]}
-                placeholder="0.00"
+                style={[
+                  styles.amountInput, 
+                  { color: direction === 'in' ? COLORS.success : COLORS.primary },
+                  amountError && { borderColor: '#EF4444', borderBottomWidth: 1 }
+                ]}
+                placeholder="0,00"
                 keyboardType="decimal-pad"
                 value={amount}
                 onChangeText={(val) => {
-                  const cleaned = val.replace(/[^0-9,.]/g, '');
-                  setAmount(cleaned);
+                  setAmountError(null);
+                  let newVal = val;
+                  if (newVal.endsWith('.')) {
+                    newVal = newVal.slice(0, -1) + ',';
+                  }
+                  let raw = newVal.replace(/\./g, '');
+                  raw = raw.replace(/[^0-9,]/g, '');
+                  raw = raw.replace(/(,.*),/g, '$1');
+
+                  let parts = raw.split(',');
+                  if (parts.length > 1) {
+                    parts[1] = parts[1].substring(0, 2);
+                    raw = parts.join(',');
+                  }
+
+                  let intPart = parts[0];
+                  if (intPart.length > 9) {
+                    intPart = intPart.substring(0, 9);
+                  }
+                  
+                  if (intPart.length > 1 && intPart.startsWith('0')) {
+                    intPart = intPart.replace(/^0+/, '');
+                    if (intPart === '') intPart = '0';
+                  }
+
+                  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                  const formatted = parts.length > 1 ? `${formattedInt},${parts[1]}` : formattedInt;
+
+                  setAmount(formatted);
+                }}
+                onBlur={() => {
+                  const parsedVal = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
+                  if (!amount || isNaN(parsedVal) || parsedVal <= 0) {
+                    setAmountError('Inserisci un importo valido');
+                  } else {
+                    setAmountError(null);
+                  }
                 }}
                 autoFocus
+                accessibilityLabel="Importo in euro"
+                accessibilityHint="Usa la virgola come separatore decimale"
               />
             </View>
+            {amountError && (
+              <Text style={styles.amountErrorText}>{amountError}</Text>
+            )}
           </View>
 
           {/* VENDOR & DESCRIPTION */}
@@ -224,6 +312,10 @@ export default function ManualEntry() {
               placeholder="Venditore / Negozio"
               value={vendor}
               onChangeText={setVendor}
+              returnKeyType="next"
+              maxLength={INPUT_MAX_LENGTH.vendor}
+              autoCapitalize="words"
+              accessibilityLabel="Nome venditore o negozio"
             />
             <TextInput 
               style={[styles.input, { marginTop: 12 }]}
@@ -231,6 +323,8 @@ export default function ManualEntry() {
               value={description}
               onChangeText={setDescription}
               multiline
+              maxLength={INPUT_MAX_LENGTH.note}
+              accessibilityLabel="Descrizione della transazione"
             />
           </View>
 
@@ -253,10 +347,10 @@ export default function ManualEntry() {
           <View style={styles.row}>
             <View style={[styles.section, { flex: 1, marginRight: 8 }]}>
               <Text style={styles.label}>Quando</Text>
-              <Pressable style={styles.input} onPress={() => setShowDatePicker(true)}>
+              <Pressable style={styles.input} onPress={() => { setShowDatePicker(!showDatePicker); setShowTimePicker(false); }}>
                 <Text style={styles.inputText}>{dateTime.toLocaleDateString('it-IT')}</Text>
               </Pressable>
-              <Pressable style={[styles.input, { marginTop: 8 }]} onPress={() => setShowTimePicker(true)}>
+              <Pressable style={[styles.input, { marginTop: 8 }]} onPress={() => { setShowTimePicker(!showTimePicker); setShowDatePicker(false); }}>
                 <Text style={styles.inputText}>{dateTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</Text>
               </Pressable>
             </View>
@@ -272,6 +366,59 @@ export default function ManualEntry() {
               </View>
             </View>
           </View>
+
+          {/* CUSTOM DATEPICKER CALENDAR */}
+          {showDatePicker && (
+            <View style={[styles.section, styles.calendarWrapper]}>
+              <View style={styles.calendarContainer}>
+                <View style={styles.calendarHeader}>
+                  <Pressable onPress={() => changeMonth('prev')} style={styles.calNavBtn}>
+                    <Ionicons name="chevron-back" size={20} color={COLORS.primary} />
+                  </Pressable>
+                  <Text style={styles.calendarHeaderTitle}>
+                    {MONTHS_IT[calendarDate.month]} {calendarDate.year}
+                  </Text>
+                  <Pressable onPress={() => changeMonth('next')} style={styles.calNavBtn}>
+                    <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                  </Pressable>
+                </View>
+                
+                <View style={styles.weekdaysRow}>
+                  {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => (
+                    <Text key={i} style={styles.weekdayText}>{d}</Text>
+                  ))}
+                </View>
+
+                <View style={styles.daysGrid}>
+                  {(() => {
+                    const days = getDaysInMonth(calendarDate.year, calendarDate.month);
+                    const firstDay = getFirstDayOfMonth(calendarDate.year, calendarDate.month);
+                    const grid = [];
+                    for (let i = 0; i < firstDay; i++) {
+                      grid.push(<View key={`empty-${i}`} style={styles.dayCellEmpty} />);
+                    }
+                    for (let i = 1; i <= days; i++) {
+                      const isSelected = dateTime.getFullYear() === calendarDate.year &&
+                        dateTime.getMonth() === calendarDate.month &&
+                        dateTime.getDate() === i;
+                      grid.push(
+                        <Pressable 
+                          key={`day-${i}`} 
+                          onPress={() => handleDaySelect(i)}
+                          style={[styles.dayCell, isSelected && styles.dayCellSelected]}
+                        >
+                          <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>
+                            {i}
+                          </Text>
+                        </Pressable>
+                      );
+                    }
+                    return grid;
+                  })()}
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* LOCATION */}
           <View style={styles.section}>
@@ -330,6 +477,10 @@ export default function ManualEntry() {
                 value={currentTag}
                 onChangeText={setCurrentTag}
                 onSubmitEditing={addPersonTag}
+                maxLength={INPUT_MAX_LENGTH.personName}
+                autoCapitalize="words"
+                returnKeyType="done"
+                accessibilityLabel="Nome della persona"
               />
               <Pressable onPress={addPersonTag} style={styles.addTagBtn}>
                 <Ionicons name="add" size={24} color={COLORS.primary} />
@@ -348,13 +499,17 @@ export default function ManualEntry() {
           </View>
 
           {/* SUBMIT */}
-          <Pressable style={styles.saveBtn} onPress={handleSave}>
+          <Pressable
+            style={styles.saveBtn}
+            onPress={handleSave}
+            accessibilityRole="button"
+            accessibilityLabel="Salva transazione"
+          >
             <Text style={styles.saveBtnText}>Salva Transazione</Text>
           </Pressable>
 
         </ScrollView>
 
-        {showDatePicker && <DateTimePicker value={dateTime} mode="date" display="default" onChange={onDateChange} />}
         {showTimePicker && <DateTimePicker value={dateTime} mode="time" display="default" onChange={onTimeChange} />}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -415,5 +570,76 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#FFF',
-  }
+  },
+  amountErrorText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontFamily: TYPOGRAPHY.fontBold,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  calendarWrapper: {
+    marginTop: -8,
+    marginBottom: SPACING.md,
+  },
+  calendarContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.soft,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  calendarHeaderTitle: {
+    fontFamily: TYPOGRAPHY.fontBold,
+    color: COLORS.primary,
+    fontSize: 14,
+  },
+  calNavBtn: {
+    padding: 4,
+  },
+  weekdaysRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  weekdayText: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    color: COLORS.secondary,
+    fontFamily: TYPOGRAPHY.fontBold,
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dayCell: {
+    width: '14.28%',
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  dayCellEmpty: {
+    width: '14.28%',
+    aspectRatio: 1,
+  },
+  dayCellSelected: {
+    backgroundColor: '#0A74FF',
+  },
+  dayText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontFamily: TYPOGRAPHY.fontBold,
+  },
+  dayTextSelected: {
+    color: '#FFFFFF',
+    fontFamily: TYPOGRAPHY.fontBold,
+  },
 });

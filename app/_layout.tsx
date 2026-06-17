@@ -6,6 +6,7 @@ import BottomMenu from '../components/BottomMenu';
 import TopNavigation from '../components/TopNavigation';
 import SwipeNavigator from '../components/SwipeNavigator';
 import VoiceChatOverlay from '../components/ai/VoiceChatOverlay';
+import { ToastProvider } from '../components/Toast';
 import { View, LogBox } from 'react-native';
 import { usePathname } from 'expo-router';
 import { voiceStore } from '../services/voiceStore';
@@ -150,6 +151,7 @@ export default function RootLayout() {
   const showBottomMenu = tabPaths.includes(pathname) || pathname.startsWith('/stats/');
 
   return (
+    <ToastProvider>
     <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
       <SwipeNavigator>
         <Stack screenOptions={{ headerShown: false }}>
@@ -177,5 +179,6 @@ export default function RootLayout() {
       {/* Bottom menu: sempre visibile sulle schede principali e sulle chat AI */}
       {(showBottomMenu || voiceOpen) && <BottomMenu />}
     </View>
+    </ToastProvider>
   );
 }

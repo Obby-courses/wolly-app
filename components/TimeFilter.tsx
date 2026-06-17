@@ -147,7 +147,7 @@ export default function TimeFilter({ timeRange, setTimeRange, baseDate, onDateCh
 }
 
 const styles = StyleSheet.create({
-  stickyFilterWrapper: { backgroundColor: COLORS.surface, paddingBottom: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border, zIndex: 10 },
+  stickyFilterWrapper: { paddingBottom: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border, zIndex: 10, backgroundColor: COLORS.background },
   filterContainer: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 12, marginHorizontal: SPACING.lg, marginTop: SPACING.sm, padding: 4 },
   filterButton: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10 },
   filterButtonActive: { backgroundColor: COLORS.surface, ...SHADOWS.soft },

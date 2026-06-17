@@ -88,8 +88,26 @@ export async function createTables(db: SQLite.SQLiteDatabase) {
   const rs = await db.getAllAsync(`SELECT count(*) as c FROM net_worth`);
   if ((rs[0] as any).c === 0) {
     const defaultId = 'nw_initial';
-    const initDate = '2026-01-01T00:00:00.000Z';
+    const initDate = new Date().toISOString();
     await db.execAsync(`INSERT INTO net_worth (id, amount, updated_at) VALUES ('${defaultId}', 1000.0, '${initDate}')`);
+  }
+
+  // Create net_worth_history table to keep track of daily manual net worth overrides
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS net_worth_history (
+      date TEXT PRIMARY KEY NOT NULL,
+      amount REAL NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  // Seed the net_worth_history with initial data if empty
+  const rsHist = await db.getAllAsync(`SELECT count(*) as c FROM net_worth_history`);
+  if ((rsHist[0] as any).c === 0) {
+    const now = new Date();
+    const initDate = now.toISOString();
+    const initDateStr = now.toISOString().split('T')[0];
+    await db.execAsync(`INSERT INTO net_worth_history (date, amount, updated_at) VALUES ('${initDateStr}', 1000.0, '${initDate}')`);
   }
 
   // Legacy table — kept for data safety, no longer used by the app
@@ -147,4 +165,6 @@ export async function dropTables(db: SQLite.SQLiteDatabase) {
   await db.execAsync(`DROP TABLE IF EXISTS transactions;`);
   await db.execAsync(`DROP TABLE IF EXISTS recurring_payments;`);
   await db.execAsync(`DROP TABLE IF EXISTS subscriptions;`);
+  await db.execAsync(`DROP TABLE IF EXISTS net_worth;`);
+  await db.execAsync(`DROP TABLE IF EXISTS net_worth_history;`);
 }

@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { DOMAINS_CONFIG, Domain, Category } from '../constants/categories';
-import { COLORS } from '../constants/Theme';
+import { COLORS, TYPOGRAPHY } from '../constants/Theme';
 
 const DOMAIN_COLORS: Record<string, string> = {
   cibo_bevande: '#6366F1',
@@ -76,7 +76,7 @@ export default function CategoryPickerModal({ visible, currentCategoryKey, direc
   const domainColor = selectedDomain ? (DOMAIN_COLORS[selectedDomain.key] || COLORS.secondary) : COLORS.primary;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleBack}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleBack} accessibilityViewIsModal>
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={[styles.header, selectedDomain && { borderBottomColor: domainColor + '40' }]}>
@@ -112,6 +112,8 @@ export default function CategoryPickerModal({ visible, currentCategoryKey, direc
                         isDomainActive && { borderWidth: 2, borderColor: '#FFF' }
                       ]}
                       onPress={() => handleDomainPress(domain)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${domain.label}, ${isDomainActive ? 'selezionato' : 'non selezionato'}`}
                     >
                       <View style={styles.domainCardTop}>
                         <Ionicons name={icon as any} size={28} color="#FFF" />
@@ -139,6 +141,8 @@ export default function CategoryPickerModal({ visible, currentCategoryKey, direc
                       isDomainSelected && { borderWidth: 2, borderColor: '#FFF' }
                     ]}
                     onPress={() => handleSelectDomain(selectedDomain)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${selectedDomain.label}, ${isDomainSelected ? 'selezionato' : 'non selezionato'}`}
                   >
                     <View style={styles.domainHeaderLeft}>
                       <Ionicons name={(DOMAIN_ICONS[selectedDomain.key] || 'grid-outline') as any} size={24} color="#FFF" />
@@ -174,9 +178,11 @@ export default function CategoryPickerModal({ visible, currentCategoryKey, direc
                         isSelected && { backgroundColor: domainColor + '12' }
                       ]}
                       onPress={() => handleSelectCategory(cat)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${cat.label}, ${isSelected ? 'selezionato' : 'non selezionato'}`}
                     >
                       <View style={[styles.categoryDot, { backgroundColor: isSelected ? domainColor : '#E5E7EB' }]} />
-                      <Text style={[styles.categoryItemText, isSelected && { color: domainColor, fontWeight: '700' }]}>
+                      <Text style={[styles.categoryItemText, isSelected && { color: domainColor, fontFamily: TYPOGRAPHY.fontBold }]}>
                         {cat.label}
                       </Text>
                       {isSelected && (
@@ -207,11 +213,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   headerBack: { padding: 4 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: COLORS.primary },
+  headerTitle: { fontSize: 17, fontFamily: TYPOGRAPHY.fontBold, color: COLORS.primary },
   content: { padding: 20, paddingBottom: 60 },
   hint: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.fontBold,
     color: COLORS.secondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -244,7 +250,7 @@ const styles = StyleSheet.create({
   domainCardLabel: {
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.fontBold,
     marginTop: 12,
     flexShrink: 1,
   },
@@ -262,15 +268,15 @@ const styles = StyleSheet.create({
     })
   },
   domainHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
-  domainHeaderLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  domainHeaderName: { color: '#FFF', fontSize: 18, fontWeight: '800', marginTop: 2 },
+  domainHeaderLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontFamily: TYPOGRAPHY.fontBold, textTransform: 'uppercase', letterSpacing: 1 },
+  domainHeaderName: { color: '#FFF', fontSize: 18, fontFamily: TYPOGRAPHY.fontBold, marginTop: 2 },
   domainSelectBadge: {
     backgroundColor: 'rgba(255,255,255,0.25)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
   },
-  domainSelectBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+  domainSelectBadgeText: { color: '#FFF', fontSize: 12, fontFamily: TYPOGRAPHY.fontBold },
   // Category list
   categoryList: {
     backgroundColor: '#FFF',

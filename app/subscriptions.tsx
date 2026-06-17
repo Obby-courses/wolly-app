@@ -19,6 +19,8 @@ import CategoryPickerModal from '../components/CategoryPickerModal';
 import CategoryPill from '../components/CategoryPill';
 import TransactionPreview from '../components/TransactionPreview';
 import PeriodicDateSelector from '../components/PeriodicDateSelector';
+import { useToast } from '../components/Toast';
+import { INPUT_MAX_LENGTH } from '../constants/accessibility';
 
 const capitalizeProperNoun = (val: string | null | undefined): string => {
   if (!val) return '';
@@ -437,22 +439,22 @@ function SubModal({
   const isIncome = form.direction === 'in';
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" accessibilityViewIsModal={true}>
       <SafeAreaView style={modal.container}>
         <View style={modal.header}>
-          <Pressable onPress={handleClose} style={modal.backIcon}>
-            <Ionicons name="close" size={26} color={COLORS.primary} />
+          <Pressable onPress={handleClose} style={modal.backIcon} accessibilityRole="button" accessibilityLabel="Chiudi">
+            <Ionicons name="close" size={20} color={COLORS.primary} />
           </Pressable>
           <Text style={modal.headerTitle}>
             {initial ? 'Gestisci Periodica' : 'Nuova Periodica'}
           </Text>
           <View style={modal.headerRightContainer}>
             {!!initial && onDelete && (
-              <Pressable onPress={handleDeleteClick} style={modal.headerActionBtn}>
-                <Ionicons name="trash-outline" size={22} color="#EF4444" />
+              <Pressable onPress={handleDeleteClick} style={modal.headerActionBtn} accessibilityRole="button" accessibilityLabel="Elimina periodica">
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
               </Pressable>
             )}
-            <Pressable onPress={handleSave} disabled={saving} style={modal.headerSaveBtn}>
+            <Pressable onPress={handleSave} disabled={saving} style={modal.headerSaveBtn} accessibilityRole="button" accessibilityLabel="Salva periodica">
               <Text style={modal.headerSaveText}>{saving ? '...' : 'Salva'}</Text>
             </Pressable>
           </View>
@@ -481,26 +483,44 @@ function SubModal({
             {/* AMOUNT */}
             <View style={modal.amountContainer}>
                <Text style={[modal.currency, { color: isIncome ? COLORS.success : COLORS.primary }]}>€</Text>
-               <TextInput 
+                <TextInput 
                   style={[modal.amountInput, { color: isIncome ? COLORS.success : COLORS.primary }]}
                   value={form.amount}
                   onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9,.]/g, '');
-                    const firstComma = cleaned.indexOf(',');
-                    const firstDot = cleaned.indexOf('.');
-                    if (firstComma !== -1 && firstDot !== -1) {
-                      if (firstComma < firstDot) {
-                        cleaned = cleaned.replace(/\./g, '');
-                      } else {
-                        cleaned = cleaned.replace(/,/g, '');
-                      }
+                    let newVal = val;
+                    if (newVal.endsWith('.')) {
+                      newVal = newVal.slice(0, -1) + ',';
                     }
-                    cleaned = cleaned.replace(/(,.*),/g, '$1').replace(/(\..*)\./, '$1');
-                    set('amount', cleaned);
+                    let raw = newVal.replace(/\./g, '');
+                    raw = raw.replace(/[^0-9,]/g, '');
+                    raw = raw.replace(/(,.*),/g, '$1');
+
+                    let parts = raw.split(',');
+                    if (parts.length > 1) {
+                      parts[1] = parts[1].substring(0, 2);
+                      raw = parts.join(',');
+                    }
+
+                    let intPart = parts[0];
+                    if (intPart.length > 9) {
+                      intPart = intPart.substring(0, 9);
+                    }
+                    
+                    if (intPart.length > 1 && intPart.startsWith('0')) {
+                      intPart = intPart.replace(/^0+/, '');
+                      if (intPart === '') intPart = '0';
+                    }
+
+                    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                    const formatted = parts.length > 1 ? `${formattedInt},${parts[1]}` : formattedInt;
+
+                    set('amount', formatted);
                   }}
                   keyboardType="decimal-pad"
                   placeholder="0,00"
                   placeholderTextColor={isIncome ? 'rgba(52, 199, 89, 0.4)' : COLORS.secondary}
+                  accessibilityLabel="Importo periodica in euro"
+                  accessibilityHint="Inserisci il valore numerico usando la virgola come separatore decimale"
                />
             </View>
 
@@ -513,6 +533,9 @@ function SubModal({
                   placeholderTextColor={COLORS.secondary}
                   value={form.name}
                   onChangeText={v => set('name', v)}
+                  maxLength={INPUT_MAX_LENGTH.subscriptionName}
+                  autoCapitalize="words"
+                  accessibilityLabel="Nome periodica"
                 />
                 <Text style={modal.detailLabel}>Nome</Text>
               </View>
@@ -578,9 +601,11 @@ function SubModal({
                       ref={ref => { inputRefs.current['description'] = ref; }}
                       style={modal.rowTextInput}
                       placeholder="----"
-                      placeholderTextColor={COLORS.primary}
+                      placeholderTextColor={COLORS.secondary}
                       value={form.description}
                       onChangeText={(v) => set('description', v)}
+                      maxLength={INPUT_MAX_LENGTH.note}
+                      accessibilityLabel="Nota o descrizione"
                       editable={focusedInlineField === 'description'}
                       scrollEnabled={false}
                       onPressIn={() => {
@@ -624,9 +649,12 @@ function SubModal({
                       ref={ref => { inputRefs.current['location_name'] = ref; }}
                       style={modal.rowTextInput}
                       placeholder="----"
-                      placeholderTextColor={COLORS.primary}
+                      placeholderTextColor={COLORS.secondary}
                       value={capitalizeProperNoun(form.location_name)}
                       onChangeText={(v) => set('location_name', capitalizeProperNoun(v))}
+                      maxLength={INPUT_MAX_LENGTH.vendor}
+                      autoCapitalize="words"
+                      accessibilityLabel="Nome negozio o venditore"
                       editable={focusedInlineField === 'location_name'}
                       scrollEnabled={false}
                       onPressIn={() => {
@@ -667,6 +695,8 @@ function SubModal({
               <Pressable 
                 style={[modal.detailItemVertical, activeField !== 'city' && modal.detailItemBorder]}
                 onPress={() => toggleField('city', 220)}
+                accessibilityRole="button"
+                accessibilityLabel={`Località, attualmente: ${form.city ? `${form.city}${form.address ? `, ${form.address}` : ''}` : 'Non definita'}`}
               >
                 <View style={modal.detailTextContainer}>
                   <Text style={modal.detailValue}>
@@ -694,6 +724,9 @@ function SubModal({
                     placeholderTextColor={COLORS.secondary}
                     value={citySearch}
                     onChangeText={setCitySearch}
+                    maxLength={INPUT_MAX_LENGTH.citySearch}
+                    autoCapitalize="words"
+                    accessibilityLabel="Cerca comune"
                     autoFocus
                     onFocus={() => handleInputFocus('citySearch')}
                   />
@@ -716,6 +749,10 @@ function SubModal({
                   </View>
                 )}
 
+                {citySearch.length >= 2 && filteredCities.length === 0 && (
+                  <Text style={modal.noResultsText}>Nessun comune trovato</Text>
+                )}
+
                 <Text style={[modal.editorLabel, { marginTop: 15 }]}>Via / Indirizzo specifico</Text>
                 <TextInput
                   ref={ref => { inputRefs.current['address'] = ref; }}
@@ -724,6 +761,9 @@ function SubModal({
                   placeholderTextColor={COLORS.secondary}
                   value={form.address}
                   onChangeText={(v) => set('address', sanitizeLocationField(v))}
+                  maxLength={INPUT_MAX_LENGTH.address}
+                  autoCapitalize="words"
+                  accessibilityLabel="Via o indirizzo specifico"
                   onFocus={() => handleInputFocus('address')}
                 />
               </View>
@@ -740,6 +780,8 @@ function SubModal({
               <Pressable 
                 style={[modal.detailItemVertical, activeField !== 'location_type' && modal.detailItemBorder]}
                 onPress={() => toggleField('location_type', 300)}
+                accessibilityRole="button"
+                accessibilityLabel={`Tipo Location, attualmente: ${form.location_type ? form.location_type : 'Non definita'}`}
               >
                 <View style={modal.detailTextContainer}>
                   <Text style={modal.detailValue}>
@@ -794,6 +836,8 @@ function SubModal({
                       key={f.key}
                       style={[modal.quickChip, form.frequency === f.key && modal.quickChipActive]}
                       onPress={() => set('frequency', f.key)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Frequenza ${f.label}`}
                     >
                       <Text style={[modal.quickChipText, form.frequency === f.key && modal.quickChipTextActive]}>
                         {f.label}
@@ -832,6 +876,8 @@ function SubModal({
                     key={tagStr}
                     onPress={() => toggleTagChip(tagStr)}
                     style={[modal.quickChip, isSel && modal.quickChipActive]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Tag ${tagStr}, ${isSel ? 'selezionato' : 'non selezionato'}`}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[modal.quickChipText, isSel && modal.quickChipTextActive]}>
@@ -853,6 +899,8 @@ function SubModal({
                     key={customTag}
                     onPress={() => toggleTagChip(customTag)}
                     style={[modal.quickChip, modal.quickChipActive]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Tag ${customTag}, selezionato`}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[modal.quickChipText, modal.quickChipTextActive]}>
@@ -871,6 +919,8 @@ function SubModal({
                   setShowNewTagInput(!showNewTagInput);
                 }}
                 style={[modal.quickChip, { borderStyle: 'dashed', borderColor: COLORS.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel="Crea nuovo tag"
               >
                 <Text style={[modal.quickChipText, { color: COLORS.primary }]}>
                   + Nuovo
@@ -888,6 +938,9 @@ function SubModal({
                   placeholderTextColor={COLORS.secondary}
                   value={newTagInput}
                   onChangeText={setNewTagInput}
+                  maxLength={INPUT_MAX_LENGTH.tag}
+                  autoCapitalize="none"
+                  accessibilityLabel="Nome nuovo tag"
                   autoFocus
                   onSubmitEditing={handleAddCustomTag}
                   onFocus={() => handleInputFocus('newTagInput')}
@@ -895,6 +948,8 @@ function SubModal({
                 <Pressable 
                   onPress={handleAddCustomTag}
                   style={modal.addTagButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Aggiungi tag"
                 >
                   <Ionicons name="checkmark" size={20} color="#FFF" />
                 </Pressable>
@@ -919,6 +974,7 @@ export default function SubscriptionsScreen() {
   const [totalMonthly, setTotalMonthly] = useState(0);
   const [totalMonthlyIncome, setTotalMonthlyIncome] = useState(0);
   const [editTarget, setEditTarget] = useState<Subscription | null>(null);
+  const { showToast } = useToast();
 
   const load = async (orderBy = scheduledSortBy) => {
     setLoading(true);
@@ -953,7 +1009,7 @@ export default function SubscriptionsScreen() {
     if (!editTarget?.id) return;
     await SubscriptionRepository.update(editTarget.id, {
       name: form.name.trim(),
-      amount: parseFloat(form.amount.replace(',', '.')),
+      amount: parseFloat(form.amount.replace(/\./g, '').replace(',', '.')),
       direction: form.direction,
       category_key: form.category_key,
       frequency: form.frequency,
@@ -969,6 +1025,7 @@ export default function SubscriptionsScreen() {
     });
     setEditTarget(null);
     load(scheduledSortBy);
+    showToast({ message: 'Abbonamento salvato con successo', type: 'success' });
   };
 
   const handleToggle = async (sub: Subscription) => {
@@ -986,7 +1043,10 @@ export default function SubscriptionsScreen() {
         {
           text: 'Elimina', style: 'destructive',
           onPress: async () => {
-            if (sub.id) await SubscriptionRepository.delete(sub.id);
+            if (sub.id) {
+              await SubscriptionRepository.delete(sub.id);
+              showToast({ message: 'Abbonamento eliminato', type: 'success' });
+            }
             load(scheduledSortBy);
           }
         }
@@ -1408,12 +1468,33 @@ const modal = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  backIcon: { padding: 4 },
+  backIcon: { 
+    width: 32, 
+    height: 32, 
+    borderRadius: 16, 
+    backgroundColor: 'rgba(28, 28, 30, 0.25)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
-  headerSaveBtn: { paddingHorizontal: 12, paddingVertical: 6 },
-  headerSaveText: { fontSize: 16, fontWeight: '700', color: COLORS.accent },
-  headerActionBtn: { padding: 6, marginRight: 8 },
-  headerRightContainer: { flexDirection: 'row', alignItems: 'center' },
+  headerSaveBtn: { 
+    backgroundColor: 'rgba(28, 28, 30, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerSaveText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
+  headerActionBtn: { 
+    width: 32, 
+    height: 32, 
+    borderRadius: 16, 
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  headerRightContainer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   content: { padding: 20, paddingBottom: 40 },
   sectionTitle: {
     fontSize: 10,
@@ -1568,7 +1649,6 @@ const modal = StyleSheet.create({
     width: 24,
   },
   expandedSection: {
-    backgroundColor: '#F9FAFB',
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomLeftRadius: 16,
@@ -1672,5 +1752,12 @@ const modal = StyleSheet.create({
   },
   resetIcon: {
     fontWeight: 'bold',
+  },
+  noResultsText: {
+    fontSize: 13,
+    fontFamily: TYPOGRAPHY.fontFamily,
+    color: COLORS.secondary,
+    textAlign: 'center',
+    paddingVertical: 12,
   },
 });

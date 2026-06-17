@@ -173,6 +173,9 @@ export default function LoginScreen() {
             style={({ pressed }) => [styles.googleButton, pressed && styles.googleButtonPressed]}
             onPress={handleGoogleLogin}
             disabled={isLoading}
+            accessibilityLabel="Accedi con Google"
+            accessibilityRole="button"
+            accessibilityHint="Apre il browser per il login con il tuo account Google"
           >
             {isLoading ? (
               <ActivityIndicator size="small" color="#1C1C1E" />
@@ -299,7 +302,7 @@ const styles = StyleSheet.create({
   disclaimer: {
     fontSize: 11,
     fontFamily: TYPOGRAPHY.fontFamily,
-    color: '#94A3B8',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 17,
   },

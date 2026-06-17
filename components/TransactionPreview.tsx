@@ -182,14 +182,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 4,
-    backgroundColor: 'transparent', // Transparent background
-    marginBottom: 4,
+    paddingLeft: 20,
+    paddingRight: 24,
+    backgroundColor: '#F3F4F6', // Grey background matching transaction page
+    borderRadius: 100,
+    marginBottom: 8,
   },
   categoryIndicator: {
-    width: 3,
-    height: 18,
-    borderRadius: 1.5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     marginRight: SPACING.md,
   },
   infoContainer: {

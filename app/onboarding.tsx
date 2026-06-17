@@ -260,6 +260,10 @@ export default function OnboardingScreen() {
         <Pressable 
           style={styles.consentRow} 
           onPress={() => setPrivacyAccepted(!privacyAccepted)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: privacyAccepted }}
+          accessibilityLabel="Ho preso visione della Privacy Policy"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <View style={[styles.checkbox, privacyAccepted && styles.checkboxActive]}>
             {privacyAccepted && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
@@ -275,6 +279,10 @@ export default function OnboardingScreen() {
         <Pressable 
           style={styles.consentRow} 
           onPress={() => setTermsAccepted(!termsAccepted)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: termsAccepted }}
+          accessibilityLabel="Accetto i Termini di Utilizzo Beta"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <View style={[styles.checkbox, termsAccepted && styles.checkboxActive]}>
             {termsAccepted && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
@@ -310,6 +318,9 @@ export default function OnboardingScreen() {
             styles.signToggle,
             isNegative ? styles.signToggleNegative : styles.signTogglePositive
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={isNegative ? 'Importo negativo, tocca per rendere positivo' : 'Importo positivo, tocca per rendere negativo'}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={[
             styles.signToggleText,
@@ -324,9 +335,11 @@ export default function OnboardingScreen() {
           style={styles.balanceTextInput}
           value={balance}
           onChangeText={handleBalanceChange}
-          keyboardType="numeric"
-          placeholder="1.000"
+          keyboardType="decimal-pad"
+          placeholder="0"
           placeholderTextColor="#94A3B8"
+          accessibilityLabel="Patrimonio iniziale in euro"
+          accessibilityHint="Inserisci il tuo capitale di partenza usando la virgola come separatore decimale"
         />
         <Text style={styles.currencySuffix}>EUR</Text>
       </View>
@@ -399,14 +412,16 @@ export default function OnboardingScreen() {
         <View style={[styles.indicatorContainer, { paddingTop: step === 0 ? insets.top + 20 : insets.top + 10 }]}>
           <View style={styles.dotsRow}>
             {Array.from({ length: totalSteps }).map((_, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.dot,
-                  idx === step ? styles.dotActive : null
-                ]}
-              />
-            ))}
+            <View
+              key={idx}
+              style={[
+                styles.dot,
+                idx === step ? styles.dotActive : null
+              ]}
+              accessibilityLabel={`Step ${idx + 1} di ${totalSteps}${idx === step ? ', attivo' : ''}`}
+              accessible
+            />
+          ))}
           </View>
         </View>
 

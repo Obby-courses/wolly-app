@@ -45,7 +45,7 @@ export default function SettingsScreen() {
   const handleDeleteAll = () => {
     Alert.alert(
       "Elimina tutti i dati",
-      "Sei sicuro di voler eliminare DEFINITIVAMENTE tutti i dati (transazioni, periodiche, abbonamenti e spese programmate) dal database? Questa azione non è reversibile e resetterà anche il tuo patrimonio.",
+      "Sei sicuro? Verranno eliminate DEFINITIVAMENTE tutte le transazioni, abbonamenti e spese programmate. Il patrimonio verrà resettato e l'onboarding ripartirà da zero.",
       [
         { text: "Annulla", style: "cancel" },
         { 
@@ -54,7 +54,14 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               await TransactionRepository.deleteAll();
-              Alert.alert("Completato", "Tutti i dati (transazioni, periodiche e programmate) sono stati eliminati e il patrimonio è stato resettato.");
+              // Reset onboarding and all related app state
+              await AsyncStorage.multiRemove([
+                'wolly_onboarding_completed',
+                'wolly_last_nw_sync_date',
+                'wolly_nw_hidden',
+              ]);
+              // Redirect to onboarding immediately
+              router.replace('/onboarding');
             } catch (error) {
               console.error(error);
               Alert.alert("Errore", "Impossibile eliminare i dati.");
